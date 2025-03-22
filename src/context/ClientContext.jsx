@@ -245,9 +245,9 @@ export const ClientProvider = ({ children }) => {
     let timeoutId;
     
     const scheduleNextRefresh = () => {
-      // If we got data successfully, set a longer refresh interval
+      // If we got data successfully, set a refresh interval
       // If we're using sample data, try to reconnect more frequently
-      const refreshInterval = usingSampleData ? 45 * 1000 : 5 * 60 * 1000; // Increase to 5 minutes
+      const refreshInterval = usingSampleData ? 45 * 1000 : 10 * 1000; // Reduce to 10 seconds
       
       // Clear any existing timeout
       if (timeoutId) clearTimeout(timeoutId);
