@@ -12,7 +12,9 @@ export const ClientProvider = ({ children }) => {
   const fetchClients = async () => {
     try {
       setLoading(true);
+      console.log('Fetching clients from:', api.defaults.baseURL);
       const { data } = await api.get('/clients');
+      console.log('Received clients data:', data);
       setClients(data);
       setLoading(false);
     } catch (err) {

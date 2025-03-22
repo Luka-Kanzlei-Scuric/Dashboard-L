@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ClientCard from '../components/ClientCard';
 import { UserPlusIcon, ArrowsUpDownIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useClients } from '../context/ClientContext';
@@ -6,19 +6,38 @@ import { useClients } from '../context/ClientContext';
 const HomePage = () => {
   const [sortOption, setSortOption] = useState('name');
   const [viewMode, setViewMode] = useState('grid');
-  const { clients, loading, error } = useClients();
+  const { clients, loading, error, fetchClients } = useClients();
 
-  // Sort clients based on selected option
-  const sortedClients = [...(clients || [])].sort((a, b) => {
-    if (sortOption === 'name') {
-      return a.name.localeCompare(b.name);
-    } else if (sortOption === 'status') {
-      return a.status.localeCompare(b.status);
-    } else if (sortOption === 'recent') {
-      return new Date(b.lastUpdated) - new Date(a.lastUpdated);
+  // Debug output
+  useEffect(() => {
+    console.log('HomePage rendered with clients:', clients);
+    console.log('Loading state:', loading);
+    console.log('Error state:', error);
+  }, [clients, loading, error]);
+
+  // Force reload on mount
+  useEffect(() => {
+    fetchClients();
+  }, [fetchClients]);
+
+  // Safely sort clients
+  const sortedClients = Array.isArray(clients) ? [...clients].sort((a, b) => {
+    try {
+      if (sortOption === 'name') {
+        return (a.name || '').localeCompare(b.name || '');
+      } else if (sortOption === 'status') {
+        return (a.status || '').localeCompare(b.status || '');
+      } else if (sortOption === 'recent') {
+        const dateA = a.lastUpdated ? new Date(a.lastUpdated) : new Date(0);
+        const dateB = b.lastUpdated ? new Date(b.lastUpdated) : new Date(0);
+        return dateB - dateA;
+      }
+      return 0;
+    } catch (err) {
+      console.error('Error sorting clients:', err);
+      return 0;
     }
-    return 0;
-  });
+  }) : [];
 
   return (
     <div className="space-y-6">

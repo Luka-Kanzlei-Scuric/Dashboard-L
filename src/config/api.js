@@ -4,7 +4,7 @@ import axios from 'axios';
 const API_URL = 
   import.meta.env.VITE_API_URL || 
   (import.meta.env.PROD 
-    ? 'https://scuric-backend.vercel.app/api' // Ersetze dies mit deiner tatsächlichen Backend-URL
+    ? 'https://scuric-dashboard-backend.onrender.com/api' // Aktualisierte Render-Backend-URL
     : 'http://localhost:5000/api');
 
 // Create axios instance with base URL
