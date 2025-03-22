@@ -18,13 +18,16 @@ import {
 const ClientDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getClient } = useClients();
+  const { getClient, updateClient } = useClients();
   const [client, setClient] = useState(null);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [isUploading, setIsUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState(null);
+  const [isEditingCaseNumber, setIsEditingCaseNumber] = useState(false);
+  const [caseNumber, setCaseNumber] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Mock-Daten für die Dokumentenliste (da diese nicht über die API kommen)
   const mockDocuments = [
@@ -125,6 +128,36 @@ const ClientDetailPage = () => {
     }
   };
 
+  // Funktion zum Speichern der Aktenzeichennummer
+  const handleSaveCaseNumber = async () => {
+    try {
+      if (!client || !client._id) return;
+      
+      // Speichern der Änderungen in der Datenbank
+      const updatedClient = await updateClient(client._id, {
+        caseNumber: caseNumber
+      });
+      
+      // Aktualisiere den Client im lokalen Zustand
+      setClient(prevClient => ({
+        ...prevClient,
+        caseNumber: caseNumber
+      }));
+      
+      // Zeige Erfolgsmeldung
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+      
+      // Beende den Bearbeitungsmodus
+      setIsEditingCaseNumber(false);
+      
+      console.log('Aktenzeichennummer aktualisiert:', updatedClient);
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren der Aktenzeichennummer:', error);
+      alert('Fehler beim Speichern: ' + error.message);
+    }
+  };
+
   useEffect(() => {
     const loadClient = async () => {
       try {
@@ -132,6 +165,9 @@ const ClientDetailPage = () => {
         
         // Erst den Client aus dem Context laden
         const clientData = await getClient(id);
+        
+        // Aktenzeichennummer in den Zustand setzen
+        setCaseNumber(clientData?.caseNumber || '');
         
         // Dann die Formulardaten vom angegebenen API-Endpunkt abrufen
         try {
@@ -297,7 +333,7 @@ const ClientDetailPage = () => {
             >
               {tab === 'overview' && 'Übersicht'}
               {tab === 'documents' && 'Dokumente'}
-              {tab === 'formdata' && 'Formulardaten'}
+              {tab === 'formdata' && 'Angaben des Mandanten'}
             </button>
           ))}
         </nav>
@@ -514,11 +550,11 @@ const ClientDetailPage = () => {
         </div>
       )}
 
-      {/* Formulardaten-Tab */}
+      {/* Angaben des Mandanten Tab */}
       {activeTab === 'formdata' && (
         <div className="space-y-6 animate-fadeIn">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-medium text-gray-900">Formulardaten</h2>
+            <h2 className="text-xl font-medium text-gray-900">Angaben des Mandanten</h2>
             
             {/* Link zum Formular */}
             <a 
@@ -533,23 +569,171 @@ const ClientDetailPage = () => {
           </div>
           
           {formData ? (
-            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {Object.entries(client.formData || {}).map(([key, value]) => (
-                  <div key={key} className="space-y-1">
-                    <p className="text-sm text-gray-500 capitalize">
-                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                    </p>
+            <div className="space-y-8 animate-fadeIn">
+              {/* Persönliche Daten */}
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
+                  <UserIcon className="h-5 w-5 text-gray-500 mr-2" />
+                  Persönliche Daten
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-500">Name</p>
                     <p className="text-gray-900 font-medium">
-                      {typeof value === 'object' ? JSON.stringify(value) : String(value || '-')}
+                      {client.formData.name || client.name || '-'}
                     </p>
                   </div>
-                ))}
+                  {client.formData.geburtsdatum && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Geburtsdatum</p>
+                      <p className="text-gray-900 font-medium">{client.formData.geburtsdatum}</p>
+                    </div>
+                  )}
+                  {client.formData.beruf && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Beruf</p>
+                      <p className="text-gray-900 font-medium">{client.formData.beruf}</p>
+                    </div>
+                  )}
+                  {client.formData.familienstand && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Familienstand</p>
+                      <p className="text-gray-900 font-medium">{client.formData.familienstand}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Kontaktinformationen */}
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
+                  <EnvelopeIcon className="h-5 w-5 text-gray-500 mr-2" />
+                  Kontaktinformationen
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-500">Adresse</p>
+                    <p className="text-gray-900 font-medium">
+                      {client.formData.adresse || client.address || '-'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-500">E-Mail</p>
+                    <a href={`mailto:${client.formData.email || client.email}`} className="text-gray-900 hover:text-blue-600 transition-colors font-medium">
+                      {client.formData.email || client.email || '-'}
+                    </a>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-500">Telefon</p>
+                    <a href={`tel:${client.formData.telefon || client.phone}`} className="text-gray-900 hover:text-blue-600 transition-colors font-medium">
+                      {client.formData.telefon || client.phone || '-'}
+                    </a>
+                  </div>
+
+                  {/* Bearbeitbare Aktenzeichennummer */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-gray-500">Aktenzeichen</p>
+                      <button 
+                        onClick={() => setIsEditingCaseNumber(true)} 
+                        className="text-blue-600 hover:text-blue-800 text-xs flex items-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
+                        bearbeiten
+                      </button>
+                    </div>
+                    {isEditingCaseNumber ? (
+                      <div className="flex mt-1">
+                        <input
+                          type="text"
+                          value={caseNumber}
+                          onChange={(e) => setCaseNumber(e.target.value)}
+                          className="flex-grow rounded-l-md border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-3 py-2 text-sm text-gray-900"
+                          placeholder="AZ-XXXX"
+                        />
+                        <button
+                          onClick={handleSaveCaseNumber}
+                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-r-md text-sm"
+                        >
+                          Speichern
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-gray-900 font-medium">{client.caseNumber || '-'}</p>
+                    )}
+                    {saveSuccess && (
+                      <p className="text-green-600 text-xs mt-1">Aktenzeichennummer erfolgreich aktualisiert</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Honorarinformationen */}
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
+                  <CurrencyEuroIcon className="h-5 w-5 text-gray-500 mr-2" />
+                  Honorarinformationen
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-500">Honorarpreis</p>
+                    <p className="text-gray-900 font-medium flex items-center">
+                      <CurrencyEuroIcon className="h-4 w-4 text-gray-400 mr-1" />
+                      {client.formData.honorar || client.honorar || 5000} €
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-500">Anzahl Raten</p>
+                    <p className="text-gray-900 font-medium">
+                      {client.formData.raten || client.raten || 5}x
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-500">Erste Rate</p>
+                    <p className="text-gray-900 font-medium flex items-center">
+                      <CalendarIcon className="h-4 w-4 text-gray-400 mr-1" />
+                      {client.formData.ratenStart || client.ratenStart || '01.01.2025'}
+                    </p>
+                  </div>
+                  {client.formData.nettoeinkommen && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Nettoeinkommen</p>
+                      <p className="text-gray-900 font-medium">
+                        {client.formData.nettoeinkommen}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Weitere Angaben */}
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
+                  <DocumentTextIcon className="h-5 w-5 text-gray-500 mr-2" />
+                  Weitere Angaben
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {Object.entries(client.formData || {}).filter(([key, _]) => ![
+                    'name', 'email', 'telefon', 'adresse', 'geburtsdatum', 'beruf', 'familienstand',
+                    'honorar', 'raten', 'ratenStart', 'nettoeinkommen'
+                  ].includes(key)).map(([key, value]) => (
+                    <div key={key} className="space-y-1">
+                      <p className="text-sm text-gray-500 capitalize">
+                        {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                      </p>
+                      <p className="text-gray-900 font-medium">
+                        {typeof value === 'object' ? JSON.stringify(value) : String(value || '-')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 text-blue-700">
-              <p className="font-medium text-lg mb-2">Formulardaten konnten nicht geladen werden</p>
+              <p className="font-medium text-lg mb-2">Angaben des Mandanten konnten nicht geladen werden</p>
               <p className="mb-4">Die Daten für diesen Mandanten konnten nicht vom Server abgerufen werden. Bitte versuchen Sie es später erneut.</p>
               <button 
                 className="mt-2 px-5 py-2.5 bg-white border border-blue-200 rounded-md text-blue-700 shadow-sm hover:bg-blue-50 transition-colors flex items-center"
