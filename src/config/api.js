@@ -22,7 +22,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'Cache-Control': 'no-cache',
+    // Temporarily remove Cache-Control to avoid CORS issues
+    // 'Cache-Control': 'no-cache',
     // Add timestamp to prevent caching issues with CORS preflight responses
     'X-Requested-With': 'XMLHttpRequest'
   },
@@ -230,8 +231,9 @@ api.interceptors.response.use(
         ...originalRequest.headers,
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
+        // Temporarily remove problematic headers
+        // 'Cache-Control': 'no-cache',
+        // 'Pragma': 'no-cache',
         'X-Requested-With': 'XMLHttpRequest',
         // Add a random parameter to avoid caching issues
         'X-Random': Math.random().toString(36).substring(7)
