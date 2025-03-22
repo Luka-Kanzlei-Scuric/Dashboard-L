@@ -106,45 +106,8 @@ const ClientCard = ({ client }) => {
           <span className="text-neutral-medium">Aktualisiert: {formattedDate}</span>
         </div>
         
-        <div className="flex items-center space-x-3">
-          {/* Löschen-Button */}
-          {showDeleteConfirm ? (
-            <div 
-              className="flex items-center space-x-1"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                className="text-xs py-1 px-2 bg-white border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors"
-                onClick={handleDeleteClient}
-                disabled={isDeleting}
-              >
-                {isDeleting ? "Löschen..." : "Bestätigen"}
-              </button>
-              <button
-                className="text-xs py-1 px-2 bg-white border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50 transition-colors"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShowDeleteConfirm(false);
-                }}
-                disabled={isDeleting}
-              >
-                Abbrechen
-              </button>
-            </div>
-          ) : (
-            <button
-              className="text-xs text-gray-400 hover:text-red-500 transition-colors flex items-center"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowDeleteConfirm(true);
-              }}
-            >
-              <TrashIcon className="h-3 w-3 mr-1" />
-              Löschen
-            </button>
-          )}
+        <div className="flex items-center">
+          {/* Löschen-Button entfernt */}
           
           {/* ClickUp-Link */}
           {client.clickupId ? (

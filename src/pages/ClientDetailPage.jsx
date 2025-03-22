@@ -12,7 +12,8 @@ import {
   CurrencyEuroIcon,
   CalendarIcon,
   ArrowPathIcon,
-  DocumentIcon
+  DocumentIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 
 const ClientDetailPage = () => {
@@ -498,6 +499,41 @@ const ClientDetailPage = () => {
                 </a>
               </div>
             </div>
+            
+            {/* Löschen-Button unter ClickUp Referenz */}
+            <div className="mt-4 pt-3 border-t border-gray-100">
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="text-sm text-gray-500 hover:text-red-500 transition-colors flex items-center"
+              >
+                <TrashIcon className="h-4 w-4 mr-2" />
+                Mandant löschen
+              </button>
+            </div>
+            
+            {/* Löschen-Bestätigungsdialog */}
+            {showDeleteConfirm && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-lg">
+                <p className="text-sm text-red-600 mb-3">
+                  Möchten Sie diesen Mandanten wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleDeleteClient}
+                    disabled={isDeleting}
+                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    {isDeleting ? "Wird gelöscht..." : "Ja, löschen"}
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
