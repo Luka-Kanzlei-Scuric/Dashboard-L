@@ -49,7 +49,28 @@ export const ClientProvider = ({ children }) => {
       
       console.log(`Fetching clients from: ${api.defaults.baseURL} (Attempt ${retryCount + 1})`);
       
-      const { data } = await api.get('/clients');
+      // Set a timeout to detect stuck requests
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout - took too long')), 15000);
+      });
+      
+      // First try the test endpoint to ensure backend is responsive
+      try {
+        console.log('Testing backend with /api/test-data endpoint');
+        await api.get('/test-data', { timeout: 5000 });
+        console.log('Test endpoint successful, proceeding with main request');
+      } catch (testError) {
+        console.error('Test endpoint failed:', testError);
+        // Continue with the main request anyway
+      }
+      
+      // Race between the actual request and the timeout
+      const response = await Promise.race([
+        api.get('/clients'),
+        timeoutPromise
+      ]);
+      
+      const { data } = response;
       
       console.log('Received clients data:', data);
       
@@ -63,6 +84,14 @@ export const ClientProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Error fetching clients:', err);
+      console.error('Request details:', {
+        baseURL: api.defaults.baseURL,
+        timeout: err.message.includes('timeout') ? true : false,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        responseData: err.response?.data,
+        isAxiosError: err.isAxiosError
+      });
       
       // Set error message
       setError(err.response?.data?.message || err.message || 'Failed to fetch clients');
@@ -70,8 +99,8 @@ export const ClientProvider = ({ children }) => {
       // Increment retry counter
       setRetryCount(prev => prev + 1);
       
-      // After 3 failed attempts, use sample data
-      if (retryCount >= 2 && clients.length === 0) {
+      // After 2 failed attempts, use sample data
+      if (retryCount >= 1 && clients.length === 0) {
         console.log('Using sample data after multiple failed attempts');
         setClients(SAMPLE_DATA);
         setUsingSampleData(true);

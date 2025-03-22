@@ -11,8 +11,19 @@ dotenv.config();
 // Init express
 const app = express();
 
-// Connect to database
-connectDB();
+// Connect to database with retry mechanism
+(async function connectWithRetry() {
+  console.log('Attempting to connect to MongoDB...');
+  
+  try {
+    await connectDB();
+    console.log('MongoDB connected successfully');
+  } catch (err) {
+    console.error('MongoDB connection error:', err);
+    console.log('Retrying in 5 seconds...');
+    setTimeout(connectWithRetry, 5000);
+  }
+})();
 
 // CORS configuration - Always allow dashboard domain in any environment
 const allowedOrigins = [
@@ -205,9 +216,20 @@ const queueClientChange = (clientData, changeType) => {
 // Get all clients
 app.get('/api/clients', async (req, res) => {
   try {
+    console.log('GET /api/clients request received from:', req.headers.origin);
+    
+    // Add delay for debugging, can be removed later
+    // This is just to see if the request is getting stuck or timing out
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     const clients = await Client.find({}).sort({ createdAt: -1 });
-    res.json(clients);
+    
+    console.log(`Returning ${clients.length} clients`);
+    
+    // If no clients found, return empty array instead of null
+    res.json(clients || []);
   } catch (error) {
+    console.error('Error fetching clients:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -349,6 +371,33 @@ app.get('/test-cors', cors(corsOptions), (req, res) => {
     origin: req.headers.origin || 'No origin header',
     timestamp: new Date().toISOString()
   });
+});
+
+// Test data endpoint for debugging
+app.get('/api/test-data', cors(corsOptions), (req, res) => {
+  console.log('GET /api/test-data request received from:', req.headers.origin);
+  
+  // Return sample data that can be used for testing
+  res.status(200).json([
+    {
+      _id: 'test1',
+      name: 'Test Client 1',
+      email: 'test1@example.com',
+      phone: '+49 123 456789',
+      clickupId: 'test123456',
+      status: 'Onboarding',
+      lastUpdated: new Date().toISOString()
+    },
+    {
+      _id: 'test2',
+      name: 'Test Client 2',
+      email: 'test2@example.com',
+      phone: '+49 123 987654',
+      clickupId: 'test654321',
+      status: 'Aktiv',
+      lastUpdated: new Date().toISOString()
+    }
+  ]);
 });
 
 // CORS proxy endpoint - helps with older browsers or edge cases
