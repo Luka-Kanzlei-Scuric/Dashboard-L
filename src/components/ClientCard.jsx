@@ -1,8 +1,14 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { EnvelopeIcon, PhoneIcon, ClockIcon } from '@heroicons/react/24/outline';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { EnvelopeIcon, PhoneIcon, ClockIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { useClients } from '../context/ClientContext';
 
 const ClientCard = ({ client }) => {
+  const { deleteClient } = useClients();
+  const navigate = useNavigate();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   if (!client) {
     console.error('ClientCard received undefined client');
     return null;
@@ -31,6 +37,25 @@ const ClientCard = ({ client }) => {
   
   // Client ID für die Detailansicht
   const clientId = client._id || 'unknown';
+  
+  // Handle delete client
+  const handleDeleteClient = async (e) => {
+    e.preventDefault(); // Verhindert die Navigation zur Detailseite
+    e.stopPropagation();
+    
+    if (!client || !client._id) return;
+    
+    try {
+      setIsDeleting(true);
+      await deleteClient(client._id);
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error('Fehler beim Löschen des Mandanten:', error);
+      setIsDeleting(false);
+      alert('Fehler beim Löschen: ' + error.message);
+    }
+  };
 
   return (
     <Link 
@@ -81,7 +106,47 @@ const ClientCard = ({ client }) => {
           <span className="text-neutral-medium">Aktualisiert: {formattedDate}</span>
         </div>
         
-        <div className="flex items-center">
+        <div className="flex items-center space-x-3">
+          {/* Löschen-Button */}
+          {showDeleteConfirm ? (
+            <div 
+              className="flex items-center space-x-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="text-xs py-1 px-2 bg-white border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors"
+                onClick={handleDeleteClient}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Löschen..." : "Bestätigen"}
+              </button>
+              <button
+                className="text-xs py-1 px-2 bg-white border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50 transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowDeleteConfirm(false);
+                }}
+                disabled={isDeleting}
+              >
+                Abbrechen
+              </button>
+            </div>
+          ) : (
+            <button
+              className="text-xs text-gray-400 hover:text-red-500 transition-colors flex items-center"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowDeleteConfirm(true);
+              }}
+            >
+              <TrashIcon className="h-3 w-3 mr-1" />
+              Löschen
+            </button>
+          )}
+          
+          {/* ClickUp-Link */}
           {client.clickupId ? (
             <a 
               href={`https://app.clickup.com/t/${client.clickupId}`} 
@@ -97,6 +162,18 @@ const ClientCard = ({ client }) => {
           )}
         </div>
       </div>
+      
+      {/* Modal-Overlay */}
+      {showDeleteConfirm && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setShowDeleteConfirm(false);
+          }}
+        ></div>
+      )}
     </Link>
   );
 };
