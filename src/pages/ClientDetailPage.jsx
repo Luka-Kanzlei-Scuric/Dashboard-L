@@ -18,7 +18,7 @@ import {
 const ClientDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getClient, updateClient } = useClients();
+  const { getClient, updateClient, deleteClient } = useClients();
   const [client, setClient] = useState(null);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
@@ -28,6 +28,8 @@ const ClientDetailPage = () => {
   const [isEditingCaseNumber, setIsEditingCaseNumber] = useState(false);
   const [caseNumber, setCaseNumber] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Mock-Daten für die Dokumentenliste (da diese nicht über die API kommen)
   const mockDocuments = [
@@ -158,6 +160,33 @@ const ClientDetailPage = () => {
     }
   };
 
+  // Funktion zum Löschen eines Mandanten
+  const handleDeleteClient = async () => {
+    if (!client || !client._id) return;
+
+    try {
+      setIsDeleting(true);
+
+      // Bestätigungsdialog wurde schon angezeigt, 
+      // jetzt den Mandanten wirklich löschen
+      await deleteClient(client._id);
+      
+      // Zur Übersicht zurückkehren
+      navigate('/', { 
+        state: { 
+          notification: {
+            type: 'success',
+            message: `Mandant ${client.name} wurde erfolgreich gelöscht.`
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Fehler beim Löschen des Mandanten:', error);
+      setIsDeleting(false);
+      alert('Fehler beim Löschen: ' + error.message);
+    }
+  };
+
   useEffect(() => {
     const loadClient = async () => {
       try {
@@ -277,24 +306,38 @@ const ClientDetailPage = () => {
     <div className="max-w-screen-lg mx-auto pb-20 px-4 animate-fadeIn">
       {/* Header mit Zurück-Button und Mandanten-Name */}
       <div className="flex flex-col mb-8 pt-6">
-        <div className="flex items-center mb-2">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center">
+            <button 
+              onClick={() => navigate('/')}
+              className="mr-6 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-300"
+              aria-label="Zurück zur Übersicht"
+            >
+              <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
+            </button>
+            <h1 className="text-2xl font-medium text-gray-900">{client.name}</h1>
+            <span className={`ml-4 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+              client.status === 'Aktiv' 
+                ? 'bg-green-100 text-green-800' 
+                : client.status === 'Wartend' 
+                ? 'bg-amber-100 text-amber-800' 
+                : 'bg-blue-100 text-blue-800'
+            }`}>
+              {client.status}
+            </span>
+          </div>
+          
+          {/* Löschen-Button */}
           <button 
-            onClick={() => navigate('/')}
-            className="mr-6 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-300"
-            aria-label="Zurück zur Übersicht"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-5 py-2 rounded-md bg-red-50 text-red-600 hover:bg-red-100 transition-colors border border-red-200 flex items-center"
+            disabled={isDeleting}
           >
-            <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            {isDeleting ? 'Wird gelöscht...' : 'Mandant löschen'}
           </button>
-          <h1 className="text-2xl font-medium text-gray-900">{client.name}</h1>
-          <span className={`ml-4 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-            client.status === 'Aktiv' 
-              ? 'bg-green-100 text-green-800' 
-              : client.status === 'Wartend' 
-              ? 'bg-amber-100 text-amber-800' 
-              : 'bg-blue-100 text-blue-800'
-          }`}>
-            {client.status}
-          </span>
         </div>
         
         {/* Mandanten-ID hervorgehoben anzeigen */}
@@ -317,6 +360,46 @@ const ClientDetailPage = () => {
           </button>
         </div>
       </div>
+      
+      {/* Bestätigungsdialog für das Löschen */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-xl font-medium text-gray-900 mb-4">Mandant löschen</h3>
+            <p className="text-gray-600 mb-6">
+              Sind Sie sicher, dass Sie den Mandanten <span className="font-semibold">{client.name}</span> löschen möchten? 
+              Diese Aktion kann nicht rückgängig gemacht werden.
+            </p>
+            
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md transition-colors"
+                disabled={isDeleting}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleDeleteClient}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors flex items-center"
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Wird gelöscht...
+                  </>
+                ) : (
+                  'Löschen bestätigen'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs Navigation */}
       <div className="border-b border-gray-200 mb-8">
