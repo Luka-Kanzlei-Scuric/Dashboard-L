@@ -39,7 +39,8 @@ const HomePage = () => {
     // Check if we need to fetch data (no clients or error)
     if (clients.length === 0 || error) {
       console.log('Triggering immediate data fetch on page load');
-      fetchClients(true);
+      // Make sure to show loading state on initial fetch
+      fetchClients(true, false);
     }
   }, []);
 
@@ -191,7 +192,8 @@ const HomePage = () => {
         </div>
       </div>
 
-      {loading && !usingSampleData ? (
+      {/* Only show loading indicator if we have no data yet */}
+      {loading && !usingSampleData && sortedClients.length === 0 ? (
         <div className="flex justify-center py-10">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-secondary"></div>
         </div>

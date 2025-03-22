@@ -39,12 +39,18 @@ export const ClientProvider = ({ children }) => {
   };
 
   // Fetch all clients with retry logic
-  const fetchClients = useCallback(async (forceRefresh = false) => {
+  const fetchClients = useCallback(async (forceRefresh = false, backgroundRefresh = false) => {
     // Don't fetch if we're already loading, unless forced
     if (loading && !forceRefresh) return;
     
+    // Track if this is a background refresh (don't show loading if we have data)
+    const isBackgroundRefresh = backgroundRefresh || clients.length > 0;
+    
     try {
-      setLoading(true);
+      // Only set loading state if we don't have data yet or it's forced
+      if (!isBackgroundRefresh) {
+        setLoading(true);
+      }
       resetError();
       
       console.log(`Fetching clients from: ${api.defaults.baseURL} (Attempt ${retryCount + 1})`);
@@ -127,10 +133,12 @@ export const ClientProvider = ({ children }) => {
         setUsingSampleData(true);
       }
     } finally {
-      // Ensure we don't turn off loading state too quickly
-      setTimeout(() => {
-        setLoading(false);
-      }, 200);
+      // Ensure we don't turn off loading state too quickly, but only if we're not doing background refresh
+      if (!isBackgroundRefresh) {
+        setTimeout(() => {
+          setLoading(false);
+        }, 200);
+      }
     }
   }, [loading, retryCount, clients.length]);
 
@@ -228,7 +236,8 @@ export const ClientProvider = ({ children }) => {
     // Also fetch when the backend connection is established
     const handleBackendConnected = () => {
       console.log('Backend connection established, fetching data immediately');
-      fetchClients(true);
+      // First load should not be a background refresh
+      fetchClients(true, false);
     };
     
     // Listen for the custom event
@@ -258,8 +267,9 @@ export const ClientProvider = ({ children }) => {
       timeoutId = setTimeout(() => {
         // Only refresh if we're not currently loading
         if (!loading) {
-          console.log('Executing scheduled data refresh');
-          fetchClients(true).catch(err => {
+          console.log('Executing scheduled data refresh in background');
+          // Use backgroundRefresh=true to avoid showing loading state when we already have data
+          fetchClients(true, true).catch(err => {
             console.error('Scheduled refresh failed:', err);
           });
         } else {
