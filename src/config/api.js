@@ -1,12 +1,15 @@
 import axios from 'axios';
 
 // Available backend URLs to try if the primary one fails
-const BACKEND_URLS = [
+let BACKEND_URLS = [
   import.meta.env.VITE_API_URL,
-  'https://scuric-dashboard-backend.onrender.com/api',
   'https://dashboard-l-backend.onrender.com/api',
+  'https://scuric-dashboard-backend.onrender.com/api',
   'http://localhost:5000/api'
 ].filter(Boolean); // Remove null/undefined entries
+
+// Remove duplicates
+BACKEND_URLS = [...new Set(BACKEND_URLS)];
 
 console.log('Available backend URLs:', BACKEND_URLS);
 
@@ -115,35 +118,75 @@ const testBackendConnection = async () => {
   }
 };
 
+// Track what backends we've already tried in this session
+const triedBackends = new Map(); // URL -> retry count
+let isConnecting = false;
+let connectionAttempts = 0;
+
 // Attempt to find a working backend on startup
 // This runs once when the module is imported
-(async () => {
-  let foundWorking = false;
+const findWorkingBackend = async () => {
+  // Prevent multiple concurrent connection attempts
+  if (isConnecting) {
+    console.log('Connection attempt already in progress, skipping');
+    return;
+  }
   
-  for (let i = 0; i < BACKEND_URLS.length; i++) {
-    api.defaults.baseURL = BACKEND_URLS[i];
-    console.log(`Testing backend connection to ${api.defaults.baseURL}...`);
-    
-    if (await testBackendConnection()) {
-      currentUrlIndex = i;
-      foundWorking = true;
-      console.log(`Found working backend at ${api.defaults.baseURL}`);
-      break;
+  isConnecting = true;
+  let foundWorking = false;
+  connectionAttempts++;
+  
+  try {
+    // Only try each backend URL once per session to avoid loops
+    for (let i = 0; i < BACKEND_URLS.length; i++) {
+      // Get current retry count for this URL
+      const retryCount = triedBackends.get(BACKEND_URLS[i]) || 0;
+      
+      if (connectionAttempts > 3 && retryCount > 2) {
+        console.log(`Already tried ${BACKEND_URLS[i]} ${retryCount} times, skipping`);
+        continue;
+      }
+      
+      api.defaults.baseURL = BACKEND_URLS[i];
+      console.log(`Testing backend connection to ${api.defaults.baseURL}...`);
+      triedBackends.set(BACKEND_URLS[i], retryCount + 1);
+      
+      if (await testBackendConnection()) {
+        currentUrlIndex = i;
+        foundWorking = true;
+        console.log(`Found working backend at ${api.defaults.baseURL}`);
+        break;
+      }
+      
+      console.log(`Backend at ${api.defaults.baseURL} not responding, trying next...`);
+    }
+  } catch (error) {
+    console.error('Error during backend connection tests:', error);
+  } finally {
+    if (!foundWorking) {
+      console.error('Could not connect to any backend servers. Using first URL as fallback.');
+      currentUrlIndex = 0;
+      api.defaults.baseURL = BACKEND_URLS[0];
     }
     
-    console.log(`Backend at ${api.defaults.baseURL} not responding, trying next...`);
+    isConnecting = false;
   }
-  
-  if (!foundWorking) {
-    console.error('Could not connect to any backend servers. Using first URL as fallback.');
-    currentUrlIndex = 0;
-    api.defaults.baseURL = BACKEND_URLS[0];
-  }
-})();
+};
+
+// Run the initial connection check
+findWorkingBackend();
+
+// Global request counter to avoid infinite loops
+let globalRetryCount = 0;
+const MAX_GLOBAL_RETRIES = 8;
 
 // Response interceptor for error handling
 api.interceptors.response.use(
-  response => response,
+  response => {
+    // Reset global retry counter on successful requests
+    globalRetryCount = 0;
+    return response;
+  },
   async error => {
     // Get the failed request
     const originalRequest = error.config;
@@ -151,6 +194,12 @@ api.interceptors.response.use(
     const isCorsError = error.message?.includes('Origin') || 
                          error.message?.includes('access control checks') ||
                          error.message?.includes('CORS');
+    
+    // Global retry limit to prevent infinite retry loops
+    if (globalRetryCount >= MAX_GLOBAL_RETRIES) {
+      console.warn(`Global retry limit (${MAX_GLOBAL_RETRIES}) reached. Stopping retry attempts.`);
+      return Promise.reject(error);
+    }
     
     // Retry if it's a network/CORS error or 5xx error and we haven't retried this request before
     if ((!originalRequest._retry) && 
@@ -167,23 +216,32 @@ api.interceptors.response.use(
       
       originalRequest._retry = true;
       originalRequest._retryCount++;
+      globalRetryCount++;
       
-      // Try a different API URL
-      const newUrl = tryNextApiUrl();
-      console.log(`Retrying request with new API URL: ${newUrl} (Attempt ${originalRequest._retryCount})`);
-      
-      // Update the baseURL for this request
-      originalRequest.baseURL = newUrl;
+      // Try a different API URL, but only if the URL hasn't been tried more than twice in this session
+      if (triedBackends.has(BACKEND_URLS[currentUrlIndex]) && triedBackends.get(BACKEND_URLS[currentUrlIndex]) > 2) {
+        const newUrl = tryNextApiUrl();
+        console.log(`Retrying request with new API URL: ${newUrl} (Attempt ${originalRequest._retryCount})`);
+        originalRequest.baseURL = newUrl;
+      }
       
       // Add headers that might help with CORS
       originalRequest.headers = {
         ...originalRequest.headers,
         'Accept': 'application/json',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'X-Requested-With': 'XMLHttpRequest',
+        // Add a random parameter to avoid caching issues
+        'X-Random': Math.random().toString(36).substring(7)
       };
       
       // Disable credentials to avoid CORS preflight
       originalRequest.withCredentials = false;
+      
+      // Add a small delay before retrying to avoid hammering the server
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Retry the request with the new URL
       return api(originalRequest);

@@ -174,12 +174,35 @@ export const ClientProvider = ({ children }) => {
 
   // Refresh data periodically
   useEffect(() => {
-    // If using sample data, try to reconnect more frequently
-    const interval = setInterval(() => {
-      fetchClients(true);
-    }, usingSampleData ? 30 * 1000 : 2 * 60 * 1000);
-
-    return () => clearInterval(interval);
+    let timeoutId;
+    
+    const scheduleNextRefresh = () => {
+      // If we got data successfully, set a longer refresh interval
+      // If we're using sample data, try to reconnect more frequently
+      const refreshInterval = usingSampleData ? 45 * 1000 : 3 * 60 * 1000;
+      
+      // Clear any existing timeout
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      console.log(`Scheduling next data refresh in ${refreshInterval/1000} seconds`);
+      
+      // Schedule next refresh
+      timeoutId = setTimeout(() => {
+        console.log('Executing scheduled data refresh');
+        fetchClients(true).then(() => {
+          // Schedule next refresh after this one completes
+          scheduleNextRefresh();
+        });
+      }, refreshInterval);
+    };
+    
+    // Start the refresh cycle
+    scheduleNextRefresh();
+    
+    // Cleanup
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [fetchClients, usingSampleData]);
 
   return (
