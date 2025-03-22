@@ -33,6 +33,15 @@ const HomePage = () => {
     await fetchClients(true);
     setTimeout(() => setRetryInProgress(false), 1000);
   };
+  
+  // Immediate data fetch on first mount to reduce initial wait time
+  useEffect(() => {
+    // Check if we need to fetch data (no clients or error)
+    if (clients.length === 0 || error) {
+      console.log('Triggering immediate data fetch on page load');
+      fetchClients(true);
+    }
+  }, []);
 
   // Safely sort clients
   const sortedClients = Array.isArray(clients) ? [...clients].sort((a, b) => {

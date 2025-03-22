@@ -130,7 +130,7 @@ const findWorkingBackend = async () => {
   // Prevent multiple concurrent connection attempts
   if (isConnecting) {
     console.log('Connection attempt already in progress, skipping');
-    return;
+    return false;
   }
   
   isConnecting = true;
@@ -172,10 +172,15 @@ const findWorkingBackend = async () => {
     
     isConnecting = false;
   }
+  
+  return foundWorking;
 };
 
-// Run the initial connection check
-findWorkingBackend();
+// Run the initial connection check and trigger an event when done
+findWorkingBackend().then(() => {
+  // Dispatch a custom event to notify the app that we found a working backend
+  window.dispatchEvent(new CustomEvent('backendConnected'));
+});
 
 // Global request counter to avoid infinite loops
 let globalRetryCount = 0;

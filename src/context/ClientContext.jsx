@@ -108,6 +108,18 @@ export const ClientProvider = ({ children }) => {
       // Increment retry counter
       setRetryCount(prev => prev + 1);
       
+      // Check if this is a CORS error
+      const isCorsError = err.message?.includes('CORS') || 
+                          err.message?.includes('Access-Control');
+      
+      // For CORS errors, try one more time after a short delay
+      if (isCorsError && retryCount === 0) {
+        console.log('CORS error detected, retrying after delay...');
+        setTimeout(() => {
+          fetchClients(true);
+        }, 2000);
+      }
+                          
       // After 2 failed attempts, use sample data
       if (retryCount >= 1 && clients.length === 0) {
         console.log('Using sample data after multiple failed attempts');
@@ -208,9 +220,24 @@ export const ClientProvider = ({ children }) => {
     }
   };
 
-  // Initial data fetch
+  // Initial data fetch when component mounts
   useEffect(() => {
+    // Immediately try to fetch data
     fetchClients();
+    
+    // Also fetch when the backend connection is established
+    const handleBackendConnected = () => {
+      console.log('Backend connection established, fetching data immediately');
+      fetchClients(true);
+    };
+    
+    // Listen for the custom event
+    window.addEventListener('backendConnected', handleBackendConnected);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('backendConnected', handleBackendConnected);
+    };
   }, [fetchClients]);
 
   // Refresh data periodically
