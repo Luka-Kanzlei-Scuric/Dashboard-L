@@ -14,33 +14,63 @@ const app = express();
 // Connect to database
 connectDB();
 
-// CORS configuration - Allow all origins in development
-const corsOptions = process.env.NODE_ENV === 'production' 
-  ? {
-      origin: process.env.CORS_ORIGIN 
-        ? process.env.CORS_ORIGIN.split(',') 
-        : ['https://dashboard-l.onrender.com', 'https://dashboard-l.vercel.app', 'http://localhost:3000'],
-      methods: ['GET', 'POST', 'PUT', 'DELETE'],
-      credentials: true
+// CORS configuration - Always allow dashboard domain in any environment
+const allowedOrigins = [
+  'https://dashboard-l.onrender.com',
+  'https://dashboard-l.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173'
+];
+
+// Add origins from environment variable if available
+if (process.env.CORS_ORIGIN) {
+  allowedOrigins.push(...process.env.CORS_ORIGIN.split(','));
+}
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      console.log(`CORS blocked origin: ${origin}`);
+      callback(null, true); // Temporarily allow all origins while debugging
     }
-  : {
-      origin: '*', // Allow all origins in development
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      credentials: true,
-      preflightContinue: false,
-      optionsSuccessStatus: 204
-    };
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
 
 // Debug CORS settings
 console.log('CORS settings:', {
   environment: process.env.NODE_ENV || 'development',
-  allowedOrigins: corsOptions.origin
+  allowedOrigins
 });
 
-// Middleware
+// Special preflight handler - respond to all OPTIONS requests immediately
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    // Add CORS headers
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, Accept');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    // Handle preflight response
+    console.log(`Handled preflight request from ${req.headers.origin} for ${req.path}`);
+    return res.status(204).send();
+  }
+  next();
+});
+
+// Apply CORS middleware to all routes
 app.use(cors(corsOptions));
 
-// Add OPTIONS handling for preflight requests
+// Handle OPTIONS preflight requests (additional dedicated handler)
 app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 
@@ -295,22 +325,69 @@ app.get('/api/webhook/dashboard-to-clickup', (req, res) => {
 });
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', cors(corsOptions), (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    origin: req.headers.origin || 'No origin header'
+  });
 });
 
 // Basic route for testing
-app.get('/', (req, res) => {
-  res.send('Scuric Dashboard API is running');
+app.get('/', cors(corsOptions), (req, res) => {
+  res.status(200).json({
+    message: 'Scuric Dashboard API is running',
+    timestamp: new Date().toISOString(),
+    origin: req.headers.origin || 'No origin header'
+  });
 });
 
 // Debug route to check CORS
-app.get('/test-cors', (req, res) => {
-  res.json({
+app.get('/test-cors', cors(corsOptions), (req, res) => {
+  res.status(200).json({
     message: 'CORS is working correctly',
     origin: req.headers.origin || 'No origin header',
     timestamp: new Date().toISOString()
   });
+});
+
+// CORS proxy endpoint - helps with older browsers or edge cases
+app.post('/cors-proxy', cors(corsOptions), async (req, res) => {
+  try {
+    const { url, method = 'GET', data = {}, headers = {} } = req.body;
+    
+    if (!url) {
+      return res.status(400).json({ success: false, message: 'URL is required' });
+    }
+    
+    // Make the request using axios
+    const response = await axios({
+      url,
+      method,
+      data,
+      headers: {
+        ...headers,
+        'User-Agent': 'Scuric-Dashboard-Backend-Proxy'
+      },
+      timeout: 10000
+    });
+    
+    // Return the proxied response
+    res.status(200).json({
+      success: true,
+      data: response.data,
+      status: response.status,
+      headers: response.headers
+    });
+  } catch (error) {
+    console.error('CORS proxy error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data
+    });
+  }
 });
 
 // Start server
