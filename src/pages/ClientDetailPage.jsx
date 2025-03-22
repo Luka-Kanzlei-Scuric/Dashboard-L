@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useClients } from '../context/ClientContext';
+import axios from 'axios';
 import { 
   ArrowLeftIcon, 
   DocumentTextIcon, 
@@ -17,56 +18,91 @@ import {
 const ClientDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getClient, loading } = useClients();
+  const { getClient } = useClients();
   const [client, setClient] = useState(null);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [isUploading, setIsUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState(null);
 
-  // Mock-Daten für die Detailansicht
-  const mockClientDetails = {
-    id: id,
-    name: "Max Mustermann",
-    address: "Musterstraße 123, 10115 Berlin",
-    email: "max.mustermann@example.com",
-    phone: "+49 123 4567890",
-    status: "Aktiv",
-    clickupId: "123456",
-    caseNumber: "AZ-2023-0042",
-    honorar: 5000,
-    raten: 5,
-    ratenStart: "01.01.2025",
-    documents: [
-      { id: 1, name: "Gläubigerschreiben.pdf", type: "pdf", date: "15.03.2025" },
-      { id: 2, name: "Vertrag.docx", type: "docx", date: "10.03.2025" },
-      { id: 3, name: "Vollmacht.pdf", type: "pdf", date: "05.03.2025" }
-    ],
-    formData: {
-      einwilligung: "Ja",
-      vorfall: "Verkehrsunfall am 01.02.2025",
-      schadensumme: "8.500 €",
-      versicherung: "AllSecure AG",
-      policeNummer: "VS-123456789"
+  // Mock-Daten für die Dokumentenliste (da diese nicht über die API kommen)
+  const mockDocuments = [
+    { id: 1, name: "Gläubigerschreiben.pdf", type: "pdf", date: "15.03.2025" },
+    { id: 2, name: "Vertrag.docx", type: "docx", date: "10.03.2025" },
+    { id: 3, name: "Vollmacht.pdf", type: "pdf", date: "05.03.2025" }
+  ];
+
+  // Funktion zum Abrufen der Formulardaten vom Backend
+  const fetchFormData = async (clientId) => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`https://privatinsolvenz-backend.onrender.com/api/forms/${clientId}`);
+      
+      if (response.status === 200) {
+        console.log('Form data received:', response.data);
+        setFormData(response.data);
+        return response.data;
+      } else {
+        throw new Error(`API-Fehler: ${response.status}`);
+      }
+    } catch (err) {
+      console.error('Error fetching form data:', err);
+      throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     const loadClient = async () => {
       try {
-        // Für Produktivsystem würde hier die echte API verwendet werden
-        // const data = await getClient(id);
-        // setClient(data);
+        setLoading(true);
         
-        // Für jetzt setzen wir die Mock-Daten
-        setClient(mockClientDetails);
+        // Erst den Client aus dem Context laden
+        const clientData = await getClient(id);
+        
+        // Dann die Formulardaten vom angegebenen API-Endpunkt abrufen
+        try {
+          const formDataResponse = await fetchFormData(clientData.clickupId || id);
+          
+          // Client-Objekt mit den Formulardaten anreichern
+          const enrichedClient = {
+            ...clientData,
+            id: id,
+            formData: formDataResponse,
+            documents: mockDocuments, // Nutze Mock-Dokumente für die Demoansicht
+            // Standard-Werte für fehlende Felder
+            honorar: formDataResponse?.honorar || 5000,
+            raten: formDataResponse?.raten || 5,
+            ratenStart: formDataResponse?.ratenStart || "01.01.2025",
+            address: formDataResponse?.adresse || clientData.address || "Keine Adresse vorhanden"
+          };
+          
+          setClient(enrichedClient);
+        } catch (formError) {
+          console.error('Error loading form data:', formError);
+          
+          // Wenn Formulardaten nicht geladen werden können, trotzdem den Client anzeigen
+          setClient({
+            ...clientData,
+            id: id,
+            documents: mockDocuments,
+            honorar: 5000,
+            raten: 5,
+            ratenStart: "01.01.2025"
+          });
+        }
       } catch (err) {
         console.error('Error loading client details:', err);
         setError(err.message || 'Fehler beim Laden der Mandantendetails');
+      } finally {
+        setLoading(false);
       }
     };
 
     loadClient();
-  }, [id]);
+  }, [id, getClient]);
 
   const handleUpload = () => {
     setIsUploading(true);
@@ -90,6 +126,8 @@ const ClientDetailPage = () => {
         <div className="flex flex-col items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
           <p className="mt-4 text-gray-600 font-light">Mandantendaten werden geladen...</p>
+          <p className="text-sm text-gray-400 mt-2">ID: {id}</p>
+          <p className="text-xs text-gray-400 mt-1">Daten werden frisch vom Server geladen</p>
         </div>
       </div>
     );
@@ -131,24 +169,46 @@ const ClientDetailPage = () => {
   return (
     <div className="max-w-screen-lg mx-auto pb-20 px-4 animate-fadeIn">
       {/* Header mit Zurück-Button und Mandanten-Name */}
-      <div className="flex items-center mb-8 pt-6">
-        <button 
-          onClick={() => navigate('/')}
-          className="mr-6 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-300"
-          aria-label="Zurück zur Übersicht"
-        >
-          <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
-        </button>
-        <h1 className="text-2xl font-medium text-gray-900">{client.name}</h1>
-        <span className={`ml-4 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-          client.status === 'Aktiv' 
-            ? 'bg-green-100 text-green-800' 
-            : client.status === 'Wartend' 
-            ? 'bg-amber-100 text-amber-800' 
-            : 'bg-blue-100 text-blue-800'
-        }`}>
-          {client.status}
-        </span>
+      <div className="flex flex-col mb-8 pt-6">
+        <div className="flex items-center mb-2">
+          <button 
+            onClick={() => navigate('/')}
+            className="mr-6 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-300"
+            aria-label="Zurück zur Übersicht"
+          >
+            <ArrowLeftIcon className="h-5 w-5 text-gray-600" />
+          </button>
+          <h1 className="text-2xl font-medium text-gray-900">{client.name}</h1>
+          <span className={`ml-4 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+            client.status === 'Aktiv' 
+              ? 'bg-green-100 text-green-800' 
+              : client.status === 'Wartend' 
+              ? 'bg-amber-100 text-amber-800' 
+              : 'bg-blue-100 text-blue-800'
+          }`}>
+            {client.status}
+          </span>
+        </div>
+        
+        {/* Mandanten-ID hervorgehoben anzeigen */}
+        <div className="flex items-center ml-12">
+          <span className="text-sm text-gray-500">ID:</span>
+          <span className="ml-2 text-sm font-medium text-gray-700 bg-gray-100 px-2 py-1 rounded select-all">
+            {client.clickupId || id}
+          </span>
+          <button 
+            onClick={() => {
+              navigator.clipboard.writeText(client.clickupId || id);
+              alert('ID in die Zwischenablage kopiert!');
+            }}
+            className="ml-2 text-gray-500 hover:text-gray-700"
+            aria-label="ID kopieren"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Tabs Navigation */}
@@ -386,20 +446,49 @@ const ClientDetailPage = () => {
       {/* Formulardaten-Tab */}
       {activeTab === 'formdata' && (
         <div className="space-y-6 animate-fadeIn">
-          <h2 className="text-xl font-medium text-gray-900 mb-6">Formulardaten</h2>
-          
-          <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {Object.entries(client.formData).map(([key, value]) => (
-                <div key={key} className="space-y-1">
-                  <p className="text-sm text-gray-500 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                  </p>
-                  <p className="text-gray-900 font-medium">{value}</p>
-                </div>
-              ))}
-            </div>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-medium text-gray-900">Formulardaten</h2>
+            
+            {/* Link zum Formular */}
+            <a 
+              href={`https://formular-mitarbeiter.vercel.app/form/${client.clickupId || id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-5 py-2.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white shadow-sm transition-all duration-300 inline-flex items-center"
+            >
+              <DocumentTextIcon className="h-4 w-4 mr-2" />
+              Formular öffnen
+            </a>
           </div>
+          
+          {formData ? (
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Object.entries(client.formData || {}).map(([key, value]) => (
+                  <div key={key} className="space-y-1">
+                    <p className="text-sm text-gray-500 capitalize">
+                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                    </p>
+                    <p className="text-gray-900 font-medium">
+                      {typeof value === 'object' ? JSON.stringify(value) : String(value || '-')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 text-blue-700">
+              <p className="font-medium text-lg mb-2">Formulardaten konnten nicht geladen werden</p>
+              <p className="mb-4">Die Daten für diesen Mandanten konnten nicht vom Server abgerufen werden. Bitte versuchen Sie es später erneut.</p>
+              <button 
+                className="mt-2 px-5 py-2.5 bg-white border border-blue-200 rounded-md text-blue-700 shadow-sm hover:bg-blue-50 transition-colors flex items-center"
+                onClick={() => fetchFormData(client.clickupId || id).catch(err => console.error(err))}
+              >
+                <ArrowPathIcon className="h-4 w-4 mr-2" />
+                Erneut versuchen
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
