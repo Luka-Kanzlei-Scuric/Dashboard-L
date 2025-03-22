@@ -580,22 +580,22 @@ const ClientDetailPage = () => {
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500">Name</p>
                     <p className="text-gray-900 font-medium">
-                      {client.formData.name || client.name || '-'}
+                      {client.formData?.name || client.name || '-'}
                     </p>
                   </div>
-                  {client.formData.geburtsdatum && (
+                  {client.formData?.geburtsdatum && (
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Geburtsdatum</p>
                       <p className="text-gray-900 font-medium">{client.formData.geburtsdatum}</p>
                     </div>
                   )}
-                  {client.formData.beruf && (
+                  {client.formData?.beruf && (
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Beruf</p>
                       <p className="text-gray-900 font-medium">{client.formData.beruf}</p>
                     </div>
                   )}
-                  {client.formData.familienstand && (
+                  {client.formData?.familienstand && (
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Familienstand</p>
                       <p className="text-gray-900 font-medium">{client.formData.familienstand}</p>
@@ -614,19 +614,19 @@ const ClientDetailPage = () => {
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500">Adresse</p>
                     <p className="text-gray-900 font-medium">
-                      {client.formData.adresse || client.address || '-'}
+                      {client.formData?.adresse || client.address || '-'}
                     </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500">E-Mail</p>
-                    <a href={`mailto:${client.formData.email || client.email}`} className="text-gray-900 hover:text-blue-600 transition-colors font-medium">
-                      {client.formData.email || client.email || '-'}
+                    <a href={`mailto:${client.formData?.email || client.email}`} className="text-gray-900 hover:text-blue-600 transition-colors font-medium">
+                      {client.formData?.email || client.email || '-'}
                     </a>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500">Telefon</p>
-                    <a href={`tel:${client.formData.telefon || client.phone}`} className="text-gray-900 hover:text-blue-600 transition-colors font-medium">
-                      {client.formData.telefon || client.phone || '-'}
+                    <a href={`tel:${client.formData?.telefon || client.phone}`} className="text-gray-900 hover:text-blue-600 transition-colors font-medium">
+                      {client.formData?.telefon || client.phone || '-'}
                     </a>
                   </div>
 
@@ -681,23 +681,23 @@ const ClientDetailPage = () => {
                     <p className="text-sm text-gray-500">Honorarpreis</p>
                     <p className="text-gray-900 font-medium flex items-center">
                       <CurrencyEuroIcon className="h-4 w-4 text-gray-400 mr-1" />
-                      {client.formData.honorar || client.honorar || 5000} €
+                      {client.honorar || 5000} €
                     </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500">Anzahl Raten</p>
                     <p className="text-gray-900 font-medium">
-                      {client.formData.raten || client.raten || 5}x
+                      {client.raten || 5}x
                     </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500">Erste Rate</p>
                     <p className="text-gray-900 font-medium flex items-center">
                       <CalendarIcon className="h-4 w-4 text-gray-400 mr-1" />
-                      {client.formData.ratenStart || client.ratenStart || '01.01.2025'}
+                      {client.ratenStart || '01.01.2025'}
                     </p>
                   </div>
-                  {client.formData.nettoeinkommen && (
+                  {client.formData?.nettoeinkommen && (
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Nettoeinkommen</p>
                       <p className="text-gray-900 font-medium">
@@ -715,10 +715,12 @@ const ClientDetailPage = () => {
                   Weitere Angaben
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {Object.entries(client.formData || {}).filter(([key, _]) => ![
-                    'name', 'email', 'telefon', 'adresse', 'geburtsdatum', 'beruf', 'familienstand',
-                    'honorar', 'raten', 'ratenStart', 'nettoeinkommen'
-                  ].includes(key)).map(([key, value]) => (
+                  {Object.entries(client.formData || {}).filter(([key, _]) => 
+                    key && ![
+                      'name', 'email', 'telefon', 'adresse', 'geburtsdatum', 'beruf', 'familienstand',
+                      'honorar', 'raten', 'ratenStart', 'nettoeinkommen'
+                    ].includes(key)
+                  ).map(([key, value]) => (
                     <div key={key} className="space-y-1">
                       <p className="text-sm text-gray-500 capitalize">
                         {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
