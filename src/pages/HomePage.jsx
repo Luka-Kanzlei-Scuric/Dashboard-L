@@ -1,24 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import ClientCard from '../components/ClientCard';
-import { UserPlusIcon, ArrowsUpDownIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { UserPlusIcon, ArrowsUpDownIcon, ChevronDownIcon, ExclamationTriangleIcon, ArrowPathIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { useClients } from '../context/ClientContext';
 
 const HomePage = () => {
   const [sortOption, setSortOption] = useState('name');
   const [viewMode, setViewMode] = useState('grid');
-  const { clients, loading, error, fetchClients } = useClients();
+  const [retryInProgress, setRetryInProgress] = useState(false);
+  const { 
+    clients, 
+    loading, 
+    error, 
+    fetchClients, 
+    usingSampleData, 
+    lastSuccessfulFetch,
+    resetError
+  } = useClients();
 
   // Debug output
   useEffect(() => {
     console.log('HomePage rendered with clients:', clients);
     console.log('Loading state:', loading);
     console.log('Error state:', error);
-  }, [clients, loading, error]);
+    console.log('Using sample data:', usingSampleData);
+  }, [clients, loading, error, usingSampleData]);
 
-  // Force reload on mount
-  useEffect(() => {
-    fetchClients();
-  }, [fetchClients]);
+  // Force manual retry with loading indicator
+  const handleRetry = async () => {
+    setRetryInProgress(true);
+    resetError();
+    await fetchClients(true);
+    setTimeout(() => setRetryInProgress(false), 1000);
+  };
 
   // Safely sort clients
   const sortedClients = Array.isArray(clients) ? [...clients].sort((a, b) => {
@@ -42,7 +55,17 @@ const HomePage = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-primary">Dashboard</h1>
+        <div className="flex items-center">
+          <h1 className="text-2xl font-semibold text-primary">Dashboard</h1>
+          {usingSampleData && (
+            <div className="ml-3 flex items-center">
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                <InformationCircleIcon className="w-4 h-4 mr-1" />
+                Demo-Modus
+              </span>
+            </div>
+          )}
+        </div>
         <button 
           disabled
           className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-neutral-medium opacity-60 cursor-not-allowed transition-colors duration-200"
@@ -52,6 +75,60 @@ const HomePage = () => {
           Neuer Mandant
         </button>
       </div>
+      
+      {usingSampleData && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-800 text-sm flex items-center">
+          <ExclamationTriangleIcon className="h-5 w-5 mr-2 text-amber-600 flex-shrink-0" />
+          <div>
+            <p className="font-medium">Das Dashboard verwendet aktuell Beispieldaten.</p>
+            <p className="mt-1">Es konnte keine Verbindung zum Backend-Server hergestellt werden. Die Anzeige wird automatisch aktualisiert, sobald die Verbindung wiederhergestellt ist.</p>
+          </div>
+          <button 
+            onClick={handleRetry}
+            disabled={retryInProgress || loading}
+            className="ml-4 flex-shrink-0 inline-flex items-center px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-amber-800 text-sm font-medium hover:bg-amber-100 transition-colors"
+          >
+            {retryInProgress || loading ? (
+              <>
+                <ArrowPathIcon className="h-4 w-4 mr-1.5 animate-spin" />
+                Verbinde...
+              </>
+            ) : (
+              <>
+                <ArrowPathIcon className="h-4 w-4 mr-1.5" />
+                Verbindung prüfen
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {error && !usingSampleData && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-800 text-sm flex items-center">
+          <ExclamationTriangleIcon className="h-5 w-5 mr-2 text-red-600 flex-shrink-0" />
+          <div>
+            <p className="font-medium">Fehler beim Laden der Mandanten</p>
+            <p className="mt-1">{error}</p>
+          </div>
+          <button 
+            onClick={handleRetry}
+            disabled={retryInProgress || loading}
+            className="ml-4 flex-shrink-0 inline-flex items-center px-3 py-1.5 bg-white border border-red-300 rounded-lg text-red-800 text-sm font-medium hover:bg-red-100 transition-colors"
+          >
+            {retryInProgress || loading ? (
+              <>
+                <ArrowPathIcon className="h-4 w-4 mr-1.5 animate-spin" />
+                Erneut laden...
+              </>
+            ) : (
+              <>
+                <ArrowPathIcon className="h-4 w-4 mr-1.5" />
+                Erneut versuchen
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -104,15 +181,11 @@ const HomePage = () => {
         </div>
       </div>
 
-      {loading ? (
+      {loading && !usingSampleData ? (
         <div className="flex justify-center py-10">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-secondary"></div>
         </div>
-      ) : error ? (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          Fehler beim Laden der Mandanten: {error}
-        </div>
-      ) : sortedClients.length === 0 ? (
+      ) : sortedClients.length === 0 && !usingSampleData ? (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
           <p className="text-blue-700 mb-2">Keine Mandanten gefunden</p>
           <p className="text-blue-600 text-sm">Neue Mandanten aus ClickUp werden alle 15 Minuten synchronisiert.</p>
@@ -122,6 +195,12 @@ const HomePage = () => {
           {sortedClients.map(client => (
             <ClientCard key={client._id} client={client} />
           ))}
+        </div>
+      )}
+      
+      {lastSuccessfulFetch && !usingSampleData && (
+        <div className="text-xs text-neutral-medium text-center pt-4 pb-2">
+          Zuletzt aktualisiert: {new Date(lastSuccessfulFetch).toLocaleString('de-DE')}
         </div>
       )}
     </div>

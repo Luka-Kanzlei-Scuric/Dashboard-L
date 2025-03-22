@@ -14,15 +14,34 @@ const app = express();
 // Connect to database
 connectDB();
 
-// CORS configuration
-const corsOptions = {
-  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
-};
+// CORS configuration - Allow all origins in development
+const corsOptions = process.env.NODE_ENV === 'production' 
+  ? {
+      origin: process.env.CORS_ORIGIN 
+        ? process.env.CORS_ORIGIN.split(',') 
+        : ['https://dashboard-l.onrender.com', 'https://dashboard-l.vercel.app', 'http://localhost:3000'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      credentials: true
+    }
+  : {
+      origin: '*', // Allow all origins in development
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      credentials: true,
+      preflightContinue: false,
+      optionsSuccessStatus: 204
+    };
+
+// Debug CORS settings
+console.log('CORS settings:', {
+  environment: process.env.NODE_ENV || 'development',
+  allowedOrigins: corsOptions.origin
+});
 
 // Middleware
 app.use(cors(corsOptions));
+
+// Add OPTIONS handling for preflight requests
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 
 // Queue for changes that need to be sent to ClickUp via Make.com
@@ -283,6 +302,15 @@ app.get('/api/health', (req, res) => {
 // Basic route for testing
 app.get('/', (req, res) => {
   res.send('Scuric Dashboard API is running');
+});
+
+// Debug route to check CORS
+app.get('/test-cors', (req, res) => {
+  res.json({
+    message: 'CORS is working correctly',
+    origin: req.headers.origin || 'No origin header',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Start server
