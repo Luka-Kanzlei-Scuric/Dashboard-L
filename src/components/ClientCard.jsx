@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { EnvelopeIcon, PhoneIcon, ClockIcon } from '@heroicons/react/24/outline';
 
 const ClientCard = ({ client }) => {
@@ -28,10 +29,14 @@ const ClientCard = ({ client }) => {
   // Safe status
   const status = client.status || 'Unbekannt';
   
-  console.log('Rendering ClientCard for:', name);
+  // Client ID für die Detailansicht
+  const clientId = client._id || 'unknown';
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md border border-neutral-light/40">
+    <Link 
+      to={`/client/${clientId}`}
+      className="block bg-white rounded-xl shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md border border-neutral-light/40 hover:border-gray-300"
+    >
       <div className="px-6 py-5">
         <div className="flex items-start justify-between">
           <div className="flex items-center">
@@ -76,20 +81,23 @@ const ClientCard = ({ client }) => {
           <span className="text-neutral-medium">Aktualisiert: {formattedDate}</span>
         </div>
         
-        {client.clickupId ? (
-          <a 
-            href={`https://app.clickup.com/t/${client.clickupId}`} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-sm font-medium text-secondary hover:text-secondary-light transition-colors"
-          >
-            In ClickUp öffnen
-          </a>
-        ) : (
-          <span className="text-sm text-gray-400">Kein ClickUp-Link</span>
-        )}
+        <div className="flex items-center">
+          {client.clickupId ? (
+            <a 
+              href={`https://app.clickup.com/t/${client.clickupId}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-secondary hover:text-secondary-light transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              In ClickUp öffnen
+            </a>
+          ) : (
+            <span className="text-sm text-gray-400">Kein ClickUp-Link</span>
+          )}
+        </div>
       </div>
-    </div>
+    </Link>
   );
 };
 

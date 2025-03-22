@@ -11,9 +11,11 @@
   
   body {
     @apply text-primary;
+    background-color: #F5F5F7;
   }
 }
 
+/* Sidebar Styles */
 .sidebar-icon {
   @apply relative flex items-center justify-center h-12 w-12 mt-2 mb-2 mx-auto shadow-lg 
   bg-white text-primary rounded-xl hover:bg-secondary hover:text-white
@@ -28,4 +30,44 @@
 
 .sidebar-hr {
   @apply bg-neutral-light dark:bg-neutral-dark h-px my-2 mx-2;
+}
+
+/* Apple-style animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Document card hover effects */
+.document-card {
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.document-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+}
+
+/* Button animations */
+button {
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+/* Tab indicator animation */
+.tab-indicator {
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }

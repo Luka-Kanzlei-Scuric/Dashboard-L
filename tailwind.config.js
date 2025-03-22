@@ -27,6 +27,22 @@ module.exports = {
           'SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif',
         ],
       },
+      animation: {
+        'fadeIn': 'fadeIn 0.4s ease-out forwards',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      borderRadius: {
+        'xl': '0.75rem',
+        '2xl': '1rem',
+      },
+      transitionTimingFunction: {
+        'apple': 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+      },
     },
   },
   plugins: [],
