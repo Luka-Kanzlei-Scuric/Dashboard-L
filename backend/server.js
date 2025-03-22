@@ -439,6 +439,65 @@ app.post('/cors-proxy', cors(corsOptions), async (req, res) => {
   }
 });
 
+// Dedicated proxy endpoint for form data
+app.get('/api/proxy/forms/:taskId', cors(corsOptions), async (req, res) => {
+  try {
+    const taskId = req.params.taskId;
+    
+    if (!taskId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Task ID is required' 
+      });
+    }
+    
+    console.log(`Proxying form data request for task ID: ${taskId}`);
+    
+    // Make the request to the target API
+    const targetUrl = `https://privatinsolvenz-backend.onrender.com/api/forms/${taskId}`;
+    
+    const response = await axios.get(targetUrl, {
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Scuric-Dashboard-Backend-Proxy',
+        'Origin': 'https://dashboard-l.onrender.com' // Set allowed origin
+      },
+      timeout: 8000
+    });
+    
+    // Return the proxied response
+    res.status(200).json(response.data);
+    
+  } catch (error) {
+    console.error('Form data proxy error:', error.message);
+    
+    // Return fallback data if remote API fails
+    if (error.response?.status === 404 || !error.response) {
+      return res.status(200).json({
+        name: "Max Mustermann (Fallback)",
+        honorar: 5000,
+        raten: 5,
+        ratenStart: "01.01.2025",
+        adresse: "Musterstraße 123, 10115 Berlin",
+        einwilligung: "Ja",
+        vorfall: "Privatinsolvenz beantragt am 01.02.2025",
+        schadensumme: "8.500 €",
+        versicherung: "AllSecure AG",
+        policeNummer: "VS-123456789",
+        nettoeinkommen: "2.400 €",
+        _isFallback: true
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data
+    });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
