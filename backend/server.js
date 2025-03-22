@@ -46,12 +46,35 @@ const processClickUpData = async (tasks) => {
         let email = '';
         let phone = '';
         
-        if (task.custom_fields) {
+        // Handle custom_fields as array (from custom_fields_original)
+        if (Array.isArray(task.custom_fields)) {
           for (const field of task.custom_fields) {
-            if (field.name.toLowerCase() === 'email') {
+            if (field.name && field.name.toLowerCase() === 'email') {
               email = field.value || '';
             }
-            if (field.name.toLowerCase() === 'phone' || field.name.toLowerCase() === 'telefon') {
+            if (field.name && (field.name.toLowerCase() === 'phone' || field.name.toLowerCase() === 'telefon' || field.name.toLowerCase() === 'telefonnummer')) {
+              phone = field.value || '';
+            }
+          }
+        } 
+        // Handle custom_fields as object (direct from ClickUp API)
+        else if (typeof task.custom_fields === 'object' && task.custom_fields !== null) {
+          // Try to find email and phone in the object
+          if (task.custom_fields.Email) {
+            email = task.custom_fields.Email;
+          }
+          if (task.custom_fields.Phone || task.custom_fields.Telefon || task.custom_fields.Telefonnummer) {
+            phone = task.custom_fields.Phone || task.custom_fields.Telefon || task.custom_fields.Telefonnummer;
+          }
+        }
+        
+        // Try to get from custom_fields_original if still no email/phone
+        if ((!email || !phone) && task.custom_fields_original && Array.isArray(task.custom_fields_original)) {
+          for (const field of task.custom_fields_original) {
+            if (field.name && field.name.toLowerCase() === 'email') {
+              email = field.value || '';
+            }
+            if (field.name && (field.name.toLowerCase() === 'phone' || field.name.toLowerCase() === 'telefon' || field.name.toLowerCase() === 'telefonnummer')) {
               phone = field.value || '';
             }
           }
