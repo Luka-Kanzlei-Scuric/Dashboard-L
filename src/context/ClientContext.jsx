@@ -75,6 +75,15 @@ export const ClientProvider = ({ children }) => {
       console.log('Received clients data:', data);
       
       if (Array.isArray(data)) {
+        // Ensure we have the data for at least 500ms to avoid flickering UI
+        const minLoadingTime = 500;
+        const loadingStartTime = Date.now();
+        const timeElapsed = Date.now() - loadingStartTime;
+        
+        if (timeElapsed < minLoadingTime) {
+          await new Promise(resolve => setTimeout(resolve, minLoadingTime - timeElapsed));
+        }
+        
         setClients(data);
         setUsingSampleData(false);
         setLastSuccessfulFetch(new Date());
@@ -106,7 +115,10 @@ export const ClientProvider = ({ children }) => {
         setUsingSampleData(true);
       }
     } finally {
-      setLoading(false);
+      // Ensure we don't turn off loading state too quickly
+      setTimeout(() => {
+        setLoading(false);
+      }, 200);
     }
   }, [loading, retryCount, clients.length]);
 
@@ -208,7 +220,7 @@ export const ClientProvider = ({ children }) => {
     const scheduleNextRefresh = () => {
       // If we got data successfully, set a longer refresh interval
       // If we're using sample data, try to reconnect more frequently
-      const refreshInterval = usingSampleData ? 45 * 1000 : 3 * 60 * 1000;
+      const refreshInterval = usingSampleData ? 45 * 1000 : 5 * 60 * 1000; // Increase to 5 minutes
       
       // Clear any existing timeout
       if (timeoutId) clearTimeout(timeoutId);
@@ -217,11 +229,17 @@ export const ClientProvider = ({ children }) => {
       
       // Schedule next refresh
       timeoutId = setTimeout(() => {
-        console.log('Executing scheduled data refresh');
-        fetchClients(true).then(() => {
-          // Schedule next refresh after this one completes
+        // Only refresh if we're not currently loading
+        if (!loading) {
+          console.log('Executing scheduled data refresh');
+          fetchClients(true).catch(err => {
+            console.error('Scheduled refresh failed:', err);
+          });
+        } else {
+          console.log('Skipping data refresh - previous request still in progress');
+          // Reschedule refresh without making a request
           scheduleNextRefresh();
-        });
+        }
       }, refreshInterval);
     };
     
@@ -232,7 +250,7 @@ export const ClientProvider = ({ children }) => {
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [fetchClients, usingSampleData]);
+  }, [fetchClients, usingSampleData, loading]);
 
   return (
     <ClientContext.Provider

@@ -17,13 +17,14 @@ const HomePage = () => {
     resetError
   } = useClients();
 
-  // Debug output
+  // Debug output - reduced to minimize console spam
   useEffect(() => {
-    console.log('HomePage rendered with clients:', clients);
-    console.log('Loading state:', loading);
-    console.log('Error state:', error);
-    console.log('Using sample data:', usingSampleData);
-  }, [clients, loading, error, usingSampleData]);
+    if (process.env.NODE_ENV !== 'production') {
+      // Only log changes in data state, not every render
+      const clientCount = Array.isArray(clients) ? clients.length : 0;
+      console.log(`HomePage state: ${clientCount} clients, loading=${loading}, error=${!!error}, sampleData=${usingSampleData}`);
+    }
+  }, [clients.length, loading, error, usingSampleData]);
 
   // Force manual retry with loading indicator
   const handleRetry = async () => {
