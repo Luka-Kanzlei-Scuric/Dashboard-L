@@ -160,11 +160,54 @@ const ClientDetailPage = () => {
         
         // Wenn wir kostenaufstellung haben, versuche die Werte direkt daraus zu nehmen
         if (normalizedData.kostenaufstellung) {
-          console.log('Found kostenaufstellung in form data', normalizedData.kostenaufstellung);
+          console.log('Found kostenaufstellung in form data', JSON.stringify(normalizedData.kostenaufstellung, null, 2));
           
+          // Versuche das Gesamtpreis-Feld zu finden und zu verwenden
           if (normalizedData.kostenaufstellung.gesamtpreis) {
-            normalizedData.honorar = parseInt(normalizedData.kostenaufstellung.gesamtpreis.replace(/[^\d.,]/g, ''), 10);
-            console.log(`Using kostenaufstellung.gesamtpreis: ${normalizedData.honorar}`);
+            try {
+              // Extrahiere nur Zahlen aus dem String
+              const gesamtpreis = normalizedData.kostenaufstellung.gesamtpreis.toString().replace(/[^\d.,]/g, '');
+              // Ersetze Komma durch Punkt für die Konvertierung
+              const numericValue = gesamtpreis.replace(',', '.');
+              // Konvertiere in eine Zahl
+              normalizedData.honorar = parseFloat(numericValue);
+              console.log(`Using kostenaufstellung.gesamtpreis: ${normalizedData.honorar}`);
+            } catch (e) {
+              console.error('Error parsing gesamtpreis:', e);
+            }
+          }
+        }
+        
+        // Mit Debug-Logging durch den kompletten Datensatz gehen
+        console.log('COMPLETE RAW FORM DATA:', JSON.stringify(normalizedData, null, 2));
+        
+        // Spezialfall für Ratenzahlung mit komplexeren Objekten
+        if (normalizedData.ratenzahlung) {
+          console.log('RATENZAHLUNG DETAILS:', JSON.stringify(normalizedData.ratenzahlung, null, 2));
+          
+          if (typeof normalizedData.ratenzahlung === 'object') {
+            // Versuche monatliche Rate zu finden
+            if (normalizedData.ratenzahlung.monatlicheRate) {
+              try {
+                const rateString = normalizedData.ratenzahlung.monatlicheRate.toString().replace(/[^\d.,]/g, '');
+                normalizedData.monatlicheRate = parseFloat(rateString.replace(',', '.'));
+                console.log(`Extracted monatlicheRate: ${normalizedData.monatlicheRate}`);
+              } catch (e) {
+                console.error('Error parsing monatlicheRate:', e);
+              }
+            }
+            
+            // Versuche Laufzeit zu finden
+            if (normalizedData.ratenzahlung.laufzeit) {
+              try {
+                // Entferne alles außer Zahlen
+                const laufzeitString = normalizedData.ratenzahlung.laufzeit.toString().replace(/[^\d]/g, '');
+                normalizedData.raten = parseInt(laufzeitString, 10);
+                console.log(`Extracted laufzeit: ${normalizedData.raten}`);
+              } catch (e) {
+                console.error('Error parsing laufzeit:', e);
+              }
+            }
           }
         }
         
