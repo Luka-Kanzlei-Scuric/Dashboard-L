@@ -265,6 +265,13 @@ app.post('/api/clients', async (req, res) => {
 // Update a client
 app.put('/api/clients/:id', async (req, res) => {
   try {
+    console.log(`Updating client ${req.params.id} with data:`, req.body);
+    
+    // Prüfe auf Honorardaten, da diese nun im Schema existieren
+    if (req.body.honorar !== undefined) {
+      console.log(`Client update includes honorar: ${req.body.honorar}`);
+    }
+    
     const client = await Client.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -275,11 +282,20 @@ app.put('/api/clients/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Client not found' });
     }
     
+    console.log(`Client updated successfully:`, {
+      id: client._id,
+      name: client.name,
+      honorar: client.honorar,
+      raten: client.raten,
+      ratenStart: client.ratenStart
+    });
+    
     // Queue this change for Make.com to sync to ClickUp
     queueClientChange(client, 'update');
     
     res.json(client);
   } catch (error) {
+    console.error('Error updating client:', error);
     res.status(400).json({ success: false, message: error.message });
   }
 });
@@ -473,6 +489,39 @@ app.get('/api/proxy/forms/:taskId', cors(corsOptions), async (req, res) => {
     
     // Return fallback data if remote API fails
     if (error.response?.status === 404 || !error.response) {
+      // Versuche zuerst, den Client aus der Datenbank zu laden
+      try {
+        const taskId = req.params.taskId;
+        console.log(`Looking for client with clickupId: ${taskId} to use stored honorar data`);
+        
+        const client = await Client.findOne({ clickupId: taskId });
+        
+        // Wenn der Client gefunden wurde und Honorardaten hat, verwende diese
+        if (client && (client.honorar || client.raten || client.ratenStart)) {
+          console.log(`Found client with clickupId ${taskId}, using stored honorar data:`, {
+            honorar: client.honorar,
+            raten: client.raten,
+            ratenStart: client.ratenStart
+          });
+          
+          return res.status(200).json({
+            name: client.name,
+            honorar: client.honorar || 5000,
+            raten: client.raten || 5,
+            ratenStart: client.ratenStart || "01.01.2025",
+            adresse: client.address || "Adresse nicht verfügbar",
+            einwilligung: "Ja",
+            vorfall: "Privatinsolvenz",
+            nettoeinkommen: "Nicht verfügbar",
+            _isFallback: true,
+            _fromDatabase: true
+          });
+        }
+      } catch (dbError) {
+        console.error('Error fetching client data from database:', dbError);
+      }
+      
+      // Falls kein Client gefunden wurde oder ein Fehler auftrat, verwende die Standard-Fallback-Daten
       return res.status(200).json({
         name: "Max Mustermann (Fallback)",
         honorar: 5000,

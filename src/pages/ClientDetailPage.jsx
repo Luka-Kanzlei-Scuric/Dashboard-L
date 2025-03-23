@@ -98,12 +98,45 @@ const ClientDetailPage = () => {
         }
       }
       
-      if (response.status === 200) {
+      if (response && response.status === 200) {
         console.log('Form data received:', response.data);
-        setFormData(response.data);
-        return response.data;
+        
+        // Protokolliere die erhaltenen Felder für Debugging
+        const fields = Object.keys(response.data);
+        console.log('Form data fields received:', fields);
+        
+        // Prüfe auf honorar vs. honorarpreis und normalisiere die Daten
+        let normalizedData = { ...response.data };
+        
+        // Wenn honorarpreis im Response vorhanden ist, aber honorar nicht,
+        // verwende honorarpreis als honorar
+        if (normalizedData.honorarpreis !== undefined && normalizedData.honorar === undefined) {
+          console.log(`Converting honorarpreis (${normalizedData.honorarpreis}) to honorar`);
+          normalizedData.honorar = normalizedData.honorarpreis;
+        }
+        
+        // Stelle sicher, dass honorar als Zahl vorliegt
+        if (normalizedData.honorar !== undefined) {
+          // Wenn es ein String mit Währungssymbol ist, konvertiere es
+          if (typeof normalizedData.honorar === 'string') {
+            normalizedData.honorar = parseInt(normalizedData.honorar.replace(/[^\d]/g, ''), 10);
+            console.log(`Converted string honorar to number: ${normalizedData.honorar}`);
+          }
+        }
+        
+        // Stelle sicher, dass raten als Zahl vorliegt
+        if (normalizedData.raten !== undefined) {
+          if (typeof normalizedData.raten === 'string') {
+            normalizedData.raten = parseInt(normalizedData.raten, 10);
+            console.log(`Converted string raten to number: ${normalizedData.raten}`);
+          }
+        }
+        
+        console.log('Normalized form data:', normalizedData);
+        setFormData(normalizedData);
+        return normalizedData;
       } else {
-        throw new Error(`API-Fehler: ${response.status}`);
+        throw new Error(`API-Fehler: ${response ? response.status : 'Keine Antwort'}`);
       }
     } catch (err) {
       console.error('Error fetching form data:', err);
@@ -210,24 +243,58 @@ const ClientDetailPage = () => {
             formData: formDataResponse,
             documents: mockDocuments, // Nutze Mock-Dokumente für die Demoansicht
             // Standard-Werte für fehlende Felder
-            honorar: formDataResponse?.honorar || 5000,
-            raten: formDataResponse?.raten || 5,
-            ratenStart: formDataResponse?.ratenStart || "01.01.2025",
+            honorar: formDataResponse?.honorar || clientData.honorar || 5000,
+            raten: formDataResponse?.raten || clientData.raten || 5,
+            ratenStart: formDataResponse?.ratenStart || clientData.ratenStart || "01.01.2025",
             address: formDataResponse?.adresse || clientData.address || "Keine Adresse vorhanden"
           };
           
+          // Log für Debugging der Honorardaten
+          console.log('Honorardaten nach Anreicherung:', {
+            honorarFormData: formDataResponse?.honorar,
+            honorarClientData: clientData.honorar,
+            finalHonorar: enrichedClient.honorar
+          });
+          
           setClient(enrichedClient);
+          
+          // Aktualisiere auch die Daten in der Datenbank, damit die Honorardaten persistiert werden
+          if (formDataResponse?.honorar || formDataResponse?.raten || formDataResponse?.ratenStart) {
+            try {
+              const updateData = {};
+              
+              if (formDataResponse.honorar) {
+                updateData.honorar = formDataResponse.honorar;
+              }
+              
+              if (formDataResponse.raten) {
+                updateData.raten = formDataResponse.raten;
+              }
+              
+              if (formDataResponse.ratenStart) {
+                updateData.ratenStart = formDataResponse.ratenStart;
+              }
+              
+              if (Object.keys(updateData).length > 0) {
+                console.log('Updating client data in database with form data:', updateData);
+                await updateClient(clientData._id, updateData);
+              }
+            } catch (updateError) {
+              console.error('Failed to persist form data to database:', updateError);
+            }
+          }
         } catch (formError) {
           console.error('Error loading form data:', formError);
           
           // Wenn Formulardaten nicht geladen werden können, trotzdem den Client anzeigen
+          // Verwende dabei die in der Datenbank gespeicherten Werte, falls vorhanden
           setClient({
             ...clientData,
             id: id,
             documents: mockDocuments,
-            honorar: 5000,
-            raten: 5,
-            ratenStart: "01.01.2025"
+            honorar: clientData.honorar || 5000,
+            raten: clientData.raten || 5,
+            ratenStart: clientData.ratenStart || "01.01.2025"
           });
         }
       } catch (err) {
