@@ -105,15 +105,12 @@ const ClientDetailPage = () => {
         const fields = Object.keys(response.data);
         console.log('Form data fields received:', fields);
         
-        // Prüfe auf honorar vs. honorarpreis und normalisiere die Daten
+        // Erstelle eine Kopie der Antwortdaten
         let normalizedData = { ...response.data };
         
         console.log('Form data response raw fields:', Object.keys(response.data));
         
-        // Extrahiere Honorardaten aus verschiedenen möglichen Feldern
-        // Neue Priorität: preisKalkulation > gesamtpreis > honorarpreis > standardpreis > honorar > fallback
-        
-        // Prüfe auf die neue API-Struktur mit preisKalkulation
+        // Verarbeite die preisKalkulation-Daten
         if (normalizedData.preisKalkulation) {
           console.log('Found preisKalkulation in form data', JSON.stringify(normalizedData.preisKalkulation, null, 2));
           
@@ -142,7 +139,6 @@ const ClientDetailPage = () => {
           }
         } else {
           // Fallback auf ältere API-Struktur
-          // 1. Honorarpreis extrahieren
           if (normalizedData.gesamtpreis !== undefined) {
             console.log(`Using gesamtpreis (${normalizedData.gesamtpreis}) as honorar`);
             normalizedData.honorar = normalizedData.gesamtpreis;
@@ -154,7 +150,7 @@ const ClientDetailPage = () => {
             normalizedData.honorar = normalizedData.standardpreis;
           }
           
-          // 2. Raten extrahieren
+          // Raten extrahieren
           if (normalizedData.ratenzahlung && normalizedData.ratenzahlung.laufzeit) {
             console.log(`Using ratenzahlung.laufzeit (${normalizedData.ratenzahlung.laufzeit}) as raten`);
             normalizedData.raten = normalizedData.ratenzahlung.laufzeit;
@@ -163,85 +159,101 @@ const ClientDetailPage = () => {
             normalizedData.raten = normalizedData.laufzeit;
           }
           
-          // 3. Monatliche Rate extrahieren
+          // Monatliche Rate extrahieren
           if (normalizedData.ratenzahlung && normalizedData.ratenzahlung.monatlicheRate) {
             console.log(`Found monatlicheRate: ${normalizedData.ratenzahlung.monatlicheRate}`);
             normalizedData.monatlicheRate = normalizedData.ratenzahlung.monatlicheRate;
           }
         }
         
-        // Stelle sicher, dass honorar als Zahl vorliegt
-        if (normalizedData.honorar !== undefined) {
-          // Wenn es ein String mit Währungssymbol ist, konvertiere es
-          if (typeof normalizedData.honorar === 'string') {
-            normalizedData.honorar = parseInt(normalizedData.honorar.replace(/[^\d.,]/g, ''), 10);
-            console.log(`Converted string honorar to number: ${normalizedData.honorar}`);
-          }
-        }
+        // Umwandlung von String-Werten in entsprechende Datentypen
+        // 1. Zahlen und Währungswerte
+        const numberFields = [
+          'honorar', 'raten', 'monatlicheRate', 'nettoEinkommen', 'gesamtSchulden', 
+          'fahrzeugWert', 'fahrzeugKreditsumme', 'manuellerPreisBetrag'
+        ];
         
-        // Stelle sicher, dass raten als Zahl vorliegt
-        if (normalizedData.raten !== undefined) {
-          if (typeof normalizedData.raten === 'string') {
-            // Extrahiere nur Zahlen, z.B. "2 Monate" → 2
-            normalizedData.raten = parseInt(normalizedData.raten.replace(/[^\d]/g, ''), 10);
-            console.log(`Converted string raten to number: ${normalizedData.raten}`);
+        numberFields.forEach(field => {
+          if (normalizedData[field] !== undefined && normalizedData[field] !== '' && normalizedData[field] !== null) {
+            if (typeof normalizedData[field] === 'string') {
+              // Entferne Nicht-Zahlen-Zeichen, behalte aber Dezimalpunkte und -kommas
+              const cleanString = normalizedData[field].replace(/[^\d.,]/g, '');
+              // Ersetze Komma durch Punkt für die Zahlenkonvertierung
+              const numericString = cleanString.replace(',', '.');
+              
+              if (field === 'raten') {
+                // Für Raten wollen wir eine Ganzzahl
+                normalizedData[field] = parseInt(numericString, 10);
+              } else {
+                // Für andere Felder können Dezimalzahlen erlaubt sein
+                normalizedData[field] = parseFloat(numericString);
+              }
+              
+              console.log(`Converted ${field} from "${normalizedData[field]}" to number: ${normalizedData[field]}`);
+            }
           }
-        }
+        });
         
-        // Wenn wir kostenaufstellung haben, versuche die Werte direkt daraus zu nehmen
-        if (normalizedData.kostenaufstellung) {
-          console.log('Found kostenaufstellung in form data', JSON.stringify(normalizedData.kostenaufstellung, null, 2));
-          
-          // Versuche das Gesamtpreis-Feld zu finden und zu verwenden
-          if (normalizedData.kostenaufstellung.gesamtpreis) {
+        // 2. Boolean-Felder (werden als true/false oder "true"/"false" gespeichert)
+        const booleanFields = [
+          'aktuelePfaendung', 'bausparvertrag', 'befristet', 'fahrzeugFinanziert',
+          'fahrzeugNotwendig', 'fahrzeugbriefBank', 'fahrzeuge', 'immobilieAusland',
+          'immobilien', 'lebensversicherung', 'manuellerPreis', 'qualifiziert',
+          'rentenversicherung', 'schenkungAndere', 'schenkungAngehoerige', 'selbststaendig',
+          'sparbuch', 'unterhaltspflicht', 'vorherigeInsolvenz', 'warSelbststaendig',
+          'weitereVermoegen', 'zustellungEmail', 'zustellungPost'
+        ];
+        
+        booleanFields.forEach(field => {
+          if (normalizedData[field] !== undefined) {
+            if (typeof normalizedData[field] === 'string') {
+              // Konvertiere String-Werte ("true"/"false") in echte Boolean-Werte
+              normalizedData[field] = normalizedData[field].toLowerCase() === 'true';
+            }
+            // Booleans bleiben Booleans, undefined/null bleiben unverändert
+          }
+        });
+        
+        // 3. Datum-Felder - versuche zu einem einheitlichen Format zu konvertieren
+        const dateFields = ['geburtsdatum', 'insolvenzDatum', 'createdAt', 'updatedAt'];
+        
+        dateFields.forEach(field => {
+          if (normalizedData[field] && normalizedData[field] !== '') {
             try {
-              // Extrahiere nur Zahlen aus dem String
-              const gesamtpreis = normalizedData.kostenaufstellung.gesamtpreis.toString().replace(/[^\d.,]/g, '');
-              // Ersetze Komma durch Punkt für die Konvertierung
-              const numericValue = gesamtpreis.replace(',', '.');
-              // Konvertiere in eine Zahl
-              normalizedData.honorar = parseFloat(numericValue);
-              console.log(`Using kostenaufstellung.gesamtpreis: ${normalizedData.honorar}`);
+              // Wir behalten das Datum als String bei, stellen aber sicher, dass es ein gültiges Datum ist
+              const testDate = new Date(normalizedData[field]);
+              if (!isNaN(testDate.getTime())) {
+                // Datum ist gültig, wir behalten das vorhandene Format
+                console.log(`Validated date field ${field}: ${normalizedData[field]}`);
+              }
             } catch (e) {
-              console.error('Error parsing gesamtpreis:', e);
+              console.error(`Error parsing date field ${field}:`, e);
             }
           }
+        });
+        
+        // 4. Spezialfall: Wohnort und Ort sind möglicherweise synonym
+        if (normalizedData.wohnort && !normalizedData.ort) {
+          normalizedData.ort = normalizedData.wohnort;
         }
         
-        // Mit Debug-Logging durch den kompletten Datensatz gehen
-        console.log('COMPLETE RAW FORM DATA:', JSON.stringify(normalizedData, null, 2));
-        
-        // Spezialfall für Ratenzahlung mit komplexeren Objekten
-        if (normalizedData.ratenzahlung) {
-          console.log('RATENZAHLUNG DETAILS:', JSON.stringify(normalizedData.ratenzahlung, null, 2));
+        // Verarbeite Adressinformationen
+        if (normalizedData.strasse || normalizedData.hausnummer || normalizedData.plz || normalizedData.ort || normalizedData.wohnort) {
+          // Stelle sicher, dass alle Adressfelder vorhanden sind, auch wenn leer
+          normalizedData.strasse = normalizedData.strasse || '';
+          normalizedData.hausnummer = normalizedData.hausnummer || '';
+          normalizedData.plz = normalizedData.plz || '';
+          normalizedData.ort = normalizedData.ort || normalizedData.wohnort || '';
           
-          if (typeof normalizedData.ratenzahlung === 'object') {
-            // Versuche monatliche Rate zu finden
-            if (normalizedData.ratenzahlung.monatlicheRate) {
-              try {
-                const rateString = normalizedData.ratenzahlung.monatlicheRate.toString().replace(/[^\d.,]/g, '');
-                normalizedData.monatlicheRate = parseFloat(rateString.replace(',', '.'));
-                console.log(`Extracted monatlicheRate: ${normalizedData.monatlicheRate}`);
-              } catch (e) {
-                console.error('Error parsing monatlicheRate:', e);
-              }
-            }
-            
-            // Versuche Laufzeit zu finden
-            if (normalizedData.ratenzahlung.laufzeit) {
-              try {
-                // Entferne alles außer Zahlen
-                const laufzeitString = normalizedData.ratenzahlung.laufzeit.toString().replace(/[^\d]/g, '');
-                normalizedData.raten = parseInt(laufzeitString, 10);
-                console.log(`Extracted laufzeit: ${normalizedData.raten}`);
-              } catch (e) {
-                console.error('Error parsing laufzeit:', e);
-              }
-            }
-          }
+          // Erstelle eine formatierte Adresszeile für die Anzeige
+          normalizedData.adresse = `${normalizedData.strasse} ${normalizedData.hausnummer}, ${normalizedData.plz} ${normalizedData.ort}`.trim();
+          console.log(`Created formatted address: ${normalizedData.adresse}`);
         }
         
+        // Protokolliere den vollständigen Datensatz für Debugging
+        console.log('COMPLETE RAW FORM DATA:', JSON.stringify(normalizedData, null, 2));
         console.log('Normalized form data:', normalizedData);
+        
         setFormData(normalizedData);
         return normalizedData;
       } else {
@@ -1564,22 +1576,61 @@ const ClientDetailPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {Object.entries(client.formData || {})
                     .filter(([key, value]) => {
-                      // Include only empty values or null
-                      return (value === null || value === undefined || value === '') && 
-                             key && ![
-                               'kostenaufstellung', 'ratenzahlung'
-                             ].includes(key);
+                      // Felder, die wir immer ausschließen wollen (interne Felder, IDs, etc.)
+                      const excludedKeys = [
+                        'kostenaufstellung', 'ratenzahlung', '_id', '__v', 'taskId', 'preisKalkulation',
+                        'createdAt', 'updatedAt', 'adresse', 'id'
+                      ];
+                      
+                      // Prüfe, ob der Schlüssel in der Ausschlussliste ist
+                      if (excludedKeys.includes(key)) {
+                        return false;
+                      }
+                      
+                      // Prüfe, ob der Wert leer ist
+                      const isEmpty = 
+                        value === null || 
+                        value === undefined || 
+                        value === '' || 
+                        (typeof value === 'object' && Object.keys(value).length === 0);
+                      
+                      return isEmpty;
                     })
-                    .map(([key, _]) => (
-                      <div key={key} className="space-y-1">
-                        <p className="text-sm text-gray-500 capitalize">
-                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                        </p>
-                        <p className="text-gray-400 italic text-sm">
-                          Nicht ausgefüllt
-                        </p>
-                      </div>
-                    ))
+                    .map(([key, _]) => {
+                      // Funktion zur Formatierung der Feldnamen für benutzerfreundliche Anzeige
+                      const formatFieldName = (key) => {
+                        // Ersetze camelCase durch Leerzeichen
+                        let formatted = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                        
+                        // Spezialfälle für bessere Lesbarkeit
+                        const replacements = {
+                          'Aktuelle Pfaendung': 'Aktuelle Pfändung',
+                          'Immobilie Ausland': 'Immobilie im Ausland',
+                          'War Selbststaendig': 'War selbstständig',
+                          'Selbststaendig': 'Selbstständig',
+                          'Weitere Vermoegen': 'Weitere Vermögenswerte',
+                          'Fahrzeug Brief Bank': 'Fahrzeugbrief bei Bank',
+                          'Plz': 'PLZ'
+                        };
+                        
+                        Object.entries(replacements).forEach(([search, replace]) => {
+                          formatted = formatted.replace(search, replace);
+                        });
+                        
+                        return formatted;
+                      };
+                      
+                      return (
+                        <div key={key} className="space-y-1">
+                          <p className="text-sm text-gray-500">
+                            {formatFieldName(key)}
+                          </p>
+                          <p className="text-gray-400 italic text-sm">
+                            Nicht ausgefüllt
+                          </p>
+                        </div>
+                      );
+                    })
                   }
                 </div>
               </div>
