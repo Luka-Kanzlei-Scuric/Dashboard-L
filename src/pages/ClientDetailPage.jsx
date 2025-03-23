@@ -376,7 +376,7 @@ const ClientDetailPage = () => {
             'nettoEinkommen', 'gesamtSchulden', 'glaeubiger', 'fahrzeugWert', 
             'fahrzeugKreditsumme', 'manuellerPreisBetrag', 'startgebuehr',
             'preisProGlaeubiger', 'standardPrice', 'pfandungsPrice', 'gesamtPreis',
-            'monatsRate', 'monate', 'kinderAnzahl', 'ratenzahlungMonate'
+            'monatsRate', 'monate', 'kinderAnzahl', 'ratenzahlungMonate', 'zusatzEinkommen'
           ];
           
           numberFields.forEach(field => {
@@ -1812,10 +1812,27 @@ const ClientDetailPage = () => {
                       <p className="text-gray-900 font-medium">{client.formData.pfaendungDetails}</p>
                     </div>
                   )}
+                  {/* Kinder und Unterhalt */}
+                  {client.formData?.kinderAnzahl && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Anzahl Kinder</p>
+                      <p className="text-gray-900 font-medium">{client.formData.kinderAnzahl}</p>
+                    </div>
+                  )}
                   {client.formData?.unterhaltspflicht !== undefined && (
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Unterhaltspflicht</p>
                       <p className="text-gray-900 font-medium">{client.formData.unterhaltspflicht ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.unterhaltArt && client.formData.unterhaltspflicht && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Art des Unterhalts</p>
+                      <p className="text-gray-900 font-medium">
+                        {client.formData.unterhaltArt === 'barunterhalt' ? 'Barunterhalt' : 
+                         client.formData.unterhaltArt === 'naturalunterhalt' ? 'Naturalunterhalt' :
+                         client.formData.unterhaltArt}
+                      </p>
                     </div>
                   )}
                 </div>
