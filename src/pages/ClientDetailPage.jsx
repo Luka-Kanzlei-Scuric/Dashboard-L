@@ -40,220 +40,285 @@ const ClientDetailPage = () => {
   ];
 
   // Funktion zum Abrufen der Formulardaten vom Backend via Proxy
+  // Direkter API-Endpunkt für Tests mit MOCK-ID
+  const TEST_CLIENT_ID = '869878qzv';
+  
   const fetchFormData = async (clientId) => {
     try {
       setLoading(true);
       console.log(`Fetching form data for client ID: ${clientId}`);
-
-      // Versuche verschiedene Proxy-Strategien in einer bestimmten Reihenfolge
-      let response = null;
-      let error = null;
       
-      // 1. Option: Unser eigener Backend-Proxy (bevorzugt für Produktion)
+      // DEBUG-MODUS: Wenn der Client-ID leer ist oder nicht gefunden werden kann,
+      // verwenden wir die TEST_CLIENT_ID für Demonstrationszwecke
+      if (!clientId || clientId === 'undefined' || clientId === 'null') {
+        console.warn('Client ID is missing or invalid, using test client ID for debugging');
+        clientId = TEST_CLIENT_ID;
+      }
+
+      // Vereinfachte Proxy-Strategie mit besserer Fehlerbehandlung
+      let response = null;
+      let errorDetails = [];
+      
+      // 1. Option: Backend-Proxy
       try {
-        console.log('Trying backend proxy endpoint...');
-        // Importiere die API-Konfiguration, um die aktuelle Backend-URL zu verwenden
+        console.log('Attempting to fetch data via backend proxy...');
         const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
         const proxyUrl = `${apiBaseUrl}/proxy/forms/${clientId}`;
         
         response = await axios.get(proxyUrl, { 
-          timeout: 8000,
+          timeout: 10000, // Längerer Timeout für stabilere Verbindung
           headers: { 'Accept': 'application/json' }
         });
-        console.log('Backend proxy successful');
+        console.log('Backend proxy fetch successful');
       } catch (proxyError) {
-        console.error('Backend proxy failed:', proxyError.message);
-        error = proxyError;
+        // Detailliertes Logging für bessere Fehlerdiagnose
+        const errorInfo = {
+          stage: 'Backend proxy',
+          message: proxyError.message,
+          status: proxyError.response?.status,
+          data: proxyError.response?.data
+        };
+        errorDetails.push(errorInfo);
+        console.error('Backend proxy failed:', errorInfo);
         
-        // 2. Option: Öffentlicher CORS-Proxy (Fallback für Entwicklung)
+        // 2. Option: Direkte Anfrage an API mit CORS-Proxy für Entwicklung
         try {
-          console.log('Trying public CORS proxy...');
+          console.log('Attempting direct API request via CORS proxy...');
+          // Direkter Zugriff über CORS-Proxy
           const corsProxyUrl = 'https://corsproxy.io/?';
           const targetUrl = `https://privatinsolvenz-backend.onrender.com/api/forms/${clientId}`;
           const encodedUrl = encodeURIComponent(targetUrl);
-          const publicProxyUrl = `${corsProxyUrl}${encodedUrl}`;
           
-          response = await axios.get(publicProxyUrl, {
-            timeout: 8000,
+          response = await axios.get(`${corsProxyUrl}${encodedUrl}`, {
+            timeout: 10000,
             headers: {
               'Accept': 'application/json',
               'x-requested-with': 'XMLHttpRequest'
             }
           });
-          console.log('Public CORS proxy successful');
-        } catch (corsProxyError) {
-          console.error('Public CORS proxy failed:', corsProxyError.message);
-          // Direkte Anfrage an API als letzte Option
-          try {
-            console.log('Trying direct API request as last resort...');
-            response = await axios.get(`https://privatinsolvenz-backend.onrender.com/api/forms/${clientId}`, {
-              timeout: 5000,
-              headers: { 'Accept': 'application/json' }
-            });
-            console.log('Direct API request successful');
-          } catch (directError) {
-            console.error('All proxy attempts failed:', directError.message);
-            throw directError; // Werfe den letzten Fehler
-          }
+          console.log('Direct API request via CORS proxy successful');
+        } catch (directError) {
+          const errorInfo = {
+            stage: 'Direct API with CORS proxy',
+            message: directError.message,
+            status: directError.response?.status,
+            data: directError.response?.data
+          };
+          errorDetails.push(errorInfo);
+          console.error('All fetch attempts failed:', errorDetails);
+          
+          // Wenn alles fehlschlägt, werfen wir einen detaillierten Fehler
+          const combinedError = new Error('Failed to fetch form data after multiple attempts');
+          combinedError.details = errorDetails;
+          throw combinedError;
         }
       }
       
       if (response && response.status === 200) {
         console.log('Form data received:', response.data);
         
-        // Protokolliere die erhaltenen Felder für Debugging
-        const fields = Object.keys(response.data);
-        console.log('Form data fields received:', fields);
+        // Tiefes Debugging der API-Antwort
+        console.log('Raw API response:', JSON.stringify(response.data, null, 2));
         
-        // Erstelle eine Kopie der Antwortdaten
-        let normalizedData = { ...response.data };
+        // Erstelle eine saubere Kopie der Daten
+        let normalizedData = JSON.parse(JSON.stringify(response.data));
         
-        console.log('Form data response raw fields:', Object.keys(response.data));
-        
-        // Verarbeite die preisKalkulation-Daten
-        if (normalizedData.preisKalkulation) {
-          console.log('Found preisKalkulation in form data', JSON.stringify(normalizedData.preisKalkulation, null, 2));
+        try {
+          // ============================================================
+          // SCHRITT 1: HONORAR-INFORMATIONEN VERARBEITEN
+          // ============================================================
           
-          // 1. Honorarpreis extrahieren aus preisKalkulation.gesamtPreis
-          if (normalizedData.preisKalkulation.gesamtPreis !== undefined) {
-            console.log(`Using preisKalkulation.gesamtPreis (${normalizedData.preisKalkulation.gesamtPreis}) as honorar`);
-            normalizedData.honorar = normalizedData.preisKalkulation.gesamtPreis;
-          } else if (normalizedData.preisKalkulation.standardPrice !== undefined) {
-            console.log(`Using preisKalkulation.standardPrice (${normalizedData.preisKalkulation.standardPrice}) as honorar`);
-            normalizedData.honorar = normalizedData.preisKalkulation.standardPrice;
-          }
-          
-          // 2. Raten extrahieren aus preisKalkulation.ratenzahlung.monate
-          if (normalizedData.preisKalkulation.ratenzahlung && normalizedData.preisKalkulation.ratenzahlung.monate !== undefined) {
-            console.log(`Using preisKalkulation.ratenzahlung.monate (${normalizedData.preisKalkulation.ratenzahlung.monate}) as raten`);
-            normalizedData.raten = normalizedData.preisKalkulation.ratenzahlung.monate;
-          } else if (normalizedData.ratenzahlungMonate) {
-            console.log(`Using ratenzahlungMonate (${normalizedData.ratenzahlungMonate}) as raten`);
-            normalizedData.raten = normalizedData.ratenzahlungMonate;
-          }
-          
-          // 3. Monatliche Rate extrahieren aus preisKalkulation.ratenzahlung.monatsRate
-          if (normalizedData.preisKalkulation.ratenzahlung && normalizedData.preisKalkulation.ratenzahlung.monatsRate !== undefined) {
-            console.log(`Found monatsRate: ${normalizedData.preisKalkulation.ratenzahlung.monatsRate}`);
-            normalizedData.monatlicheRate = normalizedData.preisKalkulation.ratenzahlung.monatsRate;
-          }
-        } else {
-          // Fallback auf ältere API-Struktur
-          if (normalizedData.gesamtpreis !== undefined) {
-            console.log(`Using gesamtpreis (${normalizedData.gesamtpreis}) as honorar`);
-            normalizedData.honorar = normalizedData.gesamtpreis;
-          } else if (normalizedData.honorarpreis !== undefined) {
-            console.log(`Using honorarpreis (${normalizedData.honorarpreis}) as honorar`);
-            normalizedData.honorar = normalizedData.honorarpreis;
-          } else if (normalizedData.standardpreis !== undefined) {
-            console.log(`Using standardpreis (${normalizedData.standardpreis}) as honorar`);
-            normalizedData.honorar = normalizedData.standardpreis;
-          }
-          
-          // Raten extrahieren
-          if (normalizedData.ratenzahlung && normalizedData.ratenzahlung.laufzeit) {
-            console.log(`Using ratenzahlung.laufzeit (${normalizedData.ratenzahlung.laufzeit}) as raten`);
-            normalizedData.raten = normalizedData.ratenzahlung.laufzeit;
-          } else if (normalizedData.laufzeit !== undefined) {
-            console.log(`Using laufzeit (${normalizedData.laufzeit}) as raten`);
-            normalizedData.raten = normalizedData.laufzeit;
-          }
-          
-          // Monatliche Rate extrahieren
-          if (normalizedData.ratenzahlung && normalizedData.ratenzahlung.monatlicheRate) {
-            console.log(`Found monatlicheRate: ${normalizedData.ratenzahlung.monatlicheRate}`);
-            normalizedData.monatlicheRate = normalizedData.ratenzahlung.monatlicheRate;
-          }
-        }
-        
-        // Umwandlung von String-Werten in entsprechende Datentypen
-        // 1. Zahlen und Währungswerte
-        const numberFields = [
-          'honorar', 'raten', 'monatlicheRate', 'nettoEinkommen', 'gesamtSchulden', 
-          'fahrzeugWert', 'fahrzeugKreditsumme', 'manuellerPreisBetrag'
-        ];
-        
-        numberFields.forEach(field => {
-          if (normalizedData[field] !== undefined && normalizedData[field] !== '' && normalizedData[field] !== null) {
-            if (typeof normalizedData[field] === 'string') {
-              // Entferne Nicht-Zahlen-Zeichen, behalte aber Dezimalpunkte und -kommas
-              const cleanString = normalizedData[field].replace(/[^\d.,]/g, '');
-              // Ersetze Komma durch Punkt für die Zahlenkonvertierung
-              const numericString = cleanString.replace(',', '.');
-              
-              if (field === 'raten') {
-                // Für Raten wollen wir eine Ganzzahl
-                normalizedData[field] = parseInt(numericString, 10);
-              } else {
-                // Für andere Felder können Dezimalzahlen erlaubt sein
-                normalizedData[field] = parseFloat(numericString);
+          // Zunächst Daten aus der preisKalkulation extrahieren
+          if (normalizedData.preisKalkulation) {
+            console.log('preisKalkulation gefunden in API-Antwort:', normalizedData.preisKalkulation);
+            
+            // A. Honorar/Gesamtpreis aus preisKalkulation
+            if (normalizedData.preisKalkulation.gesamtPreis !== undefined) {
+              normalizedData.honorar = normalizedData.preisKalkulation.gesamtPreis;
+              console.log(`Honorar aus preisKalkulation.gesamtPreis: ${normalizedData.honorar}`);
+            } else if (normalizedData.preisKalkulation.standardPrice !== undefined) {
+              normalizedData.honorar = normalizedData.preisKalkulation.standardPrice;
+              console.log(`Honorar aus preisKalkulation.standardPrice: ${normalizedData.honorar}`);
+            }
+            
+            // B. Ratenzahlung aus preisKalkulation
+            if (normalizedData.preisKalkulation.ratenzahlung) {
+              // Anzahl der Raten
+              if (normalizedData.preisKalkulation.ratenzahlung.monate !== undefined) {
+                normalizedData.raten = normalizedData.preisKalkulation.ratenzahlung.monate;
+                console.log(`Ratenanzahl aus preisKalkulation.ratenzahlung.monate: ${normalizedData.raten}`);
               }
               
-              console.log(`Converted ${field} from "${normalizedData[field]}" to number: ${normalizedData[field]}`);
-            }
-          }
-        });
-        
-        // 2. Boolean-Felder (werden als true/false oder "true"/"false" gespeichert)
-        const booleanFields = [
-          'aktuelePfaendung', 'bausparvertrag', 'befristet', 'fahrzeugFinanziert',
-          'fahrzeugNotwendig', 'fahrzeugbriefBank', 'fahrzeuge', 'immobilieAusland',
-          'immobilien', 'lebensversicherung', 'manuellerPreis', 'qualifiziert',
-          'rentenversicherung', 'schenkungAndere', 'schenkungAngehoerige', 'selbststaendig',
-          'sparbuch', 'unterhaltspflicht', 'vorherigeInsolvenz', 'warSelbststaendig',
-          'weitereVermoegen', 'zustellungEmail', 'zustellungPost'
-        ];
-        
-        booleanFields.forEach(field => {
-          if (normalizedData[field] !== undefined) {
-            if (typeof normalizedData[field] === 'string') {
-              // Konvertiere String-Werte ("true"/"false") in echte Boolean-Werte
-              normalizedData[field] = normalizedData[field].toLowerCase() === 'true';
-            }
-            // Booleans bleiben Booleans, undefined/null bleiben unverändert
-          }
-        });
-        
-        // 3. Datum-Felder - versuche zu einem einheitlichen Format zu konvertieren
-        const dateFields = ['geburtsdatum', 'insolvenzDatum', 'createdAt', 'updatedAt'];
-        
-        dateFields.forEach(field => {
-          if (normalizedData[field] && normalizedData[field] !== '') {
-            try {
-              // Wir behalten das Datum als String bei, stellen aber sicher, dass es ein gültiges Datum ist
-              const testDate = new Date(normalizedData[field]);
-              if (!isNaN(testDate.getTime())) {
-                // Datum ist gültig, wir behalten das vorhandene Format
-                console.log(`Validated date field ${field}: ${normalizedData[field]}`);
+              // Monatliche Rate
+              if (normalizedData.preisKalkulation.ratenzahlung.monatsRate !== undefined) {
+                normalizedData.monatlicheRate = normalizedData.preisKalkulation.ratenzahlung.monatsRate;
+                console.log(`Monatsrate aus preisKalkulation.ratenzahlung.monatsRate: ${normalizedData.monatlicheRate}`);
               }
-            } catch (e) {
-              console.error(`Error parsing date field ${field}:`, e);
             }
           }
-        });
-        
-        // 4. Spezialfall: Wohnort und Ort sind möglicherweise synonym
-        if (normalizedData.wohnort && !normalizedData.ort) {
-          normalizedData.ort = normalizedData.wohnort;
-        }
-        
-        // Verarbeite Adressinformationen
-        if (normalizedData.strasse || normalizedData.hausnummer || normalizedData.plz || normalizedData.ort || normalizedData.wohnort) {
-          // Stelle sicher, dass alle Adressfelder vorhanden sind, auch wenn leer
-          normalizedData.strasse = normalizedData.strasse || '';
-          normalizedData.hausnummer = normalizedData.hausnummer || '';
-          normalizedData.plz = normalizedData.plz || '';
-          normalizedData.ort = normalizedData.ort || normalizedData.wohnort || '';
           
-          // Erstelle eine formatierte Adresszeile für die Anzeige
-          normalizedData.adresse = `${normalizedData.strasse} ${normalizedData.hausnummer}, ${normalizedData.plz} ${normalizedData.ort}`.trim();
-          console.log(`Created formatted address: ${normalizedData.adresse}`);
+          // Alternativquellen für Ratenanzahl
+          if (normalizedData.raten === undefined) {
+            if (normalizedData.ratenzahlungMonate) {
+              normalizedData.raten = normalizedData.ratenzahlungMonate;
+              console.log(`Ratenanzahl aus ratenzahlungMonate: ${normalizedData.raten}`);
+            }
+          }
+          
+          // Validiere Honorardaten
+          if (normalizedData.honorar !== undefined) {
+            normalizedData.honorar = typeof normalizedData.honorar === 'number' 
+              ? normalizedData.honorar 
+              : parseFloat(String(normalizedData.honorar).replace(/[^\d.,]/g, '').replace(',', '.'));
+            
+            console.log(`Validiertes Honorar: ${normalizedData.honorar}`);
+          }
+          
+          // Validiere Raten
+          if (normalizedData.raten !== undefined) {
+            normalizedData.raten = typeof normalizedData.raten === 'number'
+              ? normalizedData.raten
+              : parseInt(String(normalizedData.raten).replace(/[^\d.,]/g, ''), 10);
+            
+            console.log(`Validierte Ratenanzahl: ${normalizedData.raten}`);
+          }
+          
+          // Validiere monatliche Rate
+          if (normalizedData.monatlicheRate !== undefined) {
+            normalizedData.monatlicheRate = typeof normalizedData.monatlicheRate === 'number'
+              ? normalizedData.monatlicheRate
+              : parseFloat(String(normalizedData.monatlicheRate).replace(/[^\d.,]/g, '').replace(',', '.'));
+            
+            console.log(`Validierte monatliche Rate: ${normalizedData.monatlicheRate}`);
+          }
+          
+          // ============================================================
+          // SCHRITT 2: PERSONENDATEN VERARBEITEN
+          // ============================================================
+          
+          // Name aus lead_name sicherstellen
+          if (!normalizedData.name && normalizedData.leadName) {
+            normalizedData.name = normalizedData.leadName;
+            console.log(`Name aus leadName übernommen: ${normalizedData.name}`);
+          }
+          
+          // ============================================================
+          // SCHRITT 3: ALLE WEITEREN FELDER TYPSICHER UMWANDELN
+          // ============================================================
+          
+          // ZAHLENFELDER
+          const numberFields = [
+            'nettoEinkommen', 'gesamtSchulden', 'glaeubiger', 'fahrzeugWert', 
+            'fahrzeugKreditsumme', 'manuellerPreisBetrag'
+          ];
+          
+          numberFields.forEach(field => {
+            if (normalizedData[field] !== undefined && normalizedData[field] !== '') {
+              try {
+                // Konvertiere in Zahl falls nötig
+                if (typeof normalizedData[field] !== 'number') {
+                  const cleanString = String(normalizedData[field]).replace(/[^\d.,]/g, '');
+                  normalizedData[field] = parseFloat(cleanString.replace(',', '.'));
+                  console.log(`Feld ${field} zu Zahl konvertiert: ${normalizedData[field]}`);
+                }
+              } catch (e) {
+                console.error(`Fehler bei Konvertierung von ${field}:`, e);
+              }
+            }
+          });
+          
+          // BOOLEAN-FELDER
+          const booleanFields = [
+            'aktuelePfaendung', 'bausparvertrag', 'befristet', 'fahrzeugFinanziert',
+            'fahrzeugNotwendig', 'fahrzeugbriefBank', 'fahrzeuge', 'immobilieAusland',
+            'immobilien', 'lebensversicherung', 'manuellerPreis', 'qualifiziert',
+            'rentenversicherung', 'schenkungAndere', 'schenkungAngehoerige', 'selbststaendig',
+            'sparbuch', 'unterhaltspflicht', 'vorherigeInsolvenz', 'warSelbststaendig',
+            'weitereVermoegen', 'zustellungEmail', 'zustellungPost'
+          ];
+          
+          booleanFields.forEach(field => {
+            if (normalizedData[field] !== undefined) {
+              if (typeof normalizedData[field] !== 'boolean') {
+                if (typeof normalizedData[field] === 'string') {
+                  normalizedData[field] = normalizedData[field].toLowerCase() === 'true';
+                } else if (typeof normalizedData[field] === 'number') {
+                  normalizedData[field] = normalizedData[field] !== 0;
+                }
+                console.log(`Feld ${field} zu Boolean konvertiert: ${normalizedData[field]}`);
+              }
+            }
+          });
+          
+          // DATUM-FELDER
+          const dateFields = ['geburtsdatum', 'insolvenzDatum', 'createdAt', 'updatedAt'];
+          
+          dateFields.forEach(field => {
+            if (normalizedData[field] && normalizedData[field] !== '') {
+              try {
+                const date = new Date(normalizedData[field]);
+                if (!isNaN(date.getTime())) {
+                  // Behalte das originale Format
+                  console.log(`Datum ${field} validiert: ${normalizedData[field]}`);
+                }
+              } catch (e) {
+                console.error(`Fehler bei Validierung von Datum ${field}:`, e);
+              }
+            }
+          });
+          
+          // ============================================================
+          // SCHRITT 4: ADRESSINFORMATIONEN AUFBEREITEN
+          // ============================================================
+          
+          // Adressinformationen zusammenführen für Anzeige
+          if (normalizedData.strasse || normalizedData.hausnummer || normalizedData.plz || normalizedData.wohnort) {
+            const adressTeile = [];
+            
+            // Straße und Hausnummer
+            if (normalizedData.strasse) {
+              let streetPart = normalizedData.strasse.trim();
+              if (normalizedData.hausnummer) {
+                streetPart += ' ' + normalizedData.hausnummer.trim();
+              }
+              adressTeile.push(streetPart);
+            }
+            
+            // PLZ und Ort
+            const ortTeile = [];
+            if (normalizedData.plz) ortTeile.push(normalizedData.plz.trim());
+            if (normalizedData.wohnort) ortTeile.push(normalizedData.wohnort.trim());
+            if (ortTeile.length > 0) {
+              adressTeile.push(ortTeile.join(' '));
+            }
+            
+            // Formatierte Adresse für Anzeige
+            if (adressTeile.length > 0) {
+              normalizedData.adresse = adressTeile.join(', ');
+              console.log(`Formatierte Adresse: ${normalizedData.adresse}`);
+            }
+          }
+          
+          // ============================================================
+          // SCHRITT 5: DEBUGGING DER VERARBEITETEN DATEN
+          // ============================================================
+          
+          // Debug: Liste der Felder
+          const processedFields = Object.keys(normalizedData);
+          console.log(`Verarbeitete Felder (${processedFields.length}):`, processedFields);
+          
+          // Debug: Check für wichtigste Kernfelder
+          const coreFields = ['honorar', 'raten', 'monatlicheRate', 'name', 'adresse', 'geburtsdatum'];
+          coreFields.forEach(field => {
+            console.log(`Kernfeld ${field}: ${normalizedData[field] !== undefined ? 'vorhanden' : 'FEHLT'}`);
+          });
+          
+        } catch (processingError) {
+          console.error('Fehler bei Datenverarbeitung:', processingError);
+          // Im Fehlerfall versuchen wir trotzdem, die Rohdaten zu verwenden
         }
         
-        // Protokolliere den vollständigen Datensatz für Debugging
-        console.log('COMPLETE RAW FORM DATA:', JSON.stringify(normalizedData, null, 2));
-        console.log('Normalized form data:', normalizedData);
-        
+        // Setze den State und gib die verarbeiteten Daten zurück
         setFormData(normalizedData);
         return normalizedData;
       } else {
@@ -458,6 +523,9 @@ const ClientDetailPage = () => {
     loadClient();
   }, [id, getClient, lastDataUpdate, dataRefreshInterval]);
   
+  // Debug-State für die Entwicklung
+  const [debugMode, setDebugMode] = useState(false);
+  
   // Effekt für periodische Aktualisierung
   useEffect(() => {
     // Wenn kein Intervall gesetzt ist (Wert 0), keine periodische Aktualisierung durchführen
@@ -492,6 +560,21 @@ const ClientDetailPage = () => {
       }
     };
   }, [dataRefreshInterval, lastDataUpdate, loading, client]);
+  
+  // Debug-Hilfsfunktion: Ein testweise Abruf der Testdaten
+  const forceTestDataFetch = async () => {
+    try {
+      setLoading(true);
+      const testData = await fetchFormData(TEST_CLIENT_ID);
+      console.log('Test data fetch successful:', testData);
+      alert(`Testdaten für ID ${TEST_CLIENT_ID} erfolgreich abgerufen. Überprüfe die Konsole für Details.`);
+    } catch (error) {
+      console.error('Error fetching test data:', error);
+      alert('Fehler beim Abrufen der Testdaten. Siehe Konsole für Details.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [showEmailSuccess, setShowEmailSuccess] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
@@ -700,33 +783,52 @@ const ClientDetailPage = () => {
           </nav>
           
           {/* Letztes Update und Aktualisierungsintervall mit Dropdown */}
-          {lastDataUpdate && (
-            <div className="mt-2 md:mt-0 text-sm text-gray-500 flex items-center">
-              <ArrowPathIcon className="h-4 w-4 mr-1 text-gray-400" />
-              <span>
-                Daten aktualisiert: {lastDataUpdate.toLocaleTimeString()}
-              </span>
-              <div className="relative ml-3">
-                <select
-                  value={dataRefreshInterval}
-                  onChange={(e) => setDataRefreshInterval(Number(e.target.value))}
-                  className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md py-1 pl-2 pr-6 appearance-none cursor-pointer hover:bg-gray-100 transition-colors"
-                >
-                  <option value="60000">Auto-Update: 1 Min.</option>
-                  <option value="300000">Auto-Update: 5 Min.</option>
-                  <option value="600000">Auto-Update: 10 Min.</option>
-                  <option value="1800000">Auto-Update: 30 Min.</option>
-                  <option value="3600000">Auto-Update: 60 Min.</option>
-                  <option value="0">Kein Auto-Update</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+          <div className="mt-2 md:mt-0 text-sm text-gray-500 flex items-center">
+            <ArrowPathIcon className="h-4 w-4 mr-1 text-gray-400" />
+            <span>
+              {lastDataUpdate 
+                ? `Daten aktualisiert: ${lastDataUpdate.toLocaleTimeString()}`
+                : 'Warte auf Daten...'}
+            </span>
+            <div className="relative ml-3">
+              <select
+                value={dataRefreshInterval}
+                onChange={(e) => setDataRefreshInterval(Number(e.target.value))}
+                className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md py-1 pl-2 pr-6 appearance-none cursor-pointer hover:bg-gray-100 transition-colors"
+              >
+                <option value="60000">Auto-Update: 1 Min.</option>
+                <option value="300000">Auto-Update: 5 Min.</option>
+                <option value="600000">Auto-Update: 10 Min.</option>
+                <option value="1800000">Auto-Update: 30 Min.</option>
+                <option value="3600000">Auto-Update: 60 Min.</option>
+                <option value="0">Kein Auto-Update</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </div>
             </div>
-          )}
+            
+            {/* Debug-Button für Entwicklung - kann für Produktion auskommentiert werden */}
+            {debugMode && (
+              <button
+                onClick={forceTestDataFetch}
+                className="ml-4 px-2 py-1 text-xs bg-amber-100 text-amber-800 rounded hover:bg-amber-200 transition-colors"
+              >
+                Test-Daten laden
+              </button>
+            )}
+            
+            {/* Debug-Modus Toggle */}
+            <button 
+              onClick={() => setDebugMode(!debugMode)} 
+              className="ml-3 p-1 text-xs text-gray-400 hover:text-gray-600"
+              title="Debug-Modus umschalten"
+            >
+              {debugMode ? '🔍' : '⚙️'}
+            </button>
+          </div>
         </div>
       </div>
 
