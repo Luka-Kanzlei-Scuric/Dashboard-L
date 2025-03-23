@@ -55,62 +55,84 @@ const ClientDetailPage = () => {
         clientId = TEST_CLIENT_ID;
       }
 
-      // Vereinfachte Proxy-Strategie mit besserer Fehlerbehandlung
+      // Direkte Anfrage an die Privatinsolvenz-API
       let response = null;
       let errorDetails = [];
       
-      // 1. Option: Backend-Proxy
+      // Option 1: Direkte Anfrage an die API
       try {
-        console.log('Attempting to fetch data via backend proxy...');
-        const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
-        const proxyUrl = `${apiBaseUrl}/proxy/forms/${clientId}`;
+        console.log('Attempting direct API request to privatinsolvenz-backend...');
+        const directUrl = `https://privatinsolvenz-backend.onrender.com/api/forms/${clientId}`;
         
-        response = await axios.get(proxyUrl, { 
-          timeout: 10000, // Längerer Timeout für stabilere Verbindung
-          headers: { 'Accept': 'application/json' }
+        response = await axios.get(directUrl, { 
+          timeout: 15000, // Längerer Timeout für stabilere Verbindung
+          headers: { 
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
         });
-        console.log('Backend proxy fetch successful');
-      } catch (proxyError) {
+        console.log('Direct API request successful');
+      } catch (directError) {
         // Detailliertes Logging für bessere Fehlerdiagnose
         const errorInfo = {
-          stage: 'Backend proxy',
-          message: proxyError.message,
-          status: proxyError.response?.status,
-          data: proxyError.response?.data
+          stage: 'Direct API request',
+          message: directError.message,
+          status: directError.response?.status,
+          data: directError.response?.data
         };
         errorDetails.push(errorInfo);
-        console.error('Backend proxy failed:', errorInfo);
+        console.error('Direct API request failed:', errorInfo);
         
-        // 2. Option: Direkte Anfrage an API mit CORS-Proxy für Entwicklung
+        // Option 2: Fallback über CORS-Proxy
         try {
-          console.log('Attempting direct API request via CORS proxy...');
-          // Direkter Zugriff über CORS-Proxy
+          console.log('Attempting API request via CORS proxy...');
           const corsProxyUrl = 'https://corsproxy.io/?';
           const targetUrl = `https://privatinsolvenz-backend.onrender.com/api/forms/${clientId}`;
           const encodedUrl = encodeURIComponent(targetUrl);
           
           response = await axios.get(`${corsProxyUrl}${encodedUrl}`, {
-            timeout: 10000,
+            timeout: 15000,
             headers: {
               'Accept': 'application/json',
               'x-requested-with': 'XMLHttpRequest'
             }
           });
-          console.log('Direct API request via CORS proxy successful');
-        } catch (directError) {
+          console.log('API request via CORS proxy successful');
+        } catch (proxyError) {
           const errorInfo = {
-            stage: 'Direct API with CORS proxy',
-            message: directError.message,
-            status: directError.response?.status,
-            data: directError.response?.data
+            stage: 'CORS proxy request',
+            message: proxyError.message,
+            status: proxyError.response?.status,
+            data: proxyError.response?.data
           };
           errorDetails.push(errorInfo);
-          console.error('All fetch attempts failed:', errorDetails);
           
-          // Wenn alles fehlschlägt, werfen wir einen detaillierten Fehler
-          const combinedError = new Error('Failed to fetch form data after multiple attempts');
-          combinedError.details = errorDetails;
-          throw combinedError;
+          // Option 3: Fallback über Backend-Proxy
+          try {
+            console.log('Attempting to fetch data via backend proxy as last resort...');
+            const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+            const proxyUrl = `${apiBaseUrl}/proxy/forms/${clientId}`;
+            
+            response = await axios.get(proxyUrl, { 
+              timeout: 15000,
+              headers: { 'Accept': 'application/json' }
+            });
+            console.log('Backend proxy fetch successful');
+          } catch (backendProxyError) {
+            const errorInfo = {
+              stage: 'Backend proxy',
+              message: backendProxyError.message,
+              status: backendProxyError.response?.status,
+              data: backendProxyError.response?.data
+            };
+            errorDetails.push(errorInfo);
+            console.error('All fetch attempts failed:', errorDetails);
+            
+            // Wenn alles fehlschlägt, werfen wir einen detaillierten Fehler
+            const combinedError = new Error('Failed to fetch form data after multiple attempts');
+            combinedError.details = errorDetails;
+            throw combinedError;
+          }
         }
       }
       
@@ -525,14 +547,17 @@ const ClientDetailPage = () => {
         // Aktenzeichennummer in den Zustand setzen
         setCaseNumber(clientData?.caseNumber || '');
         
-        // Prüfen ob ein Daten-Update notwendig ist
-        const shouldFetchFormData = 
-          !lastDataUpdate || // Noch nie Daten geladen oder
-          (new Date().getTime() - lastDataUpdate.getTime() > dataRefreshInterval); // Intervall überschritten
+        // Bei jedem Laden des Mandanten aktualisieren wir immer die Formulardaten
+        // von der privatinsolvenz-backend API
+        console.log('Fetching fresh form data for client');
         
-        if (shouldFetchFormData) {
-          try {
-            const formDataResponse = await fetchFormData(clientData.clickupId || id);
+        try {
+          // Verwende die clickupId als API-ID oder die Task-ID aus dem clientData,
+          // oder als letzten Fallback die id aus der URL
+          const apiId = clientData.clickupId || clientData.taskId || id;
+          console.log(`Using API ID for form data: ${apiId}`);
+          
+          const formDataResponse = await fetchFormData(apiId);
             
             // Client-Objekt mit den Formulardaten anreichern
             const enrichedClient = {
@@ -562,10 +587,17 @@ const ClientDetailPage = () => {
               console.log(`Bestehende monatliche Rate beibehalten: ${enrichedClient.monatlicheRate}`);
             }
             
-            // Stelle sicher, dass preisKalkulation komplett im formData verfügbar ist
+            // Stelle sicher, dass die API-Daten vollständig im formData verfügbar sind
+            enrichedClient.formData = formDataResponse;
+            
+            // Stelle sicher, dass jedes wichtige Feld auch direkt im Client-Objekt verfügbar ist
+            // für die einfache Anzeige in der UI
             if (formDataResponse?.preisKalkulation) {
-              enrichedClient.formData.preisKalkulation = formDataResponse.preisKalkulation;
+              enrichedClient.preisKalkulation = formDataResponse.preisKalkulation;
             }
+            
+            // Für eine einfachere Debug-Ansicht
+            console.log('Enriched client with API data:', JSON.stringify(enrichedClient, null, 2));
             
             // Log für Debugging der Honorardaten
             console.log('Honorardaten nach Anreicherung:', {
@@ -1313,7 +1345,7 @@ const ClientDetailPage = () => {
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500">Name</p>
                     <p className="text-gray-900 font-medium">
-                      {client.formData?.name || client.name || '-'}
+                      {client.formData?.leadName || client.formData?.name || client.name || '-'}
                     </p>
                   </div>
                   {client.formData?.geburtsdatum && (
