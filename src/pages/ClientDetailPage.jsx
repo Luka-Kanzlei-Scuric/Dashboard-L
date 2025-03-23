@@ -108,18 +108,43 @@ const ClientDetailPage = () => {
         // Prüfe auf honorar vs. honorarpreis und normalisiere die Daten
         let normalizedData = { ...response.data };
         
-        // Wenn honorarpreis im Response vorhanden ist, aber honorar nicht,
-        // verwende honorarpreis als honorar
-        if (normalizedData.honorarpreis !== undefined && normalizedData.honorar === undefined) {
-          console.log(`Converting honorarpreis (${normalizedData.honorarpreis}) to honorar`);
+        console.log('Form data response raw fields:', Object.keys(response.data));
+        
+        // Extrahiere Honorardaten aus verschiedenen möglichen Feldern
+        // Priorität: gesamtpreis > honorarpreis > standardpreis > honorar > standardberechnung > fallback
+        
+        // 1. Honorarpreis extrahieren
+        if (normalizedData.gesamtpreis !== undefined) {
+          console.log(`Using gesamtpreis (${normalizedData.gesamtpreis}) as honorar`);
+          normalizedData.honorar = normalizedData.gesamtpreis;
+        } else if (normalizedData.honorarpreis !== undefined) {
+          console.log(`Using honorarpreis (${normalizedData.honorarpreis}) as honorar`);
           normalizedData.honorar = normalizedData.honorarpreis;
+        } else if (normalizedData.standardpreis !== undefined) {
+          console.log(`Using standardpreis (${normalizedData.standardpreis}) as honorar`);
+          normalizedData.honorar = normalizedData.standardpreis;
+        }
+        
+        // 2. Raten extrahieren
+        if (normalizedData.ratenzahlung && normalizedData.ratenzahlung.laufzeit) {
+          console.log(`Using ratenzahlung.laufzeit (${normalizedData.ratenzahlung.laufzeit}) as raten`);
+          normalizedData.raten = normalizedData.ratenzahlung.laufzeit;
+        } else if (normalizedData.laufzeit !== undefined) {
+          console.log(`Using laufzeit (${normalizedData.laufzeit}) as raten`);
+          normalizedData.raten = normalizedData.laufzeit;
+        }
+        
+        // 3. Monatliche Rate extrahieren
+        if (normalizedData.ratenzahlung && normalizedData.ratenzahlung.monatlicheRate) {
+          console.log(`Found monatlicheRate: ${normalizedData.ratenzahlung.monatlicheRate}`);
+          normalizedData.monatlicheRate = normalizedData.ratenzahlung.monatlicheRate;
         }
         
         // Stelle sicher, dass honorar als Zahl vorliegt
         if (normalizedData.honorar !== undefined) {
           // Wenn es ein String mit Währungssymbol ist, konvertiere es
           if (typeof normalizedData.honorar === 'string') {
-            normalizedData.honorar = parseInt(normalizedData.honorar.replace(/[^\d]/g, ''), 10);
+            normalizedData.honorar = parseInt(normalizedData.honorar.replace(/[^\d.,]/g, ''), 10);
             console.log(`Converted string honorar to number: ${normalizedData.honorar}`);
           }
         }
@@ -127,8 +152,19 @@ const ClientDetailPage = () => {
         // Stelle sicher, dass raten als Zahl vorliegt
         if (normalizedData.raten !== undefined) {
           if (typeof normalizedData.raten === 'string') {
-            normalizedData.raten = parseInt(normalizedData.raten, 10);
+            // Extrahiere nur Zahlen, z.B. "2 Monate" → 2
+            normalizedData.raten = parseInt(normalizedData.raten.replace(/[^\d]/g, ''), 10);
             console.log(`Converted string raten to number: ${normalizedData.raten}`);
+          }
+        }
+        
+        // Wenn wir kostenaufstellung haben, versuche die Werte direkt daraus zu nehmen
+        if (normalizedData.kostenaufstellung) {
+          console.log('Found kostenaufstellung in form data', normalizedData.kostenaufstellung);
+          
+          if (normalizedData.kostenaufstellung.gesamtpreis) {
+            normalizedData.honorar = parseInt(normalizedData.kostenaufstellung.gesamtpreis.replace(/[^\d.,]/g, ''), 10);
+            console.log(`Using kostenaufstellung.gesamtpreis: ${normalizedData.honorar}`);
           }
         }
         
@@ -446,21 +482,25 @@ const ClientDetailPage = () => {
                 <h2 className="text-lg font-medium text-gray-900 mb-4">Honorarinformationen</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-1">
-                    <p className="text-gray-500 text-sm">Honorarpreis</p>
+                    <p className="text-gray-500 text-sm">Gesamtpreis</p>
                     <p className="text-xl font-medium text-gray-900 flex items-center">
                       <CurrencyEuroIcon className="h-5 w-5 text-gray-400 mr-2" />
                       {client.honorar} €
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-gray-500 text-sm">Raten</p>
-                    <p className="text-xl font-medium text-gray-900">{client.raten}x</p>
+                    <p className="text-gray-500 text-sm">Laufzeit</p>
+                    <p className="text-xl font-medium text-gray-900">{client.raten} Monate</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-gray-500 text-sm">Erste Rate</p>
+                    <p className="text-gray-500 text-sm">Monatliche Rate</p>
                     <p className="text-xl font-medium text-gray-900 flex items-center">
-                      <CalendarIcon className="h-5 w-5 text-gray-400 mr-2" />
-                      {client.ratenStart}
+                      <CurrencyEuroIcon className="h-5 w-5 text-gray-400 mr-2" />
+                      {client.formData?.monatlicheRate || 
+                       (client.honorar && client.raten ? 
+                        (client.honorar / client.raten).toFixed(2) : 
+                        (1111/2).toFixed(2))
+                      } €
                     </p>
                   </div>
                 </div>
@@ -810,7 +850,7 @@ const ClientDetailPage = () => {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-1">
-                    <p className="text-sm text-gray-500">Honorarpreis</p>
+                    <p className="text-sm text-gray-500">Gesamtpreis</p>
                     <p className="text-gray-900 font-medium flex items-center">
                       <CurrencyEuroIcon className="h-4 w-4 text-gray-400 mr-1" />
                       {client.honorar || 1111} €
@@ -819,14 +859,18 @@ const ClientDetailPage = () => {
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500">Anzahl Raten</p>
                     <p className="text-gray-900 font-medium">
-                      {client.raten || 2}x
+                      {client.raten || 2} Monate
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm text-gray-500">Erste Rate</p>
+                    <p className="text-sm text-gray-500">Monatliche Rate</p>
                     <p className="text-gray-900 font-medium flex items-center">
-                      <CalendarIcon className="h-4 w-4 text-gray-400 mr-1" />
-                      {client.ratenStart || '01.01.2025'}
+                      <CurrencyEuroIcon className="h-4 w-4 text-gray-400 mr-1" />
+                      {client.formData?.monatlicheRate || 
+                       (client.honorar && client.raten ? 
+                        (client.honorar / client.raten).toFixed(2) : 
+                        (1111/2).toFixed(2))
+                      } €
                     </p>
                   </div>
                   {client.formData?.nettoeinkommen && (
