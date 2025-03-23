@@ -568,6 +568,31 @@ app.get('/api/proxy/forms/:taskId', cors(corsOptions), async (req, res) => {
     
     console.log(`Proxying form data request for task ID: ${taskId}`);
     
+    // Versuche zuerst, wenn schon in der Datenbank gespeichert
+    try {
+      const cachedDataKey = `formData:${taskId}`;
+      const client = await Client.findOne({ clickupId: taskId });
+      
+      // Wenn der Client gefunden wurde und wir bereits Daten im Cache haben
+      if (client && client.formDataCache) {
+        // Prüfe ob der Cache noch gültig ist (nicht älter als 1 Stunde)
+        const cacheTime = client.formDataCacheTime || 0;
+        const now = Date.now();
+        const cacheAge = now - cacheTime;
+        const cacheValidityPeriod = 60 * 60 * 1000; // 1 Stunde in Millisekunden
+        
+        if (cacheAge < cacheValidityPeriod) {
+          console.log(`Using cached form data for client ${taskId}, cache age: ${cacheAge/1000/60} minutes`);
+          return res.status(200).json(JSON.parse(client.formDataCache));
+        } else {
+          console.log(`Cache expired for client ${taskId}, fetching fresh data`);
+        }
+      }
+    } catch (cacheError) {
+      console.error('Error checking form data cache:', cacheError);
+      // Continue with API request if cache check fails
+    }
+    
     // Make the request to the target API
     const targetUrl = `https://privatinsolvenz-backend.onrender.com/api/forms/${taskId}`;
     
@@ -579,6 +604,19 @@ app.get('/api/proxy/forms/:taskId', cors(corsOptions), async (req, res) => {
       },
       timeout: 8000
     });
+    
+    // Speichere die Antwort im Cache
+    try {
+      const client = await Client.findOne({ clickupId: taskId });
+      if (client) {
+        client.formDataCache = JSON.stringify(response.data);
+        client.formDataCacheTime = Date.now();
+        await client.save();
+        console.log(`Cached form data for client ${taskId}`);
+      }
+    } catch (cacheError) {
+      console.error('Error caching form data:', cacheError);
+    }
     
     // Return the proxied response
     res.status(200).json(response.data);
@@ -594,6 +632,12 @@ app.get('/api/proxy/forms/:taskId', cors(corsOptions), async (req, res) => {
         console.log(`Looking for client with clickupId: ${taskId} to use stored honorar data`);
         
         const client = await Client.findOne({ clickupId: taskId });
+        
+        // Prüfe zuerst auf Cache-Daten
+        if (client && client.formDataCache) {
+          console.log(`Using cached form data for client ${taskId} as fallback`);
+          return res.status(200).json(JSON.parse(client.formDataCache));
+        }
         
         // Wenn der Client gefunden wurde und Honorardaten hat, verwende diese
         if (client && (client.honorar || client.raten || client.ratenStart)) {

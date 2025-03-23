@@ -355,6 +355,7 @@ const ClientDetailPage = () => {
             honorar: formDataResponse?.honorar || clientData.honorar || 1111,
             raten: formDataResponse?.raten || clientData.raten || 2,
             ratenStart: formDataResponse?.ratenStart || clientData.ratenStart || "01.01.2025",
+            monatlicheRate: formDataResponse?.monatlicheRate || clientData.monatlicheRate,
             address: formDataResponse?.adresse || clientData.address || "Keine Adresse vorhanden"
           };
           
@@ -368,7 +369,7 @@ const ClientDetailPage = () => {
           setClient(enrichedClient);
           
           // Aktualisiere auch die Daten in der Datenbank, damit die Honorardaten persistiert werden
-          if (formDataResponse?.honorar || formDataResponse?.raten || formDataResponse?.ratenStart) {
+          if (formDataResponse?.honorar || formDataResponse?.raten || formDataResponse?.ratenStart || formDataResponse?.monatlicheRate) {
             try {
               const updateData = {};
               
@@ -382,6 +383,10 @@ const ClientDetailPage = () => {
               
               if (formDataResponse.ratenStart) {
                 updateData.ratenStart = formDataResponse.ratenStart;
+              }
+              
+              if (formDataResponse.monatlicheRate) {
+                updateData.monatlicheRate = formDataResponse.monatlicheRate;
               }
               
               if (Object.keys(updateData).length > 0) {

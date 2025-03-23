@@ -249,14 +249,14 @@ export const ClientProvider = ({ children }) => {
     };
   }, [fetchClients]);
 
-  // Refresh data periodically
+  // Refresh data periodically, but with a much longer interval
   useEffect(() => {
     let timeoutId;
     
     const scheduleNextRefresh = () => {
-      // If we got data successfully, set a refresh interval
-      // If we're using sample data, try to reconnect more frequently
-      const refreshInterval = usingSampleData ? 45 * 1000 : 10 * 1000; // Reduce to 10 seconds
+      // Verwende ein viel längeres Intervall, um den Server zu entlasten
+      // Nutze 5 Minuten für normale Daten und 2 Minuten bei Sample-Daten
+      const refreshInterval = usingSampleData ? 120 * 1000 : 300 * 1000; // 2-5 Minuten
       
       // Clear any existing timeout
       if (timeoutId) clearTimeout(timeoutId);
@@ -271,17 +271,22 @@ export const ClientProvider = ({ children }) => {
           // Use backgroundRefresh=true to avoid showing loading state when we already have data
           fetchClients(true, true).catch(err => {
             console.error('Scheduled refresh failed:', err);
+            // Retry after 30 seconds if failed
+            setTimeout(scheduleNextRefresh, 30000);
           });
         } else {
           console.log('Skipping data refresh - previous request still in progress');
-          // Reschedule refresh without making a request
-          scheduleNextRefresh();
+          // Reschedule refresh without making a request, but with a delay
+          setTimeout(scheduleNextRefresh, 30000);
         }
       }, refreshInterval);
     };
     
-    // Start the refresh cycle
-    scheduleNextRefresh();
+    // Starte den Refresh-Zyklus, aber nur wenn wir in der Übersicht sind
+    // In der Detailansicht benötigen wir keinen automatischen Refresh
+    if (window.location.pathname === '/') {
+      scheduleNextRefresh();
+    }
     
     // Cleanup
     return () => {

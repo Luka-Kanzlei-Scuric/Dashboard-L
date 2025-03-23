@@ -40,10 +40,20 @@ const clientSchema = new mongoose.Schema(
       type: String,
       default: "01.01.2025",
     },
+    monatlicheRate: {
+      type: Number,
+    },
     caseNumber: {
       type: String,
       default: "",
     },
+    // Cache für Formulardaten
+    formDataCache: {
+      type: String, // JSON-String der Formulardaten
+    },
+    formDataCacheTime: {
+      type: Number, // Timestamp wann der Cache gesetzt wurde
+    }
   },
   {
     timestamps: true,
