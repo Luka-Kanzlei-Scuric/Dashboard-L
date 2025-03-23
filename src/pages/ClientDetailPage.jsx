@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useClients } from '../context/ClientContext';
 import axios from 'axios';
@@ -609,7 +609,8 @@ const ClientDetailPage = () => {
   const [refreshTimerId, setRefreshTimerId] = useState(null);
   
   // Cache für API-Antworten, um API-Aufrufe zu reduzieren
-  const [formDataCache, setFormDataCache] = useState({});
+  // Verwende useRef statt useState für den Cache, um zu verhindern, dass Cache-Updates Rerenders auslösen
+  const formDataCacheRef = useRef({});
   // Zeit zwischen API-Aufrufen erhöhen - mindestens 5 Minuten zwischen vollständigen Aktualisierungen
   const MIN_API_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 Minuten
   
@@ -626,7 +627,7 @@ const ClientDetailPage = () => {
         
         // Prüfen, ob wir die API wirklich aufrufen müssen oder gecachte Daten verwenden können
         const apiId = clientData.clickupId || clientData.taskId || id;
-        const cachedData = formDataCache[apiId];
+        const cachedData = formDataCacheRef.current[apiId];
         const now = Date.now();
         const lastCacheTime = cachedData?.timestamp || 0;
         const timeSinceLastCache = now - lastCacheTime;
@@ -644,14 +645,14 @@ const ClientDetailPage = () => {
             formDataResponse = await fetchFormData(apiId);
             freshData = true;
             
-            // Aktualisiere den Cache
-            setFormDataCache(prev => ({
-              ...prev,
+            // Aktualisiere den Cache mit useRef (löst keinen Rerender aus)
+            formDataCacheRef.current = {
+              ...formDataCacheRef.current,
               [apiId]: {
                 data: formDataResponse,
                 timestamp: now
               }
-            }));
+            };
           } catch (formError) {
             console.error('Error loading fresh form data:', formError);
             
@@ -767,7 +768,7 @@ const ClientDetailPage = () => {
     };
 
     loadClient();
-  }, [id, getClient, lastDataUpdate, dataRefreshInterval]);
+  }, [id, getClient, lastDataUpdate, dataRefreshInterval]); // WICHTIG: formDataCache absichtlich nicht als Dependency hinzufügen, um Render-Loops zu vermeiden
   
   // Debug-State für die Entwicklung
   const [debugMode, setDebugMode] = useState(false);
