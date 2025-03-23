@@ -59,71 +59,73 @@ const ClientDetailPage = () => {
       let response = null;
       let errorDetails = [];
       
-      // Option 1: Direkte Anfrage an die API
+      // Option 1: Zuerst Backend-Proxy verwenden (da dieser die CORS-Probleme bereits gelöst hat)
       try {
-        console.log('Attempting direct API request to privatinsolvenz-backend...');
-        const directUrl = `https://privatinsolvenz-backend.onrender.com/api/forms/${clientId}`;
+        console.log('Attempting to fetch data via backend proxy...');
+        const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+        const proxyUrl = `${apiBaseUrl}/proxy/forms/${clientId}`;
         
-        response = await axios.get(directUrl, { 
-          timeout: 15000, // Längerer Timeout für stabilere Verbindung
-          headers: { 
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
+        response = await axios.get(proxyUrl, { 
+          timeout: 15000,
+          headers: { 'Accept': 'application/json' }
         });
-        console.log('Direct API request successful');
-      } catch (directError) {
+        console.log('Backend proxy fetch successful');
+      } catch (backendProxyError) {
         // Detailliertes Logging für bessere Fehlerdiagnose
         const errorInfo = {
-          stage: 'Direct API request',
-          message: directError.message,
-          status: directError.response?.status,
-          data: directError.response?.data
+          stage: 'Backend proxy',
+          message: backendProxyError.message,
+          status: backendProxyError.response?.status,
+          data: backendProxyError.response?.data
         };
         errorDetails.push(errorInfo);
-        console.error('Direct API request failed:', errorInfo);
+        console.error('Backend proxy failed:', errorInfo);
         
-        // Option 2: Fallback über CORS-Proxy
+        // Option 2: Direkte Anfrage an die API (für den Fall, dass der Proxy Probleme hat)
         try {
-          console.log('Attempting API request via CORS proxy...');
-          const corsProxyUrl = 'https://corsproxy.io/?';
-          const targetUrl = `https://privatinsolvenz-backend.onrender.com/api/forms/${clientId}`;
-          const encodedUrl = encodeURIComponent(targetUrl);
+          console.log('Attempting direct API request to privatinsolvenz-backend...');
+          const directUrl = `https://privatinsolvenz-backend.onrender.com/api/forms/${clientId}`;
           
-          response = await axios.get(`${corsProxyUrl}${encodedUrl}`, {
+          response = await axios.get(directUrl, { 
             timeout: 15000,
-            headers: {
+            headers: { 
               'Accept': 'application/json',
-              'x-requested-with': 'XMLHttpRequest'
+              'Content-Type': 'application/json',
+              'Origin': 'https://dashboard-l.onrender.com' 
             }
           });
-          console.log('API request via CORS proxy successful');
-        } catch (proxyError) {
+          console.log('Direct API request successful');
+        } catch (directError) {
           const errorInfo = {
-            stage: 'CORS proxy request',
-            message: proxyError.message,
-            status: proxyError.response?.status,
-            data: proxyError.response?.data
+            stage: 'Direct API request',
+            message: directError.message,
+            status: directError.response?.status,
+            data: directError.response?.data
           };
           errorDetails.push(errorInfo);
+          console.error('Direct API request failed:', errorInfo);
           
-          // Option 3: Fallback über Backend-Proxy
+          // Option 3: Versuche es mit einem alternativen CORS-Proxy
           try {
-            console.log('Attempting to fetch data via backend proxy as last resort...');
-            const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
-            const proxyUrl = `${apiBaseUrl}/proxy/forms/${clientId}`;
+            console.log('Attempting API request via alternative CORS proxy...');
+            // Verwende den Proxy-Service von allOrigins als Alternative
+            const allOriginsUrl = 'https://api.allorigins.win/raw?url=';
+            const targetUrl = `https://privatinsolvenz-backend.onrender.com/api/forms/${clientId}`;
+            const encodedUrl = encodeURIComponent(targetUrl);
             
-            response = await axios.get(proxyUrl, { 
+            response = await axios.get(`${allOriginsUrl}${encodedUrl}`, {
               timeout: 15000,
-              headers: { 'Accept': 'application/json' }
+              headers: {
+                'Accept': 'application/json'
+              }
             });
-            console.log('Backend proxy fetch successful');
-          } catch (backendProxyError) {
+            console.log('Alternative CORS proxy successful');
+          } catch (altProxyError) {
             const errorInfo = {
-              stage: 'Backend proxy',
-              message: backendProxyError.message,
-              status: backendProxyError.response?.status,
-              data: backendProxyError.response?.data
+              stage: 'Alternative CORS proxy',
+              message: altProxyError.message,
+              status: altProxyError.response?.status,
+              data: altProxyError.response?.data
             };
             errorDetails.push(errorInfo);
             console.error('All fetch attempts failed:', errorDetails);
@@ -143,17 +145,40 @@ const ClientDetailPage = () => {
         console.log('Raw API response:', JSON.stringify(response.data, null, 2));
         
         // Erstelle eine saubere Kopie der Daten
-        // Bei manchen API-Responses kommt ein String statt ein Objekt zurück
+        // Prüfen und verarbeiten verschiedener API-Antwortformate
         let rawData;
+        
+        // Fall 1: API-Antwort ist ein String
         if (typeof response.data === 'string') {
           try {
             console.log('API-Antwort ist ein String, versuche zu parsen...');
             rawData = JSON.parse(response.data);
           } catch (parseError) {
             console.error('Fehler beim Parsen des API-String:', parseError);
-            rawData = response.data;
+            
+            // Versuche den String zu bereinigen und erneut zu parsen
+            try {
+              const cleanedString = response.data
+                .replace(/\\"/g, '"')  // Ersetze \" durch "
+                .replace(/"{/g, '{')   // Ersetze "{ durch {
+                .replace(/}"/g, '}')   // Ersetze }" durch }
+                .replace(/\\/g, '');   // Entferne alle übrigen Backslashes
+              
+              console.log('Versuche bereinigten String zu parsen...');
+              rawData = JSON.parse(cleanedString);
+            } catch (secondParseError) {
+              console.error('Bereinigen des Strings fehlgeschlagen:', secondParseError);
+              rawData = {}; // Leeres Objekt als Fallback
+            }
           }
-        } else {
+        } 
+        // Fall 2: API-Antwort ist null oder undefined
+        else if (response.data === null || response.data === undefined) {
+          console.warn('API-Antwort ist null oder undefined, verwende leeres Objekt');
+          rawData = {};
+        }
+        // Fall 3: API-Antwort ist ein normales Objekt
+        else {
           rawData = response.data;
         }
         
@@ -168,44 +193,124 @@ const ClientDetailPage = () => {
           if (normalizedData.preisKalkulation) {
             console.log('preisKalkulation gefunden in API-Antwort:', normalizedData.preisKalkulation);
             
+            // Stelle sicher, dass preisKalkulation ein Objekt ist
+            if (typeof normalizedData.preisKalkulation === 'string') {
+              try {
+                normalizedData.preisKalkulation = JSON.parse(normalizedData.preisKalkulation);
+                console.log('preisKalkulation String wurde geparst:', normalizedData.preisKalkulation);
+              } catch (e) {
+                console.error('Fehler beim Parsen von preisKalkulation String:', e);
+                // Fallback: leeres Objekt verwenden
+                normalizedData.preisKalkulation = {};
+              }
+            }
+            
             // A. Honorar/Gesamtpreis aus preisKalkulation
             if (normalizedData.preisKalkulation.gesamtPreis !== undefined) {
-              normalizedData.honorar = normalizedData.preisKalkulation.gesamtPreis;
-              console.log(`Honorar aus preisKalkulation.gesamtPreis: ${normalizedData.honorar}`);
+              const preisValue = parseFloat(String(normalizedData.preisKalkulation.gesamtPreis).replace(/[^\d.,]/g, '').replace(',', '.'));
+              if (!isNaN(preisValue)) {
+                normalizedData.honorar = preisValue;
+                console.log(`Honorar aus preisKalkulation.gesamtPreis: ${normalizedData.honorar}`);
+              }
             } else if (normalizedData.preisKalkulation.standardPrice !== undefined) {
-              normalizedData.honorar = normalizedData.preisKalkulation.standardPrice;
-              console.log(`Honorar aus preisKalkulation.standardPrice: ${normalizedData.honorar}`);
+              const preisValue = parseFloat(String(normalizedData.preisKalkulation.standardPrice).replace(/[^\d.,]/g, '').replace(',', '.'));
+              if (!isNaN(preisValue)) {
+                normalizedData.honorar = preisValue;
+                console.log(`Honorar aus preisKalkulation.standardPrice: ${normalizedData.honorar}`);
+              }
+            } else if (normalizedData.preisKalkulation.manuellerPreisBetrag !== undefined) {
+              const preisValue = parseFloat(String(normalizedData.preisKalkulation.manuellerPreisBetrag).replace(/[^\d.,]/g, '').replace(',', '.'));
+              if (!isNaN(preisValue)) {
+                normalizedData.honorar = preisValue;
+                console.log(`Honorar aus preisKalkulation.manuellerPreisBetrag: ${normalizedData.honorar}`);
+              }
             }
             
             // B. Ratenzahlung aus preisKalkulation
             if (normalizedData.preisKalkulation.ratenzahlung) {
               console.log('Ratenzahlung-Objekt gefunden:', normalizedData.preisKalkulation.ratenzahlung);
               
+              // Stelle sicher, dass ratenzahlung ein Objekt ist
+              if (typeof normalizedData.preisKalkulation.ratenzahlung === 'string') {
+                try {
+                  normalizedData.preisKalkulation.ratenzahlung = JSON.parse(normalizedData.preisKalkulation.ratenzahlung);
+                  console.log('ratenzahlung String wurde geparst:', normalizedData.preisKalkulation.ratenzahlung);
+                } catch (e) {
+                  console.error('Fehler beim Parsen von ratenzahlung String:', e);
+                  normalizedData.preisKalkulation.ratenzahlung = {};
+                }
+              } else if (!normalizedData.preisKalkulation.ratenzahlung) {
+                normalizedData.preisKalkulation.ratenzahlung = {};
+              }
+              
               // Anzahl der Raten - versuche mehrere mögliche Feldnamen
               const monatFields = ['monate', 'monat', 'raten', 'anzahlRaten', 'anzahl'];
+              let foundRaten = false;
+              
               for (const field of monatFields) {
                 if (normalizedData.preisKalkulation.ratenzahlung[field] !== undefined) {
                   const ratenValue = normalizedData.preisKalkulation.ratenzahlung[field];
-                  normalizedData.raten = typeof ratenValue === 'number' ? 
-                    ratenValue : 
-                    parseInt(String(ratenValue).replace(/[^\d]/g, ''), 10);
-                    
-                  console.log(`Ratenanzahl aus preisKalkulation.ratenzahlung.${field}: ${normalizedData.raten}`);
-                  break;
+                  try {
+                    // Konvertiere zu Zahl, egal welcher Typ der Wert hat
+                    const ratenNum = typeof ratenValue === 'number' ? 
+                      ratenValue : 
+                      parseInt(String(ratenValue).replace(/[^\d]/g, ''), 10);
+                      
+                    if (!isNaN(ratenNum) && ratenNum > 0) {
+                      normalizedData.raten = ratenNum;
+                      console.log(`Ratenanzahl aus preisKalkulation.ratenzahlung.${field}: ${normalizedData.raten}`);
+                      foundRaten = true;
+                      break;
+                    }
+                  } catch (e) {
+                    console.error(`Fehler bei Konvertierung von ${field}:`, e);
+                  }
+                }
+              }
+              
+              // Wenn keine Raten in ratenzahlung gefunden wurden, versuche im Root-Objekt
+              if (!foundRaten && normalizedData.ratenzahlungMonate) {
+                try {
+                  const ratenNum = parseInt(String(normalizedData.ratenzahlungMonate).replace(/[^\d]/g, ''), 10);
+                  if (!isNaN(ratenNum) && ratenNum > 0) {
+                    normalizedData.raten = ratenNum;
+                    console.log(`Ratenanzahl aus ratenzahlungMonate: ${normalizedData.raten}`);
+                  }
+                } catch (e) {
+                  console.error('Fehler bei Konvertierung von ratenzahlungMonate:', e);
                 }
               }
               
               // Monatliche Rate - versuche mehrere mögliche Feldnamen
               const rateFields = ['monatsRate', 'rate', 'monthlyRate', 'ratenhoehe', 'betrag'];
+              let foundRate = false;
+              
               for (const field of rateFields) {
                 if (normalizedData.preisKalkulation.ratenzahlung[field] !== undefined) {
                   const rateValue = normalizedData.preisKalkulation.ratenzahlung[field];
-                  normalizedData.monatlicheRate = typeof rateValue === 'number' ? 
-                    rateValue : 
-                    parseFloat(String(rateValue).replace(/[^\d.,]/g, '').replace(',', '.'));
-                    
-                  console.log(`Monatsrate aus preisKalkulation.ratenzahlung.${field}: ${normalizedData.monatlicheRate}`);
-                  break;
+                  try {
+                    // Konvertiere zu Zahl, egal welcher Typ der Wert hat
+                    const rateNum = typeof rateValue === 'number' ? 
+                      rateValue : 
+                      parseFloat(String(rateValue).replace(/[^\d.,]/g, '').replace(',', '.'));
+                      
+                    if (!isNaN(rateNum) && rateNum > 0) {
+                      normalizedData.monatlicheRate = rateNum;
+                      console.log(`Monatsrate aus preisKalkulation.ratenzahlung.${field}: ${normalizedData.monatlicheRate}`);
+                      foundRate = true;
+                      break;
+                    }
+                  } catch (e) {
+                    console.error(`Fehler bei Konvertierung von Rate ${field}:`, e);
+                  }
+                }
+              }
+              
+              // Alternativ: Berechne monatliche Rate aus Honorar und Raten
+              if (!foundRate && normalizedData.honorar !== undefined && normalizedData.raten !== undefined) {
+                if (normalizedData.raten > 0) {
+                  normalizedData.monatlicheRate = normalizedData.honorar / normalizedData.raten;
+                  console.log(`Monatsrate berechnet aus Honorar/Raten: ${normalizedData.monatlicheRate}`);
                 }
               }
               
