@@ -450,7 +450,7 @@ const ClientDetailPage = () => {
           // ============================================================
           
           // Adressinformationen zusammenführen für Anzeige
-          if (normalizedData.strasse || normalizedData.hausnummer || normalizedData.plz || normalizedData.wohnort) {
+          if (normalizedData.strasse || normalizedData.hausnummer || normalizedData.plz || normalizedData.wohnort || normalizedData.ort) {
             const adressTeile = [];
             
             // Straße und Hausnummer
@@ -465,7 +465,13 @@ const ClientDetailPage = () => {
             // PLZ und Ort
             const ortTeile = [];
             if (normalizedData.plz) ortTeile.push(normalizedData.plz.trim());
-            if (normalizedData.wohnort) ortTeile.push(normalizedData.wohnort.trim());
+            // Wohnort oder Ort verwenden - beide Feldnamen werden in manchen Formularquellen genutzt
+            if (normalizedData.wohnort) {
+              ortTeile.push(normalizedData.wohnort.trim());
+            } else if (normalizedData.ort) {
+              ortTeile.push(normalizedData.ort.trim());
+            }
+            
             if (ortTeile.length > 0) {
               adressTeile.push(ortTeile.join(' '));
             }
@@ -1268,7 +1274,37 @@ const ClientDetailPage = () => {
                 </svg>
                 <div>
                   <p className="text-sm text-gray-500">Adresse</p>
-                  <p className="text-gray-900">{client.address}</p>
+                  <p className="text-gray-900">
+                    {(() => {
+                      // Wenn formData vorhanden ist, versuche eine vollständigere Adresse zusammenzustellen
+                      if (client.formData?.strasse) {
+                        const adressTeile = [];
+                        
+                        // Straße und Hausnummer
+                        let strasseHausnummer = client.formData.strasse;
+                        if (client.formData.hausnummer) {
+                          strasseHausnummer += ' ' + client.formData.hausnummer;
+                        }
+                        adressTeile.push(strasseHausnummer);
+                        
+                        // PLZ und Ort 
+                        const ortTeile = [];
+                        if (client.formData.plz) ortTeile.push(client.formData.plz);
+                        if (client.formData.ort || client.formData.wohnort) {
+                          ortTeile.push(client.formData.ort || client.formData.wohnort);
+                        }
+                        
+                        if (ortTeile.length > 0) {
+                          adressTeile.push(ortTeile.join(' '));
+                        }
+                        
+                        return adressTeile.join(', ');
+                      } else {
+                        // Fallback auf die vorhandene Adresse
+                        return client.address;
+                      }
+                    })()}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1519,14 +1555,20 @@ const ClientDetailPage = () => {
                     <p className="text-gray-900 font-medium">
                       {(() => {
                         // Wenn die strukturierten Adressfelder vorhanden sind, verwenden wir diese
-                        if (client.formData?.strasse || client.formData?.hausnummer || client.formData?.plz || client.formData?.ort) {
+                        if (client.formData?.strasse || client.formData?.hausnummer || client.formData?.plz || client.formData?.ort || client.formData?.wohnort) {
                           const adressTeile = [];
                           if (client.formData?.strasse) adressTeile.push(client.formData.strasse);
                           if (client.formData?.hausnummer) adressTeile.push(client.formData.hausnummer);
                           
                           const ortTeile = [];
                           if (client.formData?.plz) ortTeile.push(client.formData.plz);
-                          if (client.formData?.ort) ortTeile.push(client.formData.ort);
+                          
+                          // Wohnort oder Ort verwenden - je nachdem was vorhanden ist
+                          if (client.formData?.ort) {
+                            ortTeile.push(client.formData.ort);
+                          } else if (client.formData?.wohnort) {
+                            ortTeile.push(client.formData.wohnort);
+                          }
                           
                           const adressZeile1 = adressTeile.join(' ');
                           const adressZeile2 = ortTeile.join(' ');
@@ -1704,7 +1746,7 @@ const ClientDetailPage = () => {
               </div>
 
               {/* Adressinformationen - Speziell formatiert */}
-              {(client.formData?.strasse || client.formData?.hausnummer || client.formData?.plz || client.formData?.ort) && (
+              {(client.formData?.strasse || client.formData?.hausnummer || client.formData?.plz || client.formData?.ort || client.formData?.wohnort) && (
                 <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
                   <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1732,10 +1774,11 @@ const ClientDetailPage = () => {
                         <p className="text-gray-900 font-medium">{client.formData.plz}</p>
                       </div>
                     )}
-                    {client.formData?.ort && (
+                    {/* Wohnort oder Ort anzeigen */}
+                    {(client.formData?.ort || client.formData?.wohnort) && (
                       <div className="space-y-1">
                         <p className="text-sm text-gray-500">Ort</p>
-                        <p className="text-gray-900 font-medium">{client.formData.ort}</p>
+                        <p className="text-gray-900 font-medium">{client.formData.ort || client.formData.wohnort}</p>
                       </div>
                     )}
                   </div>
