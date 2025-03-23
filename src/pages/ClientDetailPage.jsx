@@ -1641,11 +1641,62 @@ const ClientDetailPage = () => {
                       })()} €
                     </p>
                   </div>
+                  
+                  {/* Startdatum der Bearbeitung */}
+                  {(client.formData?.bearbeitungStart && client.formData?.bearbeitungMonat) && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Startdatum</p>
+                      <p className="text-gray-900 font-medium flex items-center">
+                        <CalendarIcon className="h-4 w-4 text-gray-400 mr-1" />
+                        {(() => {
+                          // Formatiere das Datum aus Tag und Monat
+                          const tag = client.formData.bearbeitungStart;
+                          const monat = client.formData.bearbeitungMonat;
+                          const jahr = new Date().getFullYear();
+                          return `${tag}.${monat}.${jahr}`;
+                        })()}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Datum der ersten Abrechnung */}
+                  {(client.formData?.abrechnungStart && client.formData?.abrechnungMonat) && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Erste Abrechnung</p>
+                      <p className="text-gray-900 font-medium flex items-center">
+                        <CalendarIcon className="h-4 w-4 text-gray-400 mr-1" />
+                        {(() => {
+                          // Formatiere das Datum aus Tag und Monat
+                          const tag = client.formData.abrechnungStart;
+                          const monat = client.formData.abrechnungMonat;
+                          const jahr = new Date().getFullYear();
+                          return `${tag}.${monat}.${jahr}`;
+                        })()}
+                      </p>
+                    </div>
+                  )}
+
                   {client.formData?.nettoeinkommen && (
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Nettoeinkommen</p>
                       <p className="text-gray-900 font-medium">
                         {client.formData.nettoeinkommen}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Abrechnungsart */}
+                  {client.formData?.preisKalkulation?.berechnungsart && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Berechnungsart</p>
+                      <p className="text-gray-900 font-medium">
+                        {(() => {
+                          const berechnungsart = client.formData.preisKalkulation.berechnungsart;
+                          if (berechnungsart === 'nach Gläubiger') return 'Nach Gläubigeranzahl';
+                          if (berechnungsart === 'standard') return 'Standardpreis';
+                          if (berechnungsart === 'manuell') return 'Manueller Preis';
+                          return berechnungsart;
+                        })()}
                       </p>
                     </div>
                   )}
