@@ -143,16 +143,36 @@ const ClientDetailPage = () => {
             
             // B. Ratenzahlung aus preisKalkulation
             if (normalizedData.preisKalkulation.ratenzahlung) {
-              // Anzahl der Raten
-              if (normalizedData.preisKalkulation.ratenzahlung.monate !== undefined) {
-                normalizedData.raten = normalizedData.preisKalkulation.ratenzahlung.monate;
-                console.log(`Ratenanzahl aus preisKalkulation.ratenzahlung.monate: ${normalizedData.raten}`);
+              console.log('Ratenzahlung-Objekt gefunden:', normalizedData.preisKalkulation.ratenzahlung);
+              
+              // Anzahl der Raten - versuche mehrere mögliche Feldnamen
+              const monatFields = ['monate', 'monat', 'raten', 'anzahlRaten', 'anzahl'];
+              for (const field of monatFields) {
+                if (normalizedData.preisKalkulation.ratenzahlung[field] !== undefined) {
+                  normalizedData.raten = normalizedData.preisKalkulation.ratenzahlung[field];
+                  console.log(`Ratenanzahl aus preisKalkulation.ratenzahlung.${field}: ${normalizedData.raten}`);
+                  break;
+                }
               }
               
-              // Monatliche Rate
-              if (normalizedData.preisKalkulation.ratenzahlung.monatsRate !== undefined) {
-                normalizedData.monatlicheRate = normalizedData.preisKalkulation.ratenzahlung.monatsRate;
-                console.log(`Monatsrate aus preisKalkulation.ratenzahlung.monatsRate: ${normalizedData.monatlicheRate}`);
+              // Monatliche Rate - versuche mehrere mögliche Feldnamen
+              const rateFields = ['monatsRate', 'rate', 'monthlyRate', 'ratenhoehe', 'betrag'];
+              for (const field of rateFields) {
+                if (normalizedData.preisKalkulation.ratenzahlung[field] !== undefined) {
+                  normalizedData.monatlicheRate = normalizedData.preisKalkulation.ratenzahlung[field];
+                  console.log(`Monatsrate aus preisKalkulation.ratenzahlung.${field}: ${normalizedData.monatlicheRate}`);
+                  break;
+                }
+              }
+              
+              // Falls wir monatsRate haben, aber keine Raten, und das Gesamthonorar bekannt ist,
+              // können wir die Anzahl der Raten berechnen
+              if (normalizedData.monatlicheRate !== undefined && 
+                  normalizedData.raten === undefined && 
+                  normalizedData.honorar !== undefined &&
+                  normalizedData.monatlicheRate > 0) {
+                normalizedData.raten = Math.round(normalizedData.honorar / normalizedData.monatlicheRate);
+                console.log(`Ratenanzahl berechnet aus Honorar/Monatsrate: ${normalizedData.raten}`);
               }
             }
           }
@@ -162,6 +182,28 @@ const ClientDetailPage = () => {
             if (normalizedData.ratenzahlungMonate) {
               normalizedData.raten = normalizedData.ratenzahlungMonate;
               console.log(`Ratenanzahl aus ratenzahlungMonate: ${normalizedData.raten}`);
+            }
+          }
+          
+          // Wenn wir immer noch keine Raten haben, versuchen wir die direkt aus dem String zu extrahieren
+          if (normalizedData.raten === undefined && normalizedData.preisKalkulation) {
+            // Suche nach monate in allen möglichen Feldern von preisKalkulation
+            const findRaten = (obj) => {
+              for (const key in obj) {
+                if (typeof obj[key] === 'object' && obj[key] !== null) {
+                  const foundInNested = findRaten(obj[key]);
+                  if (foundInNested !== undefined) return foundInNested;
+                } else if (key.toLowerCase().includes('monat') && obj[key] !== undefined) {
+                  return obj[key];
+                }
+              }
+              return undefined;
+            };
+            
+            const foundRaten = findRaten(normalizedData.preisKalkulation);
+            if (foundRaten !== undefined) {
+              normalizedData.raten = foundRaten;
+              console.log(`Ratenanzahl rekursiv aus preisKalkulation gefunden: ${normalizedData.raten}`);
             }
           }
           
@@ -190,6 +232,12 @@ const ClientDetailPage = () => {
               : parseFloat(String(normalizedData.monatlicheRate).replace(/[^\d.,]/g, '').replace(',', '.'));
             
             console.log(`Validierte monatliche Rate: ${normalizedData.monatlicheRate}`);
+          }
+          
+          // Berechne die monatliche Rate neu, wenn wir Honorar und Raten haben, aber keine monatliche Rate
+          if (normalizedData.monatlicheRate === undefined && normalizedData.honorar !== undefined && normalizedData.raten !== undefined && normalizedData.raten > 0) {
+            normalizedData.monatlicheRate = normalizedData.honorar / normalizedData.raten;
+            console.log(`Monatliche Rate berechnet: ${normalizedData.monatlicheRate}`);
           }
           
           // ============================================================
@@ -442,9 +490,17 @@ const ClientDetailPage = () => {
               honorar: formDataResponse?.honorar || clientData.honorar || 1111,
               raten: formDataResponse?.raten || clientData.raten || 2,
               ratenStart: formDataResponse?.ratenStart || clientData.ratenStart || "01.01.2025",
-              monatlicheRate: formDataResponse?.monatlicheRate || clientData.monatlicheRate,
               address: formDataResponse?.adresse || clientData.address || "Keine Adresse vorhanden"
             };
+            
+            // Berechne die monatliche Rate wenn möglich
+            if (formDataResponse?.monatlicheRate) {
+              enrichedClient.monatlicheRate = formDataResponse.monatlicheRate;
+            } else if (enrichedClient.honorar && enrichedClient.raten && enrichedClient.raten > 0) {
+              enrichedClient.monatlicheRate = enrichedClient.honorar / enrichedClient.raten;
+            } else {
+              enrichedClient.monatlicheRate = clientData.monatlicheRate;
+            }
             
             // Log für Debugging der Honorardaten
             console.log('Honorardaten nach Anreicherung:', {
@@ -459,33 +515,36 @@ const ClientDetailPage = () => {
             setLastDataUpdate(new Date());
             
             // Aktualisiere auch die Daten in der Datenbank, damit die Honorardaten persistiert werden
-            if (formDataResponse?.honorar || formDataResponse?.raten || formDataResponse?.ratenStart || formDataResponse?.monatlicheRate) {
-              try {
-                const updateData = {};
-                
-                if (formDataResponse.honorar) {
-                  updateData.honorar = formDataResponse.honorar;
-                }
-                
-                if (formDataResponse.raten) {
-                  updateData.raten = formDataResponse.raten;
-                }
-                
-                if (formDataResponse.ratenStart) {
-                  updateData.ratenStart = formDataResponse.ratenStart;
-                }
-                
-                if (formDataResponse.monatlicheRate) {
-                  updateData.monatlicheRate = formDataResponse.monatlicheRate;
-                }
-                
-                if (Object.keys(updateData).length > 0) {
-                  console.log('Updating client data in database with form data:', updateData);
-                  await updateClient(clientData._id, updateData);
-                }
-              } catch (updateError) {
-                console.error('Failed to persist form data to database:', updateError);
+            try {
+              const updateData = {};
+              
+              // Honorar aktualisieren
+              if (formDataResponse?.honorar) {
+                updateData.honorar = formDataResponse.honorar;
               }
+              
+              // Raten aktualisieren
+              if (formDataResponse?.raten) {
+                updateData.raten = formDataResponse.raten;
+              }
+              
+              // Raten-Startdatum aktualisieren
+              if (formDataResponse?.ratenStart) {
+                updateData.ratenStart = formDataResponse.ratenStart;
+              }
+              
+              // Monatliche Rate aktualisieren - aus dem angereicherten Client nehmen
+              if (enrichedClient.monatlicheRate) {
+                updateData.monatlicheRate = enrichedClient.monatlicheRate;
+              }
+              
+              // Nur aktualisieren, wenn es Änderungen gibt
+              if (Object.keys(updateData).length > 0) {
+                console.log('Updating client data in database with form data:', updateData);
+                await updateClient(clientData._id, updateData);
+              }
+            } catch (updateError) {
+              console.error('Failed to persist form data to database:', updateError);
             }
           } catch (formError) {
             console.error('Error loading form data:', formError);
@@ -856,11 +915,26 @@ const ClientDetailPage = () => {
                     <p className="text-gray-500 text-sm">Monatliche Rate</p>
                     <p className="text-xl font-medium text-gray-900 flex items-center">
                       <CurrencyEuroIcon className="h-5 w-5 text-gray-400 mr-2" />
-                      {client.formData?.monatlicheRate || 
-                       (client.honorar && client.raten ? 
-                        (client.honorar / client.raten).toFixed(2) : 
-                        (1111/2).toFixed(2))
-                      } €
+                      {(() => {
+                        // Erste Priorität: die berechnete monatliche Rate aus den Formulardaten
+                        if (client.formData?.monatlicheRate) {
+                          const rate = parseFloat(client.formData.monatlicheRate);
+                          return isNaN(rate) ? (1111/2).toFixed(2) : rate.toFixed(2);
+                        }
+                        
+                        // Zweite Priorität: Berechnung aus Honorar und Raten
+                        if (client.honorar && client.raten && client.raten > 0) {
+                          return (client.honorar / client.raten).toFixed(2);
+                        }
+                        
+                        // Dritte Priorität: Berechnung aus Formular-Honorar und Formular-Raten
+                        if (client.formData?.honorar && client.formData?.raten && client.formData.raten > 0) {
+                          return (client.formData.honorar / client.formData.raten).toFixed(2);
+                        }
+                        
+                        // Fallback: Standardwert
+                        return (1111/2).toFixed(2);
+                      })()} €
                     </p>
                   </div>
                 </div>
@@ -1311,11 +1385,26 @@ const ClientDetailPage = () => {
                     <p className="text-sm text-gray-500">Monatliche Rate</p>
                     <p className="text-gray-900 font-medium flex items-center">
                       <CurrencyEuroIcon className="h-4 w-4 text-gray-400 mr-1" />
-                      {client.formData?.monatlicheRate || 
-                       (client.honorar && client.raten ? 
-                        (client.honorar / client.raten).toFixed(2) : 
-                        (1111/2).toFixed(2))
-                      } €
+                      {(() => {
+                        // Erste Priorität: die berechnete monatliche Rate aus den Formulardaten
+                        if (client.formData?.monatlicheRate) {
+                          const rate = parseFloat(client.formData.monatlicheRate);
+                          return isNaN(rate) ? (1111/2).toFixed(2) : rate.toFixed(2);
+                        }
+                        
+                        // Zweite Priorität: Berechnung aus Honorar und Raten
+                        if (client.honorar && client.raten && client.raten > 0) {
+                          return (client.honorar / client.raten).toFixed(2);
+                        }
+                        
+                        // Dritte Priorität: Berechnung aus Formular-Honorar und Formular-Raten
+                        if (client.formData?.honorar && client.formData?.raten && client.formData.raten > 0) {
+                          return (client.formData.honorar / client.formData.raten).toFixed(2);
+                        }
+                        
+                        // Fallback: Standardwert
+                        return (1111/2).toFixed(2);
+                      })()} €
                     </p>
                   </div>
                   {client.formData?.nettoeinkommen && (
