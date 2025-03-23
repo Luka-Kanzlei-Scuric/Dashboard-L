@@ -783,10 +783,33 @@ const ClientDetailPage = () => {
                   Kontaktinformationen
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Formatierte Zusammenfassung der Adresse */}
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500">Adresse</p>
                     <p className="text-gray-900 font-medium">
-                      {client.formData?.adresse || client.address || '-'}
+                      {(() => {
+                        // Wenn die strukturierten Adressfelder vorhanden sind, verwenden wir diese
+                        if (client.formData?.strasse || client.formData?.hausnummer || client.formData?.plz || client.formData?.ort) {
+                          const adressTeile = [];
+                          if (client.formData?.strasse) adressTeile.push(client.formData.strasse);
+                          if (client.formData?.hausnummer) adressTeile.push(client.formData.hausnummer);
+                          
+                          const ortTeile = [];
+                          if (client.formData?.plz) ortTeile.push(client.formData.plz);
+                          if (client.formData?.ort) ortTeile.push(client.formData.ort);
+                          
+                          const adressZeile1 = adressTeile.join(' ');
+                          const adressZeile2 = ortTeile.join(' ');
+                          
+                          return <>
+                            {adressZeile1}<br />
+                            {adressZeile2}
+                          </>;
+                        } else {
+                          // Ansonsten verwenden wir das generische Adressfeld
+                          return client.formData?.adresse || client.address || '-';
+                        }
+                      })()}
                     </p>
                   </div>
                   <div className="space-y-1">
@@ -884,28 +907,151 @@ const ClientDetailPage = () => {
                 </div>
               </div>
 
-              {/* Weitere Angaben */}
+              {/* Adressinformationen - Speziell formatiert */}
+              {(client.formData?.strasse || client.formData?.hausnummer || client.formData?.plz || client.formData?.ort) && (
+                <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Adressinformationen
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {client.formData?.strasse && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Straße</p>
+                        <p className="text-gray-900 font-medium">{client.formData.strasse}</p>
+                      </div>
+                    )}
+                    {client.formData?.hausnummer && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Hausnummer</p>
+                        <p className="text-gray-900 font-medium">{client.formData.hausnummer}</p>
+                      </div>
+                    )}
+                    {client.formData?.plz && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-500">PLZ</p>
+                        <p className="text-gray-900 font-medium">{client.formData.plz}</p>
+                      </div>
+                    )}
+                    {client.formData?.ort && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Ort</p>
+                        <p className="text-gray-900 font-medium">{client.formData.ort}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Kostenaufstellung - Wenn vorhanden */}
+              {client.formData?.kostenaufstellung && (
+                <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
+                    <CurrencyEuroIcon className="h-5 w-5 text-gray-500 mr-2" />
+                    Kostenaufstellung
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {client.formData.kostenaufstellung.standardberechnung && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Standardberechnung</p>
+                        <p className="text-gray-900 font-medium">{client.formData.kostenaufstellung.standardberechnung}</p>
+                      </div>
+                    )}
+                    {client.formData.kostenaufstellung.standardpreis && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Standardpreis</p>
+                        <p className="text-gray-900 font-medium">{client.formData.kostenaufstellung.standardpreis}</p>
+                      </div>
+                    )}
+                    {client.formData.kostenaufstellung.gesamtpreis && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Gesamtpreis</p>
+                        <p className="text-gray-900 font-medium">{client.formData.kostenaufstellung.gesamtpreis}</p>
+                      </div>
+                    )}
+                    {client.formData.kostenaufstellung.berechnung && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Berechnungsmethode</p>
+                        <p className="text-gray-900 font-medium">{client.formData.kostenaufstellung.berechnung}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Weitere Angaben - Alle restlichen Felder */}
               <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
                 <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
                   <DocumentTextIcon className="h-5 w-5 text-gray-500 mr-2" />
                   Weitere Angaben
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {Object.entries(client.formData || {}).filter(([key, _]) => 
-                    key && ![
-                      'name', 'email', 'telefon', 'adresse', 'geburtsdatum', 'beruf', 'familienstand',
-                      'honorar', 'raten', 'ratenStart', 'nettoeinkommen'
-                    ].includes(key)
-                  ).map(([key, value]) => (
-                    <div key={key} className="space-y-1">
-                      <p className="text-sm text-gray-500 capitalize">
-                        {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                      </p>
-                      <p className="text-gray-900 font-medium">
-                        {typeof value === 'object' ? JSON.stringify(value) : String(value || '-')}
-                      </p>
-                    </div>
-                  ))}
+                  {Object.entries(client.formData || {})
+                    .filter(([key, value]) => {
+                      // Filter out specific categories
+                      const excludedKeys = [
+                        'name', 'email', 'telefon', 'adresse', 'geburtsdatum', 'beruf', 'familienstand',
+                        'honorar', 'raten', 'ratenStart', 'nettoeinkommen', 'strasse', 'hausnummer', 'plz', 'ort',
+                        'kostenaufstellung', 'ratenzahlung'
+                      ];
+                      
+                      // Filter out empty values
+                      if (value === null || value === undefined || value === '') {
+                        return false;
+                      }
+                      
+                      // Filter out objects (they are displayed in their own sections)
+                      if (typeof value === 'object') {
+                        return false;
+                      }
+                      
+                      return key && !excludedKeys.includes(key);
+                    })
+                    .map(([key, value]) => (
+                      <div key={key} className="space-y-1">
+                        <p className="text-sm text-gray-500 capitalize">
+                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                        </p>
+                        <p className="text-gray-900 font-medium">
+                          {String(value || '-')}
+                        </p>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+              
+              {/* Leere Felder - Am Ende gruppiert */}
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Nicht ausgefüllte Felder
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {Object.entries(client.formData || {})
+                    .filter(([key, value]) => {
+                      // Include only empty values or null
+                      return (value === null || value === undefined || value === '') && 
+                             key && ![
+                               'kostenaufstellung', 'ratenzahlung'
+                             ].includes(key);
+                    })
+                    .map(([key, _]) => (
+                      <div key={key} className="space-y-1">
+                        <p className="text-sm text-gray-500 capitalize">
+                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                        </p>
+                        <p className="text-gray-400 italic text-sm">
+                          Nicht ausgefüllt
+                        </p>
+                      </div>
+                    ))
+                  }
                 </div>
               </div>
             </div>
