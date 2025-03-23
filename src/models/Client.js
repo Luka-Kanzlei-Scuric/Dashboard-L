@@ -30,11 +30,11 @@ const clientSchema = new mongoose.Schema(
     // Honorar-Informationen
     honorar: {
       type: Number,
-      default: 5000,
+      default: 1111,
     },
     raten: {
       type: Number,
-      default: 5,
+      default: 2,
     },
     ratenStart: {
       type: String,

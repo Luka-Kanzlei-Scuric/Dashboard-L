@@ -506,8 +506,8 @@ app.get('/api/proxy/forms/:taskId', cors(corsOptions), async (req, res) => {
           
           return res.status(200).json({
             name: client.name,
-            honorar: client.honorar || 5000,
-            raten: client.raten || 5,
+            honorar: client.honorar || 1111,
+            raten: client.raten || 2,
             ratenStart: client.ratenStart || "01.01.2025",
             adresse: client.address || "Adresse nicht verfügbar",
             einwilligung: "Ja",
@@ -524,8 +524,8 @@ app.get('/api/proxy/forms/:taskId', cors(corsOptions), async (req, res) => {
       // Falls kein Client gefunden wurde oder ein Fehler auftrat, verwende die Standard-Fallback-Daten
       return res.status(200).json({
         name: "Max Mustermann (Fallback)",
-        honorar: 5000,
-        raten: 5,
+        honorar: 1111,
+        raten: 2,
         ratenStart: "01.01.2025",
         adresse: "Musterstraße 123, 10115 Berlin",
         einwilligung: "Ja",

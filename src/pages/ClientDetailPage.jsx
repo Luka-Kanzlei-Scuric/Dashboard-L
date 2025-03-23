@@ -144,8 +144,8 @@ const ClientDetailPage = () => {
       // Mock-Daten für Fallback, falls die API nicht erreichbar ist
       const mockFormData = {
         name: "Max Mustermann",
-        honorar: 5000,
-        raten: 5,
+        honorar: 1111,
+        raten: 2,
         ratenStart: "01.01.2025",
         adresse: "Musterstraße 123, 10115 Berlin",
         einwilligung: "Ja",
@@ -243,8 +243,8 @@ const ClientDetailPage = () => {
             formData: formDataResponse,
             documents: mockDocuments, // Nutze Mock-Dokumente für die Demoansicht
             // Standard-Werte für fehlende Felder
-            honorar: formDataResponse?.honorar || clientData.honorar || 5000,
-            raten: formDataResponse?.raten || clientData.raten || 5,
+            honorar: formDataResponse?.honorar || clientData.honorar || 1111,
+            raten: formDataResponse?.raten || clientData.raten || 2,
             ratenStart: formDataResponse?.ratenStart || clientData.ratenStart || "01.01.2025",
             address: formDataResponse?.adresse || clientData.address || "Keine Adresse vorhanden"
           };
@@ -292,8 +292,8 @@ const ClientDetailPage = () => {
             ...clientData,
             id: id,
             documents: mockDocuments,
-            honorar: clientData.honorar || 5000,
-            raten: clientData.raten || 5,
+            honorar: clientData.honorar || 1111,
+            raten: clientData.raten || 2,
             ratenStart: clientData.ratenStart || "01.01.2025"
           });
         }
@@ -813,13 +813,13 @@ const ClientDetailPage = () => {
                     <p className="text-sm text-gray-500">Honorarpreis</p>
                     <p className="text-gray-900 font-medium flex items-center">
                       <CurrencyEuroIcon className="h-4 w-4 text-gray-400 mr-1" />
-                      {client.honorar || 5000} €
+                      {client.honorar || 1111} €
                     </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm text-gray-500">Anzahl Raten</p>
                     <p className="text-gray-900 font-medium">
-                      {client.raten || 5}x
+                      {client.raten || 2}x
                     </p>
                   </div>
                   <div className="space-y-1">
