@@ -657,16 +657,6 @@ const ClientDetailPage = () => {
               ratenStart: clientData.ratenStart || "01.01.2025"
             });
           }
-        } else {
-          // Keine neuen Daten benötigt, verwende vorhandene Client-Daten
-          setClient({
-            ...clientData,
-            id: id,
-            documents: mockDocuments,
-            honorar: clientData.honorar || 1111,
-            raten: clientData.raten || 2,
-            ratenStart: clientData.ratenStart || "01.01.2025"
-          });
         }
       } catch (err) {
         console.error('Error loading client details:', err);
