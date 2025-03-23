@@ -1290,45 +1290,266 @@ const ClientDetailPage = () => {
                 </div>
               )}
 
-              {/* Weitere Angaben - Alle restlichen Felder */}
+              {/* Beschäftigung und Beruf */}
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Beschäftigung und Beruf
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {client.formData?.beschaeftigungsArt && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Beschäftigungsart</p>
+                      <p className="text-gray-900 font-medium">{client.formData.beschaeftigungsArt}</p>
+                    </div>
+                  )}
+                  {client.formData?.derzeitigeTaetigkeit && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Derzeitige Tätigkeit</p>
+                      <p className="text-gray-900 font-medium">{client.formData.derzeitigeTaetigkeit}</p>
+                    </div>
+                  )}
+                  {client.formData?.erlernterBeruf && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Erlernter Beruf</p>
+                      <p className="text-gray-900 font-medium">{client.formData.erlernterBeruf}</p>
+                    </div>
+                  )}
+                  {client.formData?.selbststaendig !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Selbstständig</p>
+                      <p className="text-gray-900 font-medium">{client.formData.selbststaendig ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.warSelbststaendig !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">War selbstständig</p>
+                      <p className="text-gray-900 font-medium">{client.formData.warSelbststaendig ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.befristet !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Befristeter Arbeitsvertrag</p>
+                      <p className="text-gray-900 font-medium">{client.formData.befristet ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Finanzielle Situation */}
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
+                  <CurrencyEuroIcon className="h-5 w-5 text-gray-500 mr-2" />
+                  Finanzielle Situation
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {client.formData?.nettoEinkommen && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Nettoeinkommen</p>
+                      <p className="text-gray-900 font-medium">{client.formData.nettoEinkommen} €</p>
+                    </div>
+                  )}
+                  {client.formData?.gesamtSchulden && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Gesamtschulden</p>
+                      <p className="text-gray-900 font-medium">{client.formData.gesamtSchulden} €</p>
+                    </div>
+                  )}
+                  {client.formData?.glaeubiger && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Anzahl Gläubiger</p>
+                      <p className="text-gray-900 font-medium">{client.formData.glaeubiger}</p>
+                    </div>
+                  )}
+                  {client.formData?.aktuelePfaendung !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Aktuelle Pfändung</p>
+                      <p className="text-gray-900 font-medium">{client.formData.aktuelePfaendung ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.pfaendungDetails && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Details zur Pfändung</p>
+                      <p className="text-gray-900 font-medium">{client.formData.pfaendungDetails}</p>
+                    </div>
+                  )}
+                  {client.formData?.unterhaltspflicht !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Unterhaltspflicht</p>
+                      <p className="text-gray-900 font-medium">{client.formData.unterhaltspflicht ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Vermögenswerte */}
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  Vermögenswerte
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Fahrzeuge */}
+                  {client.formData?.fahrzeuge !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Fahrzeuge</p>
+                      <p className="text-gray-900 font-medium">{client.formData.fahrzeuge ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.fahrzeugWert && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Fahrzeug-Wert</p>
+                      <p className="text-gray-900 font-medium">{client.formData.fahrzeugWert} €</p>
+                    </div>
+                  )}
+                  {client.formData?.fahrzeugNotwendig !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Fahrzeug notwendig</p>
+                      <p className="text-gray-900 font-medium">{client.formData.fahrzeugNotwendig ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.fahrzeugFinanziert !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Fahrzeug finanziert</p>
+                      <p className="text-gray-900 font-medium">{client.formData.fahrzeugFinanziert ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  
+                  {/* Immobilien */}
+                  {client.formData?.immobilien !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Immobilien</p>
+                      <p className="text-gray-900 font-medium">{client.formData.immobilien ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.immobilienDetails && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Immobilien-Details</p>
+                      <p className="text-gray-900 font-medium">{client.formData.immobilienDetails}</p>
+                    </div>
+                  )}
+                  
+                  {/* Versicherungen */}
+                  {client.formData?.lebensversicherung !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Lebensversicherung</p>
+                      <p className="text-gray-900 font-medium">{client.formData.lebensversicherung ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.lebensversicherungWert && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Lebensversicherung Wert</p>
+                      <p className="text-gray-900 font-medium">{client.formData.lebensversicherungWert}</p>
+                    </div>
+                  )}
+                  {client.formData?.rentenversicherung !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Rentenversicherung</p>
+                      <p className="text-gray-900 font-medium">{client.formData.rentenversicherung ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.rentenversicherungWert && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Rentenversicherung Details</p>
+                      <p className="text-gray-900 font-medium">{client.formData.rentenversicherungWert}</p>
+                    </div>
+                  )}
+                  
+                  {/* Weitere Vermögenswerte */}
+                  {client.formData?.weitereVermoegen !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Weitere Vermögenswerte</p>
+                      <p className="text-gray-900 font-medium">{client.formData.weitereVermoegen ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.weitereVermoegenDetails && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Details zu weiteren Vermögenswerten</p>
+                      <p className="text-gray-900 font-medium">{client.formData.weitereVermoegenDetails}</p>
+                    </div>
+                  )}
+                  {client.formData?.sparbuch !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Sparbuch</p>
+                      <p className="text-gray-900 font-medium">{client.formData.sparbuch ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.bausparvertrag !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Bausparvertrag</p>
+                      <p className="text-gray-900 font-medium">{client.formData.bausparvertrag ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Weitere Angaben */}
               <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
                 <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
                   <DocumentTextIcon className="h-5 w-5 text-gray-500 mr-2" />
                   Weitere Angaben
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {Object.entries(client.formData || {})
-                    .filter(([key, value]) => {
-                      // Filter out specific categories
-                      const excludedKeys = [
-                        'name', 'email', 'telefon', 'adresse', 'geburtsdatum', 'beruf', 'familienstand',
-                        'honorar', 'raten', 'ratenStart', 'nettoeinkommen', 'strasse', 'hausnummer', 'plz', 'ort',
-                        'kostenaufstellung', 'ratenzahlung'
-                      ];
-                      
-                      // Filter out empty values
-                      if (value === null || value === undefined || value === '') {
-                        return false;
-                      }
-                      
-                      // Filter out objects (they are displayed in their own sections)
-                      if (typeof value === 'object') {
-                        return false;
-                      }
-                      
-                      return key && !excludedKeys.includes(key);
-                    })
-                    .map(([key, value]) => (
-                      <div key={key} className="space-y-1">
-                        <p className="text-sm text-gray-500 capitalize">
-                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                        </p>
-                        <p className="text-gray-900 font-medium">
-                          {String(value || '-')}
-                        </p>
-                      </div>
-                    ))
-                  }
+                  {client.formData?.vorherigeInsolvenz !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Vorherige Insolvenz</p>
+                      <p className="text-gray-900 font-medium">{client.formData.vorherigeInsolvenz ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.insolvenzDatum && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Insolvenz-Datum</p>
+                      <p className="text-gray-900 font-medium">{client.formData.insolvenzDatum}</p>
+                    </div>
+                  )}
+                  {client.formData?.zustellungEmail !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Zustellung per E-Mail</p>
+                      <p className="text-gray-900 font-medium">{client.formData.zustellungEmail ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.zustellungPost !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Zustellung per Post</p>
+                      <p className="text-gray-900 font-medium">{client.formData.zustellungPost ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.notizen && (
+                    <div className="space-y-1 col-span-2">
+                      <p className="text-sm text-gray-500">Notizen</p>
+                      <p className="text-gray-900 font-medium">{client.formData.notizen}</p>
+                    </div>
+                  )}
+                  
+                  {/* Preiskalkulation Details */}
+                  {client.formData?.preisKalkulation?.berechnungsart && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Berechnungsart</p>
+                      <p className="text-gray-900 font-medium">{client.formData.preisKalkulation.berechnungsart}</p>
+                    </div>
+                  )}
+                  {client.formData?.manuellerPreis !== undefined && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Manueller Preis</p>
+                      <p className="text-gray-900 font-medium">{client.formData.manuellerPreis ? 'Ja' : 'Nein'}</p>
+                    </div>
+                  )}
+                  {client.formData?.manuellerPreisBetrag && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Manueller Preisbetrag</p>
+                      <p className="text-gray-900 font-medium">{client.formData.manuellerPreisBetrag} €</p>
+                    </div>
+                  )}
+                  {client.formData?.manuellerPreisNotiz && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Manueller Preis Notiz</p>
+                      <p className="text-gray-900 font-medium">{client.formData.manuellerPreisNotiz}</p>
+                    </div>
+                  )}
                 </div>
               </div>
               
