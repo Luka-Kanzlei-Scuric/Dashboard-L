@@ -616,15 +616,19 @@ const ClientDetailPage = () => {
   const MIN_API_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 Minuten
   
   // Verwende React.useCallback und minimale Abhängigkeiten um Effekte zu stabilisieren
+  // Flag, um zu verfolgen, ob ein Ladevorgang läuft (nicht Teil des State)
+  const isLoadingRef = useRef(false);
+  
   const loadClient = React.useCallback(async () => {
     // Prüfen, ob ein Client bereits geladen wird, um Mehrfachanfragen zu vermeiden
-    if (loading) {
+    if (isLoadingRef.current) {
       console.log('Client wird bereits geladen, Anfrage übersprungen');
       return;
     }
     
     try {
       console.log('Beginne Client zu laden mit ID:', id);
+      isLoadingRef.current = true; // Setze Flag vor dem Loading-State
       setLoading(true);
       
       // Erst den Client aus dem Context laden
@@ -693,6 +697,7 @@ const ClientDetailPage = () => {
         });
         
         setLoading(false);
+        isLoadingRef.current = false; // Flag zurücksetzen 
         return;
       }
       
@@ -773,6 +778,9 @@ const ClientDetailPage = () => {
       setError(err.message || 'Fehler beim Laden der Mandantendetails');
     } finally {
       setLoading(false);
+      // Immer das Flag zurücksetzen, auch im Fehlerfall
+      isLoadingRef.current = false;
+      console.log('Client loading completed, loading flags reset');
     }
   }, [id, getClient]); // Minimale Abhängigkeiten - wir machen das Update über useEffect 
 
@@ -781,9 +789,10 @@ const ClientDetailPage = () => {
     loadClient();
   }, [id, loadClient]);
   
-  // Separater Effekt nur für lastDataUpdate
+  // Separater Effekt nur für lastDataUpdate - verhindert Überlappung mit normalen Updates
   useEffect(() => {
-    if (lastDataUpdate) {
+    // Nur ausführen, wenn lastDataUpdate gesetzt und kein anderes Update läuft
+    if (lastDataUpdate && !isLoadingRef.current) {
       console.log(`Manuelles Update angefordert: ${lastDataUpdate.toISOString()}`);
       loadClient();
     }
@@ -806,8 +815,8 @@ const ClientDetailPage = () => {
   
   // Effekt für periodische Aktualisierung - stark vereinfacht
   useEffect(() => {
-    // Nur einen Timer starten, wenn wir ein aktives Intervall haben
-    if (dataRefreshInterval > 0 && !loading && client) {
+    // Nur einen Timer starten, wenn wir ein aktives Intervall haben und Client bereits geladen ist
+    if (dataRefreshInterval > 0 && client && !isLoadingRef.current) {
       console.log(`Timer für nächstes Update in ${dataRefreshInterval/1000} Sekunden gesetzt`);
       
       // Alten Timer löschen falls vorhanden
@@ -819,8 +828,13 @@ const ClientDetailPage = () => {
       const effectiveInterval = Math.max(dataRefreshInterval, 60000);
       
       timerRef.current = setTimeout(() => {
-        console.log(`Automatisches Update nach ${effectiveInterval/1000}s`);
-        triggerManualUpdate();
+        // Sicherheitscheck direkt vor dem Auslösen des Updates
+        if (!isLoadingRef.current) {
+          console.log(`Automatisches Update nach ${effectiveInterval/1000}s`);
+          triggerManualUpdate();
+        } else {
+          console.log('Auto-Update übersprungen: Bereits ein Update im Gange');
+        }
       }, effectiveInterval);
     }
     
@@ -831,7 +845,7 @@ const ClientDetailPage = () => {
         timerRef.current = null;
       }
     };
-  }, [dataRefreshInterval, client, loading]);
+  }, [dataRefreshInterval, client]);
   
   // Separater Effect für lastDataUpdate, um unnötige Re-renders zu verhindern
   useEffect(() => {
