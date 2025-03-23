@@ -111,33 +111,63 @@ const ClientDetailPage = () => {
         console.log('Form data response raw fields:', Object.keys(response.data));
         
         // Extrahiere Honorardaten aus verschiedenen möglichen Feldern
-        // Priorität: gesamtpreis > honorarpreis > standardpreis > honorar > standardberechnung > fallback
+        // Neue Priorität: preisKalkulation > gesamtpreis > honorarpreis > standardpreis > honorar > fallback
         
-        // 1. Honorarpreis extrahieren
-        if (normalizedData.gesamtpreis !== undefined) {
-          console.log(`Using gesamtpreis (${normalizedData.gesamtpreis}) as honorar`);
-          normalizedData.honorar = normalizedData.gesamtpreis;
-        } else if (normalizedData.honorarpreis !== undefined) {
-          console.log(`Using honorarpreis (${normalizedData.honorarpreis}) as honorar`);
-          normalizedData.honorar = normalizedData.honorarpreis;
-        } else if (normalizedData.standardpreis !== undefined) {
-          console.log(`Using standardpreis (${normalizedData.standardpreis}) as honorar`);
-          normalizedData.honorar = normalizedData.standardpreis;
-        }
-        
-        // 2. Raten extrahieren
-        if (normalizedData.ratenzahlung && normalizedData.ratenzahlung.laufzeit) {
-          console.log(`Using ratenzahlung.laufzeit (${normalizedData.ratenzahlung.laufzeit}) as raten`);
-          normalizedData.raten = normalizedData.ratenzahlung.laufzeit;
-        } else if (normalizedData.laufzeit !== undefined) {
-          console.log(`Using laufzeit (${normalizedData.laufzeit}) as raten`);
-          normalizedData.raten = normalizedData.laufzeit;
-        }
-        
-        // 3. Monatliche Rate extrahieren
-        if (normalizedData.ratenzahlung && normalizedData.ratenzahlung.monatlicheRate) {
-          console.log(`Found monatlicheRate: ${normalizedData.ratenzahlung.monatlicheRate}`);
-          normalizedData.monatlicheRate = normalizedData.ratenzahlung.monatlicheRate;
+        // Prüfe auf die neue API-Struktur mit preisKalkulation
+        if (normalizedData.preisKalkulation) {
+          console.log('Found preisKalkulation in form data', JSON.stringify(normalizedData.preisKalkulation, null, 2));
+          
+          // 1. Honorarpreis extrahieren aus preisKalkulation.gesamtPreis
+          if (normalizedData.preisKalkulation.gesamtPreis !== undefined) {
+            console.log(`Using preisKalkulation.gesamtPreis (${normalizedData.preisKalkulation.gesamtPreis}) as honorar`);
+            normalizedData.honorar = normalizedData.preisKalkulation.gesamtPreis;
+          } else if (normalizedData.preisKalkulation.standardPrice !== undefined) {
+            console.log(`Using preisKalkulation.standardPrice (${normalizedData.preisKalkulation.standardPrice}) as honorar`);
+            normalizedData.honorar = normalizedData.preisKalkulation.standardPrice;
+          }
+          
+          // 2. Raten extrahieren aus preisKalkulation.ratenzahlung.monate
+          if (normalizedData.preisKalkulation.ratenzahlung && normalizedData.preisKalkulation.ratenzahlung.monate !== undefined) {
+            console.log(`Using preisKalkulation.ratenzahlung.monate (${normalizedData.preisKalkulation.ratenzahlung.monate}) as raten`);
+            normalizedData.raten = normalizedData.preisKalkulation.ratenzahlung.monate;
+          } else if (normalizedData.ratenzahlungMonate) {
+            console.log(`Using ratenzahlungMonate (${normalizedData.ratenzahlungMonate}) as raten`);
+            normalizedData.raten = normalizedData.ratenzahlungMonate;
+          }
+          
+          // 3. Monatliche Rate extrahieren aus preisKalkulation.ratenzahlung.monatsRate
+          if (normalizedData.preisKalkulation.ratenzahlung && normalizedData.preisKalkulation.ratenzahlung.monatsRate !== undefined) {
+            console.log(`Found monatsRate: ${normalizedData.preisKalkulation.ratenzahlung.monatsRate}`);
+            normalizedData.monatlicheRate = normalizedData.preisKalkulation.ratenzahlung.monatsRate;
+          }
+        } else {
+          // Fallback auf ältere API-Struktur
+          // 1. Honorarpreis extrahieren
+          if (normalizedData.gesamtpreis !== undefined) {
+            console.log(`Using gesamtpreis (${normalizedData.gesamtpreis}) as honorar`);
+            normalizedData.honorar = normalizedData.gesamtpreis;
+          } else if (normalizedData.honorarpreis !== undefined) {
+            console.log(`Using honorarpreis (${normalizedData.honorarpreis}) as honorar`);
+            normalizedData.honorar = normalizedData.honorarpreis;
+          } else if (normalizedData.standardpreis !== undefined) {
+            console.log(`Using standardpreis (${normalizedData.standardpreis}) as honorar`);
+            normalizedData.honorar = normalizedData.standardpreis;
+          }
+          
+          // 2. Raten extrahieren
+          if (normalizedData.ratenzahlung && normalizedData.ratenzahlung.laufzeit) {
+            console.log(`Using ratenzahlung.laufzeit (${normalizedData.ratenzahlung.laufzeit}) as raten`);
+            normalizedData.raten = normalizedData.ratenzahlung.laufzeit;
+          } else if (normalizedData.laufzeit !== undefined) {
+            console.log(`Using laufzeit (${normalizedData.laufzeit}) as raten`);
+            normalizedData.raten = normalizedData.laufzeit;
+          }
+          
+          // 3. Monatliche Rate extrahieren
+          if (normalizedData.ratenzahlung && normalizedData.ratenzahlung.monatlicheRate) {
+            console.log(`Found monatlicheRate: ${normalizedData.ratenzahlung.monatlicheRate}`);
+            normalizedData.monatlicheRate = normalizedData.ratenzahlung.monatlicheRate;
+          }
         }
         
         // Stelle sicher, dass honorar als Zahl vorliegt
