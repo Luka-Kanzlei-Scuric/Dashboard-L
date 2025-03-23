@@ -330,6 +330,11 @@ const ClientDetailPage = () => {
     }
   };
 
+  // State zum Speichern des letzten Daten-Updates und Aktualisierungsintervalls
+  const [lastDataUpdate, setLastDataUpdate] = useState(null);
+  const [dataRefreshInterval, setDataRefreshInterval] = useState(300000); // 5 Minuten in Millisekunden
+  const [refreshTimerId, setRefreshTimerId] = useState(null);
+  
   useEffect(() => {
     const loadClient = async () => {
       try {
@@ -341,67 +346,86 @@ const ClientDetailPage = () => {
         // Aktenzeichennummer in den Zustand setzen
         setCaseNumber(clientData?.caseNumber || '');
         
-        // Dann die Formulardaten vom angegebenen API-Endpunkt abrufen
-        try {
-          const formDataResponse = await fetchFormData(clientData.clickupId || id);
-          
-          // Client-Objekt mit den Formulardaten anreichern
-          const enrichedClient = {
-            ...clientData,
-            id: id,
-            formData: formDataResponse,
-            documents: mockDocuments, // Nutze Mock-Dokumente für die Demoansicht
-            // Standard-Werte für fehlende Felder
-            honorar: formDataResponse?.honorar || clientData.honorar || 1111,
-            raten: formDataResponse?.raten || clientData.raten || 2,
-            ratenStart: formDataResponse?.ratenStart || clientData.ratenStart || "01.01.2025",
-            monatlicheRate: formDataResponse?.monatlicheRate || clientData.monatlicheRate,
-            address: formDataResponse?.adresse || clientData.address || "Keine Adresse vorhanden"
-          };
-          
-          // Log für Debugging der Honorardaten
-          console.log('Honorardaten nach Anreicherung:', {
-            honorarFormData: formDataResponse?.honorar,
-            honorarClientData: clientData.honorar,
-            finalHonorar: enrichedClient.honorar
-          });
-          
-          setClient(enrichedClient);
-          
-          // Aktualisiere auch die Daten in der Datenbank, damit die Honorardaten persistiert werden
-          if (formDataResponse?.honorar || formDataResponse?.raten || formDataResponse?.ratenStart || formDataResponse?.monatlicheRate) {
-            try {
-              const updateData = {};
-              
-              if (formDataResponse.honorar) {
-                updateData.honorar = formDataResponse.honorar;
+        // Prüfen ob ein Daten-Update notwendig ist
+        const shouldFetchFormData = 
+          !lastDataUpdate || // Noch nie Daten geladen oder
+          (new Date().getTime() - lastDataUpdate.getTime() > dataRefreshInterval); // Intervall überschritten
+        
+        if (shouldFetchFormData) {
+          try {
+            const formDataResponse = await fetchFormData(clientData.clickupId || id);
+            
+            // Client-Objekt mit den Formulardaten anreichern
+            const enrichedClient = {
+              ...clientData,
+              id: id,
+              formData: formDataResponse,
+              documents: mockDocuments, // Nutze Mock-Dokumente für die Demoansicht
+              // Standard-Werte für fehlende Felder
+              honorar: formDataResponse?.honorar || clientData.honorar || 1111,
+              raten: formDataResponse?.raten || clientData.raten || 2,
+              ratenStart: formDataResponse?.ratenStart || clientData.ratenStart || "01.01.2025",
+              monatlicheRate: formDataResponse?.monatlicheRate || clientData.monatlicheRate,
+              address: formDataResponse?.adresse || clientData.address || "Keine Adresse vorhanden"
+            };
+            
+            // Log für Debugging der Honorardaten
+            console.log('Honorardaten nach Anreicherung:', {
+              honorarFormData: formDataResponse?.honorar,
+              honorarClientData: clientData.honorar,
+              finalHonorar: enrichedClient.honorar
+            });
+            
+            setClient(enrichedClient);
+            
+            // Aktualisiere Zeitstempel des letzten Updates
+            setLastDataUpdate(new Date());
+            
+            // Aktualisiere auch die Daten in der Datenbank, damit die Honorardaten persistiert werden
+            if (formDataResponse?.honorar || formDataResponse?.raten || formDataResponse?.ratenStart || formDataResponse?.monatlicheRate) {
+              try {
+                const updateData = {};
+                
+                if (formDataResponse.honorar) {
+                  updateData.honorar = formDataResponse.honorar;
+                }
+                
+                if (formDataResponse.raten) {
+                  updateData.raten = formDataResponse.raten;
+                }
+                
+                if (formDataResponse.ratenStart) {
+                  updateData.ratenStart = formDataResponse.ratenStart;
+                }
+                
+                if (formDataResponse.monatlicheRate) {
+                  updateData.monatlicheRate = formDataResponse.monatlicheRate;
+                }
+                
+                if (Object.keys(updateData).length > 0) {
+                  console.log('Updating client data in database with form data:', updateData);
+                  await updateClient(clientData._id, updateData);
+                }
+              } catch (updateError) {
+                console.error('Failed to persist form data to database:', updateError);
               }
-              
-              if (formDataResponse.raten) {
-                updateData.raten = formDataResponse.raten;
-              }
-              
-              if (formDataResponse.ratenStart) {
-                updateData.ratenStart = formDataResponse.ratenStart;
-              }
-              
-              if (formDataResponse.monatlicheRate) {
-                updateData.monatlicheRate = formDataResponse.monatlicheRate;
-              }
-              
-              if (Object.keys(updateData).length > 0) {
-                console.log('Updating client data in database with form data:', updateData);
-                await updateClient(clientData._id, updateData);
-              }
-            } catch (updateError) {
-              console.error('Failed to persist form data to database:', updateError);
             }
+          } catch (formError) {
+            console.error('Error loading form data:', formError);
+            
+            // Wenn Formulardaten nicht geladen werden können, trotzdem den Client anzeigen
+            // Verwende dabei die in der Datenbank gespeicherten Werte, falls vorhanden
+            setClient({
+              ...clientData,
+              id: id,
+              documents: mockDocuments,
+              honorar: clientData.honorar || 1111,
+              raten: clientData.raten || 2,
+              ratenStart: clientData.ratenStart || "01.01.2025"
+            });
           }
-        } catch (formError) {
-          console.error('Error loading form data:', formError);
-          
-          // Wenn Formulardaten nicht geladen werden können, trotzdem den Client anzeigen
-          // Verwende dabei die in der Datenbank gespeicherten Werte, falls vorhanden
+        } else {
+          // Keine neuen Daten benötigt, verwende vorhandene Client-Daten
           setClient({
             ...clientData,
             id: id,
@@ -420,7 +444,42 @@ const ClientDetailPage = () => {
     };
 
     loadClient();
-  }, [id, getClient]);
+  }, [id, getClient, lastDataUpdate, dataRefreshInterval]);
+  
+  // Effekt für periodische Aktualisierung
+  useEffect(() => {
+    // Wenn kein Intervall gesetzt ist (Wert 0), keine periodische Aktualisierung durchführen
+    if (dataRefreshInterval === 0) {
+      if (refreshTimerId) {
+        clearTimeout(refreshTimerId);
+        setRefreshTimerId(null);
+      }
+      return;
+    }
+    
+    // Bestehenden Timer löschen, falls vorhanden
+    if (refreshTimerId) {
+      clearTimeout(refreshTimerId);
+    }
+    
+    // Neuen Timer setzen
+    const timerId = setTimeout(() => {
+      // Nur aktualisieren, wenn die Komponente noch gemountet ist und nicht bereits geladen wird
+      if (!loading && client) {
+        console.log(`Automatische Aktualisierung nach ${dataRefreshInterval/1000} Sekunden`);
+        setLastDataUpdate(null); // Trigger für useEffect oben
+      }
+    }, dataRefreshInterval);
+    
+    setRefreshTimerId(timerId);
+    
+    // Cleanup beim Unmount oder Änderung des Intervalls
+    return () => {
+      if (refreshTimerId) {
+        clearTimeout(refreshTimerId);
+      }
+    };
+  }, [dataRefreshInterval, lastDataUpdate, loading, client]);
 
   const [showEmailSuccess, setShowEmailSuccess] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
@@ -523,7 +582,7 @@ const ClientDetailPage = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
           <p className="mt-4 text-gray-600 font-light">Mandantendaten werden geladen...</p>
           <p className="text-sm text-gray-400 mt-2">ID: {id}</p>
-          <p className="text-xs text-gray-400 mt-1">Daten werden frisch vom Server geladen</p>
+          <p className="text-xs text-gray-400 mt-1">Daten werden geladen, bitte warten...</p>
         </div>
       </div>
     );
@@ -609,23 +668,54 @@ const ClientDetailPage = () => {
 
       {/* Tabs Navigation */}
       <div className="border-b border-gray-200 mb-8">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          {['overview', 'documents', 'formdata'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`${
-                activeTab === tab
-                  ? 'border-gray-900 text-gray-900'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
-            >
-              {tab === 'overview' && 'Übersicht'}
-              {tab === 'documents' && 'Dokumente'}
-              {tab === 'formdata' && 'Angaben des Mandanten'}
-            </button>
-          ))}
-        </nav>
+        <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center mb-4">
+          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+            {['overview', 'documents', 'formdata'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`${
+                  activeTab === tab
+                    ? 'border-gray-900 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
+              >
+                {tab === 'overview' && 'Übersicht'}
+                {tab === 'documents' && 'Dokumente'}
+                {tab === 'formdata' && 'Angaben des Mandanten'}
+              </button>
+            ))}
+          </nav>
+          
+          {/* Letztes Update und Aktualisierungsintervall mit Dropdown */}
+          {lastDataUpdate && (
+            <div className="mt-2 md:mt-0 text-sm text-gray-500 flex items-center">
+              <ArrowPathIcon className="h-4 w-4 mr-1 text-gray-400" />
+              <span>
+                Daten aktualisiert: {lastDataUpdate.toLocaleTimeString()}
+              </span>
+              <div className="relative ml-3">
+                <select
+                  value={dataRefreshInterval}
+                  onChange={(e) => setDataRefreshInterval(Number(e.target.value))}
+                  className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md py-1 pl-2 pr-6 appearance-none cursor-pointer hover:bg-gray-100 transition-colors"
+                >
+                  <option value="60000">Auto-Update: 1 Min.</option>
+                  <option value="300000">Auto-Update: 5 Min.</option>
+                  <option value="600000">Auto-Update: 10 Min.</option>
+                  <option value="1800000">Auto-Update: 30 Min.</option>
+                  <option value="3600000">Auto-Update: 60 Min.</option>
+                  <option value="0">Kein Auto-Update</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Übersicht-Tab */}
@@ -1279,7 +1369,12 @@ const ClientDetailPage = () => {
               <p className="mb-4">Die Daten für diesen Mandanten konnten nicht vom Server abgerufen werden. Bitte versuchen Sie es später erneut.</p>
               <button 
                 className="mt-2 px-5 py-2.5 bg-white border border-blue-200 rounded-md text-blue-700 shadow-sm hover:bg-blue-50 transition-colors flex items-center"
-                onClick={() => fetchFormData(client.clickupId || id).catch(err => console.error(err))}
+                onClick={() => {
+                  setLastDataUpdate(null); // Setze lastDataUpdate zurück, um einen Refresh zu erzwingen
+                  fetchFormData(client.clickupId || id)
+                    .then(() => setLastDataUpdate(new Date()))
+                    .catch(err => console.error(err));
+                }}
               >
                 <ArrowPathIcon className="h-4 w-4 mr-2" />
                 Erneut versuchen
