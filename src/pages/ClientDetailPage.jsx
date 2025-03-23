@@ -43,23 +43,24 @@ const ClientDetailPage = () => {
   // Direkter API-Endpunkt für Tests mit MOCK-ID
   const TEST_CLIENT_ID = '869878qzv';
   
-  // Speichern des letzten API-Aufrufzeitpunkts, um Ratenbegrenzung zu implementieren
-  const [lastApiCallTime, setLastApiCallTime] = useState(0);
+  // Speichern des letzten API-Aufrufzeitpunkts mit useRef statt useState 
+  // um zu verhindern, dass der State-Update einen Re-render auslöst
+  const lastApiCallTimeRef = useRef(0);
   
   const fetchFormData = async (clientId) => {
     try {
       // Ratenbegrenzung für API-Aufrufe - maximal 1 Aufruf alle 10 Sekunden
       const now = Date.now();
       const minTimeBetweenCalls = 10000; // 10 Sekunden
-      const timeSinceLastCall = now - lastApiCallTime;
+      const timeSinceLastCall = now - lastApiCallTimeRef.current;
       
       if (timeSinceLastCall < minTimeBetweenCalls) {
         console.log(`API rate limit: Waiting ${(minTimeBetweenCalls - timeSinceLastCall)/1000}s before next call`);
         await new Promise(resolve => setTimeout(resolve, minTimeBetweenCalls - timeSinceLastCall));
       }
       
-      // Setze den Zeitpunkt des letzten API-Aufrufs
-      setLastApiCallTime(Date.now());
+      // Setze den Zeitpunkt des letzten API-Aufrufs mit useRef
+      lastApiCallTimeRef.current = Date.now();
       
       setLoading(true);
       console.log(`Fetching form data for client ID: ${clientId}`);
@@ -614,203 +615,230 @@ const ClientDetailPage = () => {
   // Zeit zwischen API-Aufrufen erhöhen - mindestens 5 Minuten zwischen vollständigen Aktualisierungen
   const MIN_API_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 Minuten
   
-  useEffect(() => {
-    const loadClient = async () => {
-      try {
-        setLoading(true);
+  // Verwende React.useCallback und minimale Abhängigkeiten um Effekte zu stabilisieren
+  const loadClient = React.useCallback(async () => {
+    // Prüfen, ob ein Client bereits geladen wird, um Mehrfachanfragen zu vermeiden
+    if (loading) {
+      console.log('Client wird bereits geladen, Anfrage übersprungen');
+      return;
+    }
+    
+    try {
+      console.log('Beginne Client zu laden mit ID:', id);
+      setLoading(true);
+      
+      // Erst den Client aus dem Context laden
+      const clientData = await getClient(id);
+      
+      // Aktenzeichennummer in den Zustand setzen
+      setCaseNumber(clientData?.caseNumber || '');
+      
+      // Prüfen, ob wir die API wirklich aufrufen müssen oder gecachte Daten verwenden können
+      const apiId = clientData.clickupId || clientData.taskId || id;
+      const cachedData = formDataCacheRef.current[apiId];
+      const now = Date.now();
+      const lastCacheTime = cachedData?.timestamp || 0;
+      const timeSinceLastCache = now - lastCacheTime;
+      
+      let formDataResponse;
+      let freshData = false;
+      
+      // Nur frische Daten laden, wenn:
+      // 1. Kein Cache vorhanden ist oder
+      // 2. Cache älter als 5 Minuten ist oder
+      // 3. Eine manuelle Aktualisierung angefordert wurde
+      const forceRefresh = lastDataUpdate ? 
+        (now - lastDataUpdate.getTime() < 2000) : false;
         
-        // Erst den Client aus dem Context laden
-        const clientData = await getClient(id);
-        
-        // Aktenzeichennummer in den Zustand setzen
-        setCaseNumber(clientData?.caseNumber || '');
-        
-        // Prüfen, ob wir die API wirklich aufrufen müssen oder gecachte Daten verwenden können
-        const apiId = clientData.clickupId || clientData.taskId || id;
-        const cachedData = formDataCacheRef.current[apiId];
-        const now = Date.now();
-        const lastCacheTime = cachedData?.timestamp || 0;
-        const timeSinceLastCache = now - lastCacheTime;
-        
-        let formDataResponse;
-        let freshData = false;
-        
-        // Nur frische Daten laden, wenn:
-        // 1. Kein Cache vorhanden ist oder
-        // 2. Cache älter als 5 Minuten ist oder
-        // 3. Eine manuelle Aktualisierung angefordert wurde (lastDataUpdate wurde explizit auf null gesetzt)
-        if (!cachedData || timeSinceLastCache > MIN_API_REFRESH_INTERVAL || lastDataUpdate === null) {
-          try {
-            console.log(`Cache ist ${!cachedData ? 'nicht vorhanden' : 'zu alt'}, lade frische Formulardaten`);
-            formDataResponse = await fetchFormData(apiId);
-            freshData = true;
-            
-            // Aktualisiere den Cache mit useRef (löst keinen Rerender aus)
-            formDataCacheRef.current = {
-              ...formDataCacheRef.current,
-              [apiId]: {
-                data: formDataResponse,
-                timestamp: now
-              }
-            };
-          } catch (formError) {
-            console.error('Error loading fresh form data:', formError);
-            
-            // Fallback auf gecachte Daten, falls vorhanden
-            if (cachedData) {
-              console.log('Using cached data as fallback');
-              formDataResponse = cachedData.data;
-            }
-          }
-        } else {
-          // Verwende gecachte Daten
-          console.log(`Verwende gecachte Daten (${Math.round(timeSinceLastCache/1000)}s alt)`);
-          formDataResponse = cachedData.data;
-        }
-        
-        // Wenn wir keine Daten haben (weder frisch noch gecacht), Client ohne Formulardaten anzeigen
-        if (!formDataResponse) {
-          console.warn('No form data available, using client data only');
-          setClient({
-            ...clientData,
-            id: id,
-            documents: mockDocuments,
-            honorar: clientData.honorar || 1111,
-            raten: clientData.raten || 2,
-            ratenStart: clientData.ratenStart || "01.01.2025",
-            address: clientData.address || "Keine Adresse vorhanden"
-          });
+      if (!cachedData || timeSinceLastCache > MIN_API_REFRESH_INTERVAL || forceRefresh) {
+        try {
+          console.log(`Cache ist ${!cachedData ? 'nicht vorhanden' : 'zu alt'}, lade frische Formulardaten`);
+          formDataResponse = await fetchFormData(apiId);
+          freshData = true;
           
-          setLastDataUpdate(new Date());
-          setLoading(false);
-          return;
+          // Aktualisiere den Cache mit useRef (löst keinen Rerender aus)
+          formDataCacheRef.current = {
+            ...formDataCacheRef.current,
+            [apiId]: {
+              data: formDataResponse,
+              timestamp: now
+            }
+          };
+        } catch (formError) {
+          console.error('Error loading fresh form data:', formError);
+          
+          // Fallback auf gecachte Daten, falls vorhanden
+          if (cachedData) {
+            console.log('Using cached data as fallback');
+            formDataResponse = cachedData.data;
+          }
         }
-        
-        // Client-Objekt mit den Formulardaten anreichern
-        const enrichedClient = {
+      } else {
+        // Verwende gecachte Daten
+        console.log(`Verwende gecachte Daten (${Math.round(timeSinceLastCache/1000)}s alt)`);
+        formDataResponse = cachedData.data;
+      }
+      
+      // Wenn wir keine Daten haben (weder frisch noch gecacht), Client ohne Formulardaten anzeigen
+      if (!formDataResponse) {
+        console.warn('No form data available, using client data only');
+        setClient({
           ...clientData,
           id: id,
-          formData: formDataResponse,
           documents: mockDocuments,
-          honorar: formDataResponse?.honorar || clientData.honorar || 1111,
-          raten: formDataResponse?.raten || clientData.raten || 2,
-          ratenStart: formDataResponse?.ratenStart || clientData.ratenStart || "01.01.2025",
-          address: formDataResponse?.adresse || clientData.address || "Keine Adresse vorhanden"
-        };
-          
-        // Monatliche Rate direkt aus den API-Daten übernehmen
-        if (formDataResponse?.preisKalkulation?.ratenzahlung?.monatsRate) {
-          enrichedClient.monatlicheRate = formDataResponse.preisKalkulation.ratenzahlung.monatsRate;
-          console.log(`Monatliche Rate direkt aus API übernommen: ${enrichedClient.monatlicheRate}`);
-        } else if (formDataResponse?.monatlicheRate) {
-          enrichedClient.monatlicheRate = formDataResponse.monatlicheRate;
-          console.log(`Monatliche Rate aus formDataResponse.monatlicheRate: ${enrichedClient.monatlicheRate}`);
-        } else {
-          enrichedClient.monatlicheRate = clientData.monatlicheRate;
-          console.log(`Bestehende monatliche Rate beibehalten: ${enrichedClient.monatlicheRate}`);
-        }
+          honorar: clientData.honorar || 1111,
+          raten: clientData.raten || 2,
+          ratenStart: clientData.ratenStart || "01.01.2025",
+          address: clientData.address || "Keine Adresse vorhanden"
+        });
         
-        // Stelle sicher, dass die API-Daten vollständig im formData verfügbar sind
-        enrichedClient.formData = formDataResponse;
-        
-        if (formDataResponse?.preisKalkulation) {
-          enrichedClient.preisKalkulation = formDataResponse.preisKalkulation;
-        }
-        
-        // Nur bei frischen Daten Debug-Infos ausgeben
-        if (freshData) {
-          console.log('Honorardaten nach Anreicherung:', {
-            honorarFormData: formDataResponse?.honorar,
-            honorarClientData: clientData.honorar,
-            finalHonorar: enrichedClient.honorar
-          });
-        }
-        
-        setClient(enrichedClient);
-        setLastDataUpdate(new Date());
-        
-        // Nur bei frischen Daten Datenbank aktualisieren
-        if (freshData) {
-          try {
-            const updateData = {};
-            
-            if (formDataResponse?.honorar) {
-              updateData.honorar = formDataResponse.honorar;
-            }
-            
-            if (formDataResponse?.raten) {
-              updateData.raten = formDataResponse.raten;
-            }
-            
-            if (formDataResponse?.ratenStart) {
-              updateData.ratenStart = formDataResponse.ratenStart;
-            }
-            
-            if (enrichedClient.monatlicheRate) {
-              updateData.monatlicheRate = enrichedClient.monatlicheRate;
-            }
-            
-            // Nur aktualisieren, wenn es Änderungen gibt
-            if (Object.keys(updateData).length > 0) {
-              console.log('Updating client data in database with form data:', updateData);
-              await updateClient(clientData._id, updateData);
-            }
-          } catch (updateError) {
-            console.error('Failed to persist form data to database:', updateError);
-          }
-        }
-      } catch (err) {
-        console.error('Error loading client details:', err);
-        setError(err.message || 'Fehler beim Laden der Mandantendetails');
-      } finally {
         setLoading(false);
+        return;
       }
-    };
+      
+      // Client-Objekt mit den Formulardaten anreichern
+      const enrichedClient = {
+        ...clientData,
+        id: id,
+        formData: formDataResponse,
+        documents: mockDocuments,
+        honorar: formDataResponse?.honorar || clientData.honorar || 1111,
+        raten: formDataResponse?.raten || clientData.raten || 2,
+        ratenStart: formDataResponse?.ratenStart || clientData.ratenStart || "01.01.2025",
+        address: formDataResponse?.adresse || clientData.address || "Keine Adresse vorhanden"
+      };
+        
+      // Monatliche Rate direkt aus den API-Daten übernehmen
+      if (formDataResponse?.preisKalkulation?.ratenzahlung?.monatsRate) {
+        enrichedClient.monatlicheRate = formDataResponse.preisKalkulation.ratenzahlung.monatsRate;
+        console.log(`Monatliche Rate direkt aus API übernommen: ${enrichedClient.monatlicheRate}`);
+      } else if (formDataResponse?.monatlicheRate) {
+        enrichedClient.monatlicheRate = formDataResponse.monatlicheRate;
+        console.log(`Monatliche Rate aus formDataResponse.monatlicheRate: ${enrichedClient.monatlicheRate}`);
+      } else {
+        enrichedClient.monatlicheRate = clientData.monatlicheRate;
+        console.log(`Bestehende monatliche Rate beibehalten: ${enrichedClient.monatlicheRate}`);
+      }
+      
+      // Stelle sicher, dass die API-Daten vollständig im formData verfügbar sind
+      enrichedClient.formData = formDataResponse;
+      
+      if (formDataResponse?.preisKalkulation) {
+        enrichedClient.preisKalkulation = formDataResponse.preisKalkulation;
+      }
+      
+      // Nur bei frischen Daten Debug-Infos ausgeben
+      if (freshData) {
+        console.log('Honorardaten nach Anreicherung:', {
+          honorarFormData: formDataResponse?.honorar,
+          honorarClientData: clientData.honorar,
+          finalHonorar: enrichedClient.honorar
+        });
+      }
+      
+      setClient(enrichedClient);
+      
+      // Nur bei frischen Daten Datenbank aktualisieren
+      if (freshData) {
+        try {
+          const updateData = {};
+          
+          if (formDataResponse?.honorar) {
+            updateData.honorar = formDataResponse.honorar;
+          }
+          
+          if (formDataResponse?.raten) {
+            updateData.raten = formDataResponse.raten;
+          }
+          
+          if (formDataResponse?.ratenStart) {
+            updateData.ratenStart = formDataResponse.ratenStart;
+          }
+          
+          if (enrichedClient.monatlicheRate) {
+            updateData.monatlicheRate = enrichedClient.monatlicheRate;
+          }
+          
+          // Nur aktualisieren, wenn es Änderungen gibt
+          if (Object.keys(updateData).length > 0) {
+            console.log('Updating client data in database with form data:', updateData);
+            await updateClient(clientData._id, updateData);
+          }
+        } catch (updateError) {
+          console.error('Failed to persist form data to database:', updateError);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading client details:', err);
+      setError(err.message || 'Fehler beim Laden der Mandantendetails');
+    } finally {
+      setLoading(false);
+    }
+  }, [id, getClient]); // Minimale Abhängigkeiten - wir machen das Update über useEffect 
 
+  // Dies ist der Haupt-Update-Effekt, der nur auf ID-Änderungen reagiert
+  useEffect(() => {
     loadClient();
-  }, [id, getClient, lastDataUpdate, dataRefreshInterval]); // WICHTIG: formDataCache absichtlich nicht als Dependency hinzufügen, um Render-Loops zu vermeiden
+  }, [id, loadClient]);
+  
+  // Separater Effekt nur für lastDataUpdate
+  useEffect(() => {
+    if (lastDataUpdate) {
+      console.log(`Manuelles Update angefordert: ${lastDataUpdate.toISOString()}`);
+      loadClient();
+    }
+  }, [lastDataUpdate, loadClient]);
   
   // Debug-State für die Entwicklung
   const [debugMode, setDebugMode] = useState(false);
   
-  // Effekt für periodische Aktualisierung
+  // Verwende useRef für den Timer, um direkte State-Updates zu vermeiden
+  const timerRef = useRef(null);
+  
+  // Manuelles Update auslösen
+  const triggerManualUpdate = () => {
+    console.log('Manuelles Update ausgelöst');
+    // Diese Variable wird explizit verwendet, um ein neues Datum zu erstellen und dann zu setzen,
+    // um sicherzustellen, dass es sich um einen neuen Referenzwert handelt
+    const newDate = new Date();
+    setLastDataUpdate(newDate);
+  };
+  
+  // Effekt für periodische Aktualisierung - stark vereinfacht
   useEffect(() => {
-    // Wenn kein Intervall gesetzt ist (Wert 0), keine periodische Aktualisierung durchführen
-    if (dataRefreshInterval === 0) {
-      if (refreshTimerId) {
-        clearTimeout(refreshTimerId);
-        setRefreshTimerId(null);
+    // Nur einen Timer starten, wenn wir ein aktives Intervall haben
+    if (dataRefreshInterval > 0 && !loading && client) {
+      console.log(`Timer für nächstes Update in ${dataRefreshInterval/1000} Sekunden gesetzt`);
+      
+      // Alten Timer löschen falls vorhanden
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
       }
-      return;
+      
+      // Neuen Timer setzen - mindestens 60 Sekunden erzwingen
+      const effectiveInterval = Math.max(dataRefreshInterval, 60000);
+      
+      timerRef.current = setTimeout(() => {
+        console.log(`Automatisches Update nach ${effectiveInterval/1000}s`);
+        triggerManualUpdate();
+      }, effectiveInterval);
     }
     
-    // Bestehenden Timer löschen, falls vorhanden
-    if (refreshTimerId) {
-      clearTimeout(refreshTimerId);
-    }
-    
-    // Neuen Timer setzen - mindestens 60 Sekunden zwischen Updates erzwingen
-    // Dies verhindert zu häufige API-Anfragen
-    const effectiveInterval = Math.max(dataRefreshInterval, 60000);
-    
-    const timerId = setTimeout(() => {
-      // Nur aktualisieren, wenn die Komponente noch gemountet ist und nicht bereits geladen wird
-      if (!loading && client) {
-        console.log(`Automatische Aktualisierung nach ${effectiveInterval/1000} Sekunden`);
-        // Verwende einen sanften Update statt vollständigem Neuladen
-        setLastDataUpdate(new Date());
-      }
-    }, effectiveInterval);
-    
-    setRefreshTimerId(timerId);
-    
-    // Cleanup beim Unmount oder Änderung des Intervalls
+    // Cleanup beim Unmount
     return () => {
-      if (refreshTimerId) {
-        clearTimeout(refreshTimerId);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
     };
-  }, [dataRefreshInterval, lastDataUpdate, loading, client]);
+  }, [dataRefreshInterval, client, loading]);
+  
+  // Separater Effect für lastDataUpdate, um unnötige Re-renders zu verhindern
+  useEffect(() => {
+    console.log(`lastDataUpdate geändert: ${lastDataUpdate}`);
+    // Dieser Effect wird nur ausgelöst, wenn lastDataUpdate sich ändert
+    // und kümmert sich ausschließlich um das Laden der Client-Daten
+  }, [lastDataUpdate]);
   
   // Debug-Hilfsfunktion: Ein testweise Abruf der Testdaten
   const forceTestDataFetch = async () => {
@@ -2024,11 +2052,7 @@ const ClientDetailPage = () => {
               <p className="mb-4">Die Daten für diesen Mandanten konnten nicht vom Server abgerufen werden. Bitte versuchen Sie es später erneut.</p>
               <button 
                 className="mt-2 px-5 py-2.5 bg-white border border-blue-200 rounded-md text-blue-700 shadow-sm hover:bg-blue-50 transition-colors flex items-center"
-                onClick={() => {
-                  // Löst ein Neuladen über den useEffect-Hook aus und umgeht dabei den Cache
-                  console.log('Manuelles Neuladen der Formulardaten angefordert');
-                  setLastDataUpdate(null);
-                }}
+                onClick={triggerManualUpdate}
               >
                 <ArrowPathIcon className="h-4 w-4 mr-2" />
                 Erneut versuchen
