@@ -558,105 +558,104 @@ const ClientDetailPage = () => {
           console.log(`Using API ID for form data: ${apiId}`);
           
           const formDataResponse = await fetchFormData(apiId);
+          
+          // Client-Objekt mit den Formulardaten anreichern
+          const enrichedClient = {
+            ...clientData,
+            id: id,
+            formData: formDataResponse,
+            documents: mockDocuments, // Nutze Mock-Dokumente für die Demoansicht
+            // Standard-Werte für fehlende Felder
+            honorar: formDataResponse?.honorar || clientData.honorar || 1111,
+            raten: formDataResponse?.raten || clientData.raten || 2,
+            ratenStart: formDataResponse?.ratenStart || clientData.ratenStart || "01.01.2025",
+            address: formDataResponse?.adresse || clientData.address || "Keine Adresse vorhanden"
+          };
             
-            // Client-Objekt mit den Formulardaten anreichern
-            const enrichedClient = {
-              ...clientData,
-              id: id,
-              formData: formDataResponse,
-              documents: mockDocuments, // Nutze Mock-Dokumente für die Demoansicht
-              // Standard-Werte für fehlende Felder
-              honorar: formDataResponse?.honorar || clientData.honorar || 1111,
-              raten: formDataResponse?.raten || clientData.raten || 2,
-              ratenStart: formDataResponse?.ratenStart || clientData.ratenStart || "01.01.2025",
-              address: formDataResponse?.adresse || clientData.address || "Keine Adresse vorhanden"
-            };
-            
-            // Monatliche Rate direkt aus den API-Daten übernehmen
-            if (formDataResponse?.preisKalkulation?.ratenzahlung?.monatsRate) {
-              // Wenn die Rate direkt in der API-Antwort im preisKalkulation-Objekt vorhanden ist
-              enrichedClient.monatlicheRate = formDataResponse.preisKalkulation.ratenzahlung.monatsRate;
-              console.log(`Monatliche Rate direkt aus API übernommen: ${enrichedClient.monatlicheRate}`);
-            } else if (formDataResponse?.monatlicheRate) {
-              // Falls die Rate im Root-Objekt der Antwort ist
-              enrichedClient.monatlicheRate = formDataResponse.monatlicheRate;
-              console.log(`Monatliche Rate aus formDataResponse.monatlicheRate: ${enrichedClient.monatlicheRate}`);
-            } else {
-              // Sonst bestehenden Wert beibehalten
-              enrichedClient.monatlicheRate = clientData.monatlicheRate;
-              console.log(`Bestehende monatliche Rate beibehalten: ${enrichedClient.monatlicheRate}`);
-            }
-            
-            // Stelle sicher, dass die API-Daten vollständig im formData verfügbar sind
-            enrichedClient.formData = formDataResponse;
-            
-            // Stelle sicher, dass jedes wichtige Feld auch direkt im Client-Objekt verfügbar ist
-            // für die einfache Anzeige in der UI
-            if (formDataResponse?.preisKalkulation) {
-              enrichedClient.preisKalkulation = formDataResponse.preisKalkulation;
-            }
-            
-            // Für eine einfachere Debug-Ansicht
-            console.log('Enriched client with API data:', JSON.stringify(enrichedClient, null, 2));
-            
-            // Log für Debugging der Honorardaten
-            console.log('Honorardaten nach Anreicherung:', {
-              honorarFormData: formDataResponse?.honorar,
-              honorarClientData: clientData.honorar,
-              finalHonorar: enrichedClient.honorar
-            });
-            
-            setClient(enrichedClient);
-            
-            // Aktualisiere Zeitstempel des letzten Updates
-            setLastDataUpdate(new Date());
-            
-            // Aktualisiere auch die Daten in der Datenbank, damit die Honorardaten persistiert werden
-            try {
-              const updateData = {};
-              
-              // Honorar aktualisieren
-              if (formDataResponse?.honorar) {
-                updateData.honorar = formDataResponse.honorar;
-              }
-              
-              // Raten aktualisieren
-              if (formDataResponse?.raten) {
-                updateData.raten = formDataResponse.raten;
-              }
-              
-              // Raten-Startdatum aktualisieren
-              if (formDataResponse?.ratenStart) {
-                updateData.ratenStart = formDataResponse.ratenStart;
-              }
-              
-              // Monatliche Rate aktualisieren - aus dem angereicherten Client nehmen
-              if (enrichedClient.monatlicheRate) {
-                updateData.monatlicheRate = enrichedClient.monatlicheRate;
-              }
-              
-              // Nur aktualisieren, wenn es Änderungen gibt
-              if (Object.keys(updateData).length > 0) {
-                console.log('Updating client data in database with form data:', updateData);
-                await updateClient(clientData._id, updateData);
-              }
-            } catch (updateError) {
-              console.error('Failed to persist form data to database:', updateError);
-            }
-          } catch (formError) {
-            console.error('Error loading form data:', formError);
-            
-            // Wenn Formulardaten nicht geladen werden können, trotzdem den Client anzeigen
-            // Verwende dabei die in der Datenbank gespeicherten Werte, falls vorhanden
-            setClient({
-              ...clientData,
-              id: id,
-              documents: mockDocuments,
-              honorar: clientData.honorar || 1111,
-              raten: clientData.raten || 2,
-              ratenStart: clientData.ratenStart || "01.01.2025"
-            });
+          // Monatliche Rate direkt aus den API-Daten übernehmen
+          if (formDataResponse?.preisKalkulation?.ratenzahlung?.monatsRate) {
+            // Wenn die Rate direkt in der API-Antwort im preisKalkulation-Objekt vorhanden ist
+            enrichedClient.monatlicheRate = formDataResponse.preisKalkulation.ratenzahlung.monatsRate;
+            console.log(`Monatliche Rate direkt aus API übernommen: ${enrichedClient.monatlicheRate}`);
+          } else if (formDataResponse?.monatlicheRate) {
+            // Falls die Rate im Root-Objekt der Antwort ist
+            enrichedClient.monatlicheRate = formDataResponse.monatlicheRate;
+            console.log(`Monatliche Rate aus formDataResponse.monatlicheRate: ${enrichedClient.monatlicheRate}`);
+          } else {
+            // Sonst bestehenden Wert beibehalten
+            enrichedClient.monatlicheRate = clientData.monatlicheRate;
+            console.log(`Bestehende monatliche Rate beibehalten: ${enrichedClient.monatlicheRate}`);
           }
+          
+          // Stelle sicher, dass die API-Daten vollständig im formData verfügbar sind
+          enrichedClient.formData = formDataResponse;
+          
+          // Stelle sicher, dass jedes wichtige Feld auch direkt im Client-Objekt verfügbar ist
+          // für die einfache Anzeige in der UI
+          if (formDataResponse?.preisKalkulation) {
+            enrichedClient.preisKalkulation = formDataResponse.preisKalkulation;
+          }
+          
+          // Für eine einfachere Debug-Ansicht
+          console.log('Enriched client with API data:', JSON.stringify(enrichedClient, null, 2));
+          
+          // Log für Debugging der Honorardaten
+          console.log('Honorardaten nach Anreicherung:', {
+            honorarFormData: formDataResponse?.honorar,
+            honorarClientData: clientData.honorar,
+            finalHonorar: enrichedClient.honorar
+          });
+          
+          setClient(enrichedClient);
+          
+          // Aktualisiere Zeitstempel des letzten Updates
+          setLastDataUpdate(new Date());
+          
+          // Aktualisiere auch die Daten in der Datenbank, damit die Honorardaten persistiert werden
+          try {
+            const updateData = {};
+            
+            // Honorar aktualisieren
+            if (formDataResponse?.honorar) {
+              updateData.honorar = formDataResponse.honorar;
+            }
+            
+            // Raten aktualisieren
+            if (formDataResponse?.raten) {
+              updateData.raten = formDataResponse.raten;
+            }
+            
+            // Raten-Startdatum aktualisieren
+            if (formDataResponse?.ratenStart) {
+              updateData.ratenStart = formDataResponse.ratenStart;
+            }
+            
+            // Monatliche Rate aktualisieren - aus dem angereicherten Client nehmen
+            if (enrichedClient.monatlicheRate) {
+              updateData.monatlicheRate = enrichedClient.monatlicheRate;
+            }
+            
+            // Nur aktualisieren, wenn es Änderungen gibt
+            if (Object.keys(updateData).length > 0) {
+              console.log('Updating client data in database with form data:', updateData);
+              await updateClient(clientData._id, updateData);
+            }
+          } catch (updateError) {
+            console.error('Failed to persist form data to database:', updateError);
+          }
+        } catch (formError) {
+          console.error('Error loading form data:', formError);
+          
+          // Wenn Formulardaten nicht geladen werden können, trotzdem den Client anzeigen
+          // Verwende dabei die in der Datenbank gespeicherten Werte, falls vorhanden
+          setClient({
+            ...clientData,
+            id: id,
+            documents: mockDocuments,
+            honorar: clientData.honorar || 1111,
+            raten: clientData.raten || 2,
+            ratenStart: clientData.ratenStart || "01.01.2025"
+          });
         }
       } catch (err) {
         console.error('Error loading client details:', err);
