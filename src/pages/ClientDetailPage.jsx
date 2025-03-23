@@ -19,7 +19,7 @@ import {
 const ClientDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getClient, updateClient, deleteClient } = useClients();
+  const { getClient, updateClient, deleteClient, sendInvoiceEmail, requestDocuments } = useClients();
   const [client, setClient] = useState(null);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
@@ -387,19 +387,97 @@ const ClientDetailPage = () => {
     loadClient();
   }, [id, getClient]);
 
-  const handleUpload = () => {
+  const [showEmailSuccess, setShowEmailSuccess] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  
+  const handleUpload = async (file) => {
     setIsUploading(true);
-    // Simuliere Upload-Prozess
-    setTimeout(() => {
+    
+    try {
+      // Simuliere Upload-Prozess für die Rechnung
+      // Hier würde normalerweise ein echter Upload an einen Dateiserver stattfinden
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Hier würde normalerweise die URL oder der Pfad der hochgeladenen Datei zurückgegeben werden
+      const uploadedFilePath = `/uploads/${file.name}`;
+      
       setIsUploading(false);
-      alert("Dokument erfolgreich hochgeladen und Gläubigerschreiben angefordert!");
-    }, 1500);
+      
+      // Zeige Email-Senden-Option an
+      return uploadedFilePath;
+    } catch (error) {
+      console.error('Fehler beim Hochladen:', error);
+      setIsUploading(false);
+      alert("Fehler beim Hochladen der Datei: " + error.message);
+    }
   };
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      handleUpload();
+      const filePath = await handleUpload(file);
+      
+      // Automatisch die Email nach dem Upload anbieten
+      if (filePath && client) {
+        handleSendInvoiceEmail(filePath, file.name);
+      }
+    }
+  };
+  
+  const handleSendInvoiceEmail = async (filePath, fileName) => {
+    if (!client || !client._id) return;
+    
+    try {
+      setEmailSending(true);
+      
+      // Bereite Rechnungsdaten für Email vor
+      const invoiceData = {
+        invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
+        date: new Date().toLocaleDateString('de-DE'),
+        amount: client.honorar || 1111,
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE'), // 14 Tage ab heute
+        filePath: filePath,
+        fileName: fileName
+      };
+      
+      // Sende Email mit Rechnung an den Mandanten
+      await sendInvoiceEmail(client._id, invoiceData);
+      
+      setEmailSending(false);
+      setShowEmailSuccess(true);
+      
+      // Blende Erfolgsmeldung nach 5 Sekunden aus
+      setTimeout(() => {
+        setShowEmailSuccess(false);
+      }, 5000);
+    } catch (error) {
+      console.error('Fehler beim Senden der Email:', error);
+      setEmailSending(false);
+      alert("Fehler beim Senden der Email: " + error.message);
+    }
+  };
+  
+  // Funktion zum Anfordern von Gläubigerschreiben
+  const handleRequestDocuments = async () => {
+    if (!client || !client._id) return;
+    
+    try {
+      setEmailSending(true);
+      
+      // Sende Email mit Anforderung für Gläubigerschreiben
+      await requestDocuments(client._id, "Gläubigerschreiben");
+      
+      setEmailSending(false);
+      setShowEmailSuccess(true);
+      
+      // Blende Erfolgsmeldung nach 5 Sekunden aus
+      setTimeout(() => {
+        setShowEmailSuccess(false);
+      }, 5000);
+    } catch (error) {
+      console.error('Fehler beim Anfordern von Dokumenten:', error);
+      setEmailSending(false);
+      alert("Fehler beim Anfordern von Dokumenten: " + error.message);
     }
   };
 
@@ -549,34 +627,53 @@ const ClientDetailPage = () => {
                 </div>
               </div>
               
-              {/* Upload-Button */}
-              <div className="relative">
-                <input
-                  type="file"
-                  id="fileUpload"
-                  onChange={handleFileSelect}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <button 
-                  className={`px-5 py-2.5 rounded-lg text-white shadow-sm transition-all duration-300 ${
-                    isUploading 
-                      ? 'bg-gray-400 cursor-wait' 
-                      : 'bg-gray-900 hover:bg-gray-800 hover:shadow-md'
-                  }`}
-                  disabled={isUploading}
-                >
-                  {isUploading ? (
-                    <span className="flex items-center">
-                      <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
-                      Wird hochgeladen...
-                    </span>
-                  ) : (
-                    <span className="flex items-center">
-                      <PaperClipIcon className="h-4 w-4 mr-2" />
-                      Rechnung hochladen
-                    </span>
-                  )}
-                </button>
+              {/* Upload-Button und Email-Erfolgsmeldung */}
+              <div className="flex flex-col items-end">
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="fileUpload"
+                    onChange={handleFileSelect}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <button 
+                    className={`px-5 py-2.5 rounded-lg text-white shadow-sm transition-all duration-300 ${
+                      isUploading || emailSending
+                        ? 'bg-gray-400 cursor-wait' 
+                        : 'bg-gray-900 hover:bg-gray-800 hover:shadow-md'
+                    }`}
+                    disabled={isUploading || emailSending}
+                  >
+                    {isUploading ? (
+                      <span className="flex items-center">
+                        <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                        Wird hochgeladen...
+                      </span>
+                    ) : emailSending ? (
+                      <span className="flex items-center">
+                        <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                        Email wird gesendet...
+                      </span>
+                    ) : (
+                      <span className="flex items-center">
+                        <PaperClipIcon className="h-4 w-4 mr-2" />
+                        Rechnung hochladen
+                      </span>
+                    )}
+                  </button>
+                </div>
+                
+                {/* Erfolgsmeldung nach dem Email-Versand */}
+                {showEmailSuccess && (
+                  <div className="mt-3 px-4 py-2 bg-green-50 text-green-700 rounded-lg border border-green-100 text-sm animate-fadeIn">
+                    <div className="flex items-center">
+                      <svg className="h-4 w-4 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Email erfolgreich gesendet
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -694,35 +791,78 @@ const ClientDetailPage = () => {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-medium text-gray-900">Dokumente</h2>
             
-            {/* Upload-Button für Dokumente-Tab */}
-            <div className="relative">
-              <input
-                type="file"
-                id="documentUpload"
-                onChange={handleFileSelect}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
+            {/* Button-Gruppe für Dokumente-Tab */}
+            <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3">
+              {/* Dokument hochladen Button */}
+              <div className="relative">
+                <input
+                  type="file"
+                  id="documentUpload"
+                  onChange={handleFileSelect}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <button 
+                  className={`w-full md:w-auto px-5 py-2.5 rounded-lg text-white shadow-sm transition-all duration-300 ${
+                    isUploading || emailSending
+                      ? 'bg-gray-400 cursor-wait' 
+                      : 'bg-gray-900 hover:bg-gray-800 hover:shadow-md'
+                  }`}
+                  disabled={isUploading || emailSending}
+                >
+                  {isUploading ? (
+                    <span className="flex items-center">
+                      <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                      Wird hochgeladen...
+                    </span>
+                  ) : emailSending ? (
+                    <span className="flex items-center">
+                      <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                      Email wird gesendet...
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      <PaperClipIcon className="h-4 w-4 mr-2" />
+                      Dokument hochladen
+                    </span>
+                  )}
+                </button>
+              </div>
+              
+              {/* Gläubigerschreiben anfordern Button */}
               <button 
-                className={`px-5 py-2.5 rounded-lg text-white shadow-sm transition-all duration-300 ${
-                  isUploading 
-                    ? 'bg-gray-400 cursor-wait' 
-                    : 'bg-gray-900 hover:bg-gray-800 hover:shadow-md'
+                onClick={handleRequestDocuments}
+                className={`w-full md:w-auto px-5 py-2.5 rounded-lg shadow-sm transition-all duration-300 ${
+                  emailSending
+                    ? 'bg-gray-400 text-white cursor-wait' 
+                    : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:shadow-md'
                 }`}
-                disabled={isUploading}
+                disabled={emailSending}
               >
-                {isUploading ? (
+                {emailSending ? (
                   <span className="flex items-center">
                     <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
-                    Wird hochgeladen...
+                    Email wird gesendet...
                   </span>
                 ) : (
                   <span className="flex items-center">
-                    <PaperClipIcon className="h-4 w-4 mr-2" />
-                    Dokument hochladen
+                    <EnvelopeIcon className="h-4 w-4 mr-2" />
+                    Gläubigerschreiben anfordern
                   </span>
                 )}
               </button>
             </div>
+            
+            {/* Erfolgsmeldung */}
+            {showEmailSuccess && (
+              <div className="mt-3 px-4 py-2 bg-green-50 text-green-700 rounded-lg border border-green-100 text-sm animate-fadeIn">
+                <div className="flex items-center">
+                  <svg className="h-4 w-4 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Email erfolgreich gesendet
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Dokumente-Liste */}

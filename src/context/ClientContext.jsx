@@ -289,6 +289,33 @@ export const ClientProvider = ({ children }) => {
     };
   }, [fetchClients, usingSampleData, loading]);
 
+  // Send invoice email to client
+  const sendInvoiceEmail = async (clientId, invoiceData) => {
+    try {
+      const response = await api.post(`/clients/${clientId}/send-invoice`, { 
+        invoiceData,
+        invoiceFilePath: invoiceData.filePath // Pass the file path to the server
+      });
+      return response.data;
+    } catch (err) {
+      console.error('Error sending invoice email:', err);
+      throw new Error(err.response?.data?.message || err.message || 'Failed to send invoice email');
+    }
+  };
+
+  // Request documents from client
+  const requestDocuments = async (clientId, documentType) => {
+    try {
+      const response = await api.post(`/clients/${clientId}/request-documents`, { 
+        documentType 
+      });
+      return response.data;
+    } catch (err) {
+      console.error('Error requesting documents:', err);
+      throw new Error(err.response?.data?.message || err.message || 'Failed to request documents');
+    }
+  };
+
   return (
     <ClientContext.Provider
       value={{
@@ -302,7 +329,9 @@ export const ClientProvider = ({ children }) => {
         deleteClient,
         usingSampleData,
         lastSuccessfulFetch,
-        resetError
+        resetError,
+        sendInvoiceEmail,
+        requestDocuments
       }}
     >
       {children}

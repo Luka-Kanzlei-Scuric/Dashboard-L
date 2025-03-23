@@ -4,6 +4,7 @@ import cors from 'cors';
 import axios from 'axios';
 import connectDB from './src/config/db.js';
 import Client from './src/models/Client.js';
+import emailService from './src/services/emailService.js';
 
 // Load env variables
 dotenv.config();
@@ -369,6 +370,104 @@ app.get('/api/health', cors(corsOptions), (req, res) => {
     timestamp: new Date().toISOString(),
     origin: req.headers.origin || 'No origin header'
   });
+});
+
+// Send invoice to client
+app.post('/api/clients/:id/send-invoice', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { invoiceData, invoiceFilePath } = req.body;
+    
+    if (!invoiceData || !invoiceFilePath) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invoice data and file path are required' 
+      });
+    }
+    
+    const client = await Client.findById(id);
+    
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    
+    const result = await emailService.sendInvoiceEmail(client, invoiceData, invoiceFilePath);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Invoice email sent successfully',
+      result
+    });
+  } catch (error) {
+    console.error('Error sending invoice email:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Send document upload request to client
+app.post('/api/clients/:id/request-documents', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { documentType } = req.body;
+    
+    if (!documentType) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Document type is required' 
+      });
+    }
+    
+    const client = await Client.findById(id);
+    
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    
+    const result = await emailService.sendDocumentUploadRequestEmail(client, documentType);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Document upload request email sent successfully',
+      uploadLink: result.uploadLink
+    });
+  } catch (error) {
+    console.error('Error sending document upload request email:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Verify upload token
+app.get('/api/verify-token', async (req, res) => {
+  try {
+    const { token } = req.query;
+    
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Token is required' });
+    }
+    
+    const decodedToken = emailService.verifyToken(token);
+    
+    if (!decodedToken) {
+      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    }
+    
+    // Optional: Get client info to provide context
+    const client = await Client.findById(decodedToken.id);
+    
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    
+    res.status(200).json({
+      success: true,
+      clientId: client._id,
+      clientName: client.name,
+      purpose: decodedToken.purpose
+    });
+  } catch (error) {
+    console.error('Error verifying token:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
 // Basic route for testing
