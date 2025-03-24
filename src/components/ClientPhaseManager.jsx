@@ -252,31 +252,23 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
           <div className="space-y-6">
             {/* Phase 2 Progress Steps - Apple-inspired Design */}
             <div className="mb-10 mt-2">
-              {/* Step Connection Line - positioned below the circles and text */}
-              <div className="relative h-1 mx-12 mt-12 rounded-full overflow-hidden bg-gray-200">
-                <div 
-                  className="absolute top-0 left-0 h-full bg-blue-500 rounded-full transition-all duration-500 ease-in-out" 
-                  style={{ width: phase2Step === 1 ? '0%' : phase2Step === 2 ? '100%' : '0%' }}
-                ></div>
-              </div>
-              
-              {/* Step Indicators positioned above the line */}
-              <div className="flex justify-between -mt-12">
+              {/* Step Indicators with smaller circles */}
+              <div className="flex justify-between">
                 <div className="flex flex-col items-center">
-                  {/* Step 1 Circle with subtle shadow and clean design */}
+                  {/* Step 1 Circle with subtle shadow and clean design - smaller size */}
                   <div 
-                    className={`flex h-12 w-12 items-center justify-center rounded-full shadow-sm transition-all duration-300 ${
+                    className={`flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-all duration-300 ${
                       phase2Step > 1 
-                        ? 'bg-blue-500 text-white ring-4 ring-blue-50' 
+                        ? 'bg-blue-500 text-white ring-3 ring-blue-50' 
                         : phase2Step === 1 
-                          ? 'bg-white border-2 border-blue-500 text-blue-500 ring-4 ring-blue-50' 
+                          ? 'bg-white border-2 border-blue-500 text-blue-500 ring-3 ring-blue-50' 
                           : 'bg-white border-2 border-gray-300 text-gray-500'
                     }`}
                   >
                     {phase2Step > 1 ? (
-                      <CheckIcon className="h-6 w-6 transition-all" />
+                      <CheckIcon className="h-4 w-4 transition-all" />
                     ) : (
-                      <span className="text-lg font-medium">1</span>
+                      <span className="text-sm font-medium">1</span>
                     )}
                   </div>
                   
@@ -288,18 +280,26 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                   </span>
                 </div>
                 
-                <div className="flex flex-col items-center">
-                  {/* Step 2 Circle with subtle shadow and clean design */}
+                {/* Step Connection Line - positioned in the middle between circles */}
+                <div className="relative h-1 w-28 my-auto mx-3 rounded-full overflow-hidden bg-gray-200">
                   <div 
-                    className={`flex h-12 w-12 items-center justify-center rounded-full shadow-sm transition-all duration-300 ${
+                    className="absolute top-0 left-0 h-full bg-blue-500 rounded-full transition-all duration-500 ease-in-out" 
+                    style={{ width: phase2Step === 1 ? '0%' : phase2Step === 2 ? '100%' : '0%' }}
+                  ></div>
+                </div>
+                
+                <div className="flex flex-col items-center">
+                  {/* Step 2 Circle with subtle shadow and clean design - smaller size */}
+                  <div 
+                    className={`flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-all duration-300 ${
                       phase2Step > 2 
-                        ? 'bg-blue-500 text-white ring-4 ring-blue-50' 
+                        ? 'bg-blue-500 text-white ring-3 ring-blue-50' 
                         : phase2Step === 2 
-                          ? 'bg-white border-2 border-blue-500 text-blue-500 ring-4 ring-blue-50' 
+                          ? 'bg-white border-2 border-blue-500 text-blue-500 ring-3 ring-blue-50' 
                           : 'bg-white border-2 border-gray-300 text-gray-500'
                     }`}
                   >
-                    <span className="text-lg font-medium">2</span>
+                    <span className="text-sm font-medium">2</span>
                     
                     {/* Subtle pulse animation for current step */}
                     {phase2Step === 2 && (
