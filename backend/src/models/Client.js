@@ -47,6 +47,29 @@ const clientSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Phase tracking information
+    currentPhase: {
+      type: Number,
+      default: 1, // Start with phase 1 (Erstberatung)
+    },
+    emailSent: {
+      type: Boolean,
+      default: false, // Whether invoice/document request emails were sent
+    },
+    documentsUploaded: {
+      type: Boolean,
+      default: false, // Whether the client has uploaded documents
+    },
+    firstPaymentReceived: {
+      type: Boolean,
+      default: false, // Whether the first payment has been received
+    },
+    // Phase completion timestamps
+    phaseCompletionDates: {
+      type: Map,
+      of: Date,
+      default: () => new Map([['1', new Date()]]) // Phase 1 is always completed by default
+    },
     // Cache für Formulardaten
     formDataCache: {
       type: String, // JSON-String der Formulardaten

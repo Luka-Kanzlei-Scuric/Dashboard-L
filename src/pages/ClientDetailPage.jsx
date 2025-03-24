@@ -15,6 +15,7 @@ import {
   DocumentIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
+import ClientPhaseManager from '../components/ClientPhaseManager';
 
 const ClientDetailPage = () => {
   const { id } = useParams();
@@ -1309,6 +1310,20 @@ const ClientDetailPage = () => {
               </div>
             </div>
           </div>
+
+          {/* Client Phase Manager */}
+          <ClientPhaseManager 
+            client={client}
+            onPhaseChange={(newPhase) => {
+              // Update client in state with new phase
+              setClient(prevClient => ({
+                ...prevClient,
+                currentPhase: newPhase,
+                ...(newPhase === 2 && { emailSent: true }),
+                ...(newPhase === 3 && { status: 'Aktiv' })
+              }));
+            }}
+          />
 
           {/* ClickUp Information */}
           <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">

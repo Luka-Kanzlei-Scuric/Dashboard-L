@@ -273,9 +273,38 @@ app.put('/api/clients/:id', async (req, res) => {
       console.log(`Client update includes honorar: ${req.body.honorar}`);
     }
     
+    // Handle phase changes
+    const updateData = { ...req.body };
+    
+    // If currentPhase is updated, add timestamp for phase completion
+    if (updateData.currentPhase) {
+      const phaseNumber = updateData.currentPhase;
+      console.log(`Updating client phase to ${phaseNumber}`);
+      
+      // Get the current client to access existing phase data
+      const existingClient = await Client.findById(req.params.id);
+      if (!existingClient) {
+        return res.status(404).json({ success: false, message: 'Client not found' });
+      }
+      
+      // Only add timestamp if this is a new phase completion
+      const phaseCompletionDates = existingClient.phaseCompletionDates || new Map();
+      if (!phaseCompletionDates.has(phaseNumber.toString())) {
+        phaseCompletionDates.set(phaseNumber.toString(), new Date());
+        updateData.phaseCompletionDates = phaseCompletionDates;
+        console.log(`Added timestamp for phase ${phaseNumber} completion`);
+      }
+      
+      // Update status based on phase
+      if (phaseNumber >= 3 && existingClient.status !== 'Aktiv') {
+        updateData.status = 'Aktiv';
+        console.log(`Updated client status to Aktiv due to phase change`);
+      }
+    }
+    
     const client = await Client.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     );
     
@@ -288,7 +317,9 @@ app.put('/api/clients/:id', async (req, res) => {
       name: client.name,
       honorar: client.honorar,
       raten: client.raten,
-      ratenStart: client.ratenStart
+      ratenStart: client.ratenStart,
+      currentPhase: client.currentPhase,
+      status: client.status
     });
     
     // Queue this change for Make.com to sync to ClickUp

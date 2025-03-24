@@ -301,6 +301,14 @@ export const ClientProvider = ({ children }) => {
         invoiceData,
         invoiceFilePath: invoiceData.filePath // Pass the file path to the server
       });
+      
+      // Update client in state to reflect that email has been sent
+      const updatedClient = await updateClient(clientId, { 
+        emailSent: true,
+        // If client is in phase 1, move to phase 2
+        currentPhase: 2 
+      });
+      
       return response.data;
     } catch (err) {
       console.error('Error sending invoice email:', err);
@@ -314,10 +322,52 @@ export const ClientProvider = ({ children }) => {
       const response = await api.post(`/clients/${clientId}/request-documents`, { 
         documentType 
       });
+      
+      // Update client in state to reflect that documents were requested
+      const client = clients.find(c => c._id === clientId);
+      if (client && !client.emailSent) {
+        await updateClient(clientId, { 
+          emailSent: true,
+          // If client is in phase 1, move to phase 2
+          currentPhase: client.currentPhase === 1 ? 2 : client.currentPhase
+        });
+      }
+      
       return response.data;
     } catch (err) {
       console.error('Error requesting documents:', err);
       throw new Error(err.response?.data?.message || err.message || 'Failed to request documents');
+    }
+  };
+  
+  // Mark client documents as uploaded
+  const markDocumentsUploaded = async (clientId) => {
+    try {
+      const client = await updateClient(clientId, { 
+        documentsUploaded: true,
+        // Update phase if applicable
+        currentPhase: 3 
+      });
+      return client;
+    } catch (err) {
+      console.error('Error marking documents as uploaded:', err);
+      throw new Error(err.response?.data?.message || err.message || 'Failed to mark documents as uploaded');
+    }
+  };
+  
+  // Mark first payment as received
+  const markPaymentReceived = async (clientId) => {
+    try {
+      const client = await updateClient(clientId, { 
+        firstPaymentReceived: true,
+        status: 'Aktiv',
+        // Update phase if applicable
+        currentPhase: 3 
+      });
+      return client;
+    } catch (err) {
+      console.error('Error marking payment as received:', err);
+      throw new Error(err.response?.data?.message || err.message || 'Failed to mark payment as received');
     }
   };
 
@@ -336,7 +386,9 @@ export const ClientProvider = ({ children }) => {
         lastSuccessfulFetch,
         resetError,
         sendInvoiceEmail,
-        requestDocuments
+        requestDocuments,
+        markDocumentsUploaded,
+        markPaymentReceived
       }}
     >
       {children}
