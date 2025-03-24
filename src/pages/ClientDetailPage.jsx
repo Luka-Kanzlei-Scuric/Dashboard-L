@@ -129,6 +129,9 @@ const ClientDetailPage = () => {
   // Direkter API-Endpunkt für Tests mit MOCK-ID
   const TEST_CLIENT_ID = '869878qzv';
   
+  // Leeres Array für Dokumente, falls keine vom Server kommen
+  const emptyDocuments = [];
+  
   // Speichern des letzten API-Aufrufzeitpunkts mit useRef statt useState 
   // um zu verhindern, dass der State-Update einen Re-render auslöst
   const lastApiCallTimeRef = useRef(0);
@@ -781,7 +784,7 @@ const ClientDetailPage = () => {
         setClient({
           ...clientData,
           id: id,
-          documents: mockDocuments,
+          documents: clientData.documents || emptyDocuments,
           honorar: clientData.honorar || 1111,
           raten: clientData.raten || 2,
           ratenStart: clientData.ratenStart || "01.01.2025",
@@ -798,7 +801,7 @@ const ClientDetailPage = () => {
         ...clientData,
         id: id,
         formData: formDataResponse,
-        documents: mockDocuments,
+        documents: clientData.documents || emptyDocuments,
         honorar: formDataResponse?.honorar || clientData.honorar || 1111,
         raten: formDataResponse?.raten || clientData.raten || 2,
         ratenStart: formDataResponse?.ratenStart || clientData.ratenStart || "01.01.2025",
