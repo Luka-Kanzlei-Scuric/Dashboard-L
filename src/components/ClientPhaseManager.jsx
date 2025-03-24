@@ -33,10 +33,10 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     },
     { 
       name: 'Rechnung & Anfrage', 
-      description: 'Rechnung senden und Gläubigerschreiben vom Mandanten anfordern.',
-      instructions: 'In dieser Phase müssen Sie eine Rechnung an den Mandanten senden und ihn bitten, alle relevanten Gläubigerschreiben hochzuladen. Verwenden Sie die Schaltflächen unten, um diese Schritte durchzuführen.',
+      description: 'Rechnung hochladen und gemeinsam mit Anfrage nach Gläubigerschreiben versenden.',
+      instructions: 'In dieser Phase laden Sie zunächst eine Rechnung hoch und senden dann eine E-Mail, die sowohl die Rechnung enthält als auch die Aufforderung, Gläubigerschreiben einzureichen. Beide Anforderungen werden in einer E-Mail zusammengefasst.',
       icon: DocumentTextIcon,
-      actions: ['invoice', 'request-documents']
+      actions: ['invoice', 'combined-email']
     },
     { 
       name: 'Dokumente & Zahlung', 
@@ -107,6 +107,9 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     }
   };
   
+  // State to track steps within Phase 2
+  const [phase2Step, setPhase2Step] = useState(1); // 1: Upload invoice, 2: Send combined email
+
   // Handle phase click with improved validation
   const handlePhaseClick = (phaseNumber) => {
     // Only allow changing to already completed phases or the next phase
@@ -121,8 +124,9 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
             // Update local state only after server confirmation
             setCurrentPhase(targetPhase);
             
-            // Update upload type when moving to phase 2
-            if (targetPhase === 2 && !selectedUploadType) {
+            // Reset phase 2 step when entering phase 2
+            if (targetPhase === 2) {
+              setPhase2Step(1);
               setSelectedUploadType('invoice');
             }
             
@@ -142,14 +146,22 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
   const handleUploadComplete = (filePath, fileName) => {
     console.log(`File uploaded: ${fileName} at ${filePath}`);
     // In a real implementation, you would save this information to the client's record
+    
+    // Move to the next step in phase 2 after upload completion
+    if (currentPhase === 2 && phase2Step === 1) {
+      setPhase2Step(2);
+      setSelectedUploadType('combined');
+    }
   };
   
   // Handle email sent
-  const handleEmailSent = (invoiceData) => {
+  const handleEmailSent = (invoiceData, includesDocumentRequest = false) => {
     setShowEmailSuccess(true);
     
-    // Move to the next phase after email is sent if we're in phase 1
+    // Move to the next phase after email is sent
     if (currentPhase === 1) {
+      handleNextPhase();
+    } else if (currentPhase === 2 && includesDocumentRequest) {
       handleNextPhase();
     }
     
@@ -189,6 +201,15 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
   // Handle selecting upload type
   const handleSelectUploadType = (type) => {
     setSelectedUploadType(type);
+    
+    // Reset phase2Step if going back to invoice 
+    if (type === 'invoice' && currentPhase === 2) {
+      setPhase2Step(1);
+    } else if (type === 'combined' && currentPhase === 2) {
+      setPhase2Step(2);
+    } else if (type === 'request-again' && currentPhase === 3) {
+      // Keep current phase but show document request UI
+    }
   };
   
   // Mark documents as uploaded
@@ -229,69 +250,108 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
       case 2:
         return (
           <div className="space-y-6">
-            {/* Phase 2 Navigation Tabs */}
-            <div className="border-b border-gray-200">
-              <nav className="flex -mb-px space-x-6">
-                <button
-                  onClick={() => handleSelectUploadType('invoice')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-                    selectedUploadType === 'invoice' || !selectedUploadType
-                      ? 'border-blue-500 text-blue-600' 
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Rechnung senden
-                </button>
-                <button
-                  onClick={() => handleSelectUploadType('documents')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-                    selectedUploadType === 'documents'
-                      ? 'border-blue-500 text-blue-600' 
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Gläubigerbriefe anfordern
-                </button>
-              </nav>
+            {/* Phase 2 Progress Steps */}
+            <div className="relative mb-8">
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-between">
+                <div className={`flex items-center ${phase2Step >= 1 ? 'text-blue-600' : 'text-gray-500'}`}>
+                  <span className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
+                    phase2Step > 1 ? 'bg-blue-600 text-white border-blue-600' :
+                    phase2Step === 1 ? 'border-blue-600 bg-white' : 'border-gray-300 bg-white'
+                  }`}>
+                    {phase2Step > 1 ? (
+                      <CheckIcon className="h-5 w-5" />
+                    ) : (
+                      <span>1</span>
+                    )}
+                  </span>
+                  <span className="ml-2 text-sm font-medium">Rechnung hochladen</span>
+                </div>
+                
+                <div className={`flex items-center ${phase2Step >= 2 ? 'text-blue-600' : 'text-gray-500'}`}>
+                  <span className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
+                    phase2Step > 2 ? 'bg-blue-600 text-white border-blue-600' :
+                    phase2Step === 2 ? 'border-blue-600 bg-white' : 'border-gray-300 bg-white'
+                  }`}>
+                    <span>2</span>
+                  </span>
+                  <span className="ml-2 text-sm font-medium">E-Mail versenden</span>
+                </div>
+              </div>
             </div>
             
-            {/* Tab Content */}
-            {selectedUploadType === 'invoice' || !selectedUploadType ? (
-              <InvoiceUpload 
-                client={client}
-                onUploadComplete={handleUploadComplete}
-                onEmailSent={handleEmailSent}
-                onRequestDocuments={() => handleSelectUploadType('documents')}
-              />
+            {/* Step Content */}
+            {phase2Step === 1 ? (
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200 animate-fadeIn">
+                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                  <DocumentTextIcon className="h-5 w-5 text-gray-500 mr-2" />
+                  Schritt 1: Rechnung hochladen
+                </h3>
+                
+                <p className="text-gray-600 mb-6">
+                  Laden Sie zunächst die Rechnung für den Mandanten hoch. Im nächsten Schritt können Sie dann 
+                  die kombinierte E-Mail mit der Rechnung und der Anfrage nach Gläubigerschreiben versenden.
+                </p>
+                
+                <InvoiceUpload 
+                  client={client}
+                  onUploadComplete={handleUploadComplete}
+                  onlyUpload={true} // Zeigt nur den Upload-Teil an, nicht die E-Mail-Optionen
+                />
+              </div>
             ) : (
               <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200 animate-fadeIn">
                 <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
                   <EnvelopeIcon className="h-5 w-5 text-gray-500 mr-2" />
-                  Gläubigerbriefe anfordern
+                  Schritt 2: Kombinierte E-Mail senden
                 </h3>
                 
                 <p className="text-gray-600 mb-6">
-                  Senden Sie eine E-Mail an den Mandanten mit der Bitte, alle relevanten Gläubigerbriefe hochzuladen.
-                  Dies ist wichtig für den weiteren Verlauf der Bearbeitung.
+                  Senden Sie eine E-Mail an den Mandanten, die sowohl die Rechnung enthält als auch die Aufforderung, 
+                  alle relevanten Gläubigerschreiben hochzuladen.
                 </p>
                 
                 <div className="bg-blue-50 rounded-xl p-4 mb-6 border border-blue-100">
                   <div className="flex">
                     <LightBulbIcon className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
                     <p className="text-sm text-blue-700">
-                      Der Mandant erhält einen sicheren Link, über den er die Dokumente hochladen kann.
-                      Die hochgeladenen Dokumente werden Ihnen dann automatisch zur Verfügung stehen.
+                      Der Mandant erhält eine E-Mail mit der Rechnung im Anhang sowie einem Link zum Hochladen seiner Gläubigerschreiben.
+                      Nach dem Versand wird automatisch zur nächsten Phase übergegangen.
                     </p>
                   </div>
                 </div>
                 
-                <button
-                  onClick={handleRequestDocuments}
-                  className="w-full px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
-                >
-                  <EnvelopeIcon className="h-5 w-5 mr-2" />
-                  Gläubigerbriefe jetzt anfordern
-                </button>
+                {/* E-Mail-Vorschau */}
+                <div className="border border-gray-200 rounded-lg p-4 mb-6">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">E-Mail-Vorschau:</h4>
+                  <div className="bg-gray-50 p-3 rounded text-sm text-gray-700">
+                    <p><strong>An:</strong> {client.name} &lt;{client.email}&gt;</p>
+                    <p><strong>Betreff:</strong> Ihre Rechnung und Anforderung von Dokumenten</p>
+                    <p className="mt-2">Sehr geehrte(r) {client.name},</p>
+                    <p className="mt-2">anbei erhalten Sie Ihre Rechnung für unsere Rechtsdienstleistungen.</p>
+                    <p className="mt-2">Bitte beginnen Sie mit Ihren monatlichen Zahlungen und laden Sie über den untenstehenden Link alle relevanten Gläubigerschreiben hoch, damit wir mit Ihrer Bearbeitung fortfahren können.</p>
+                    <p className="mt-2">Mit freundlichen Grüßen,<br/>Ihr Team von Scuric Rechtsanwälte</p>
+                  </div>
+                </div>
+                
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => handleSelectUploadType('invoice')}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Zurück
+                  </button>
+                  
+                  <button
+                    onClick={() => handleEmailSent(null, true)}
+                    className="flex-1 px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                  >
+                    <EnvelopeIcon className="h-5 w-5 mr-2" />
+                    Kombinierte E-Mail jetzt senden
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -299,101 +359,156 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
         
       case 3:
         return (
-          <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200 animate-fadeIn">
-            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-              <DocumentTextIcon className="h-5 w-5 text-gray-500 mr-2" />
-              Dokumente & Zahlungen
-            </h3>
-            
-            <p className="text-gray-600 mb-6">
-              In dieser Phase müssen vom Mandanten alle angeforderten Dokumente hochgeladen und die erste Ratenzahlung geleistet werden.
-            </p>
-            
-            <div className="bg-gray-50 rounded-xl p-5 mb-6">
-              <h4 className="text-sm font-medium text-gray-700 mb-4">Fortschritt des Mandanten</h4>
+          <div className="space-y-6 animate-fadeIn">
+            {/* Hauptteil: Phase 3 Status */}
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <DocumentTextIcon className="h-5 w-5 text-gray-500 mr-2" />
+                Dokumente & Zahlungen
+              </h3>
               
-              <div className="space-y-4">
-                <div className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full ${client?.documentsUploaded ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'} flex items-center justify-center mr-3`}>
-                    {client?.documentsUploaded ? (
-                      <CheckIcon className="h-5 w-5" />
-                    ) : (
-                      <span className="text-sm font-medium">1</span>
-                    )}
-                  </div>
-                  <div className="flex-grow">
-                    <p className={`font-medium ${client?.documentsUploaded ? 'text-green-700' : 'text-gray-700'}`}>
-                      Dokumente hochgeladen
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {client?.documentsUploaded 
-                        ? 'Alle erforderlichen Dokumente wurden hochgeladen' 
-                        : 'Der Mandant muss die angeforderten Gläubigerbriefe hochladen'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleMarkDocumentsUploaded}
-                    className={`ml-2 px-3 py-1 text-xs rounded-md ${
-                      client?.documentsUploaded 
-                        ? 'bg-green-100 text-green-700 cursor-default' 
-                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                    }`}
-                    disabled={client?.documentsUploaded}
-                  >
-                    {client?.documentsUploaded ? 'Erledigt' : 'Als erledigt markieren'}
-                  </button>
-                </div>
+              <p className="text-gray-600 mb-6">
+                In dieser Phase müssen vom Mandanten alle angeforderten Dokumente hochgeladen und die erste Ratenzahlung geleistet werden.
+              </p>
+              
+              <div className="bg-gray-50 rounded-xl p-5 mb-6">
+                <h4 className="text-sm font-medium text-gray-700 mb-4">Fortschritt des Mandanten</h4>
                 
-                <div className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full ${client?.firstPaymentReceived ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'} flex items-center justify-center mr-3`}>
-                    {client?.firstPaymentReceived ? (
-                      <CheckIcon className="h-5 w-5" />
-                    ) : (
-                      <span className="text-sm font-medium">2</span>
-                    )}
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <div className={`w-8 h-8 rounded-full ${client?.documentsUploaded ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'} flex items-center justify-center mr-3`}>
+                      {client?.documentsUploaded ? (
+                        <CheckIcon className="h-5 w-5" />
+                      ) : (
+                        <span className="text-sm font-medium">1</span>
+                      )}
+                    </div>
+                    <div className="flex-grow">
+                      <p className={`font-medium ${client?.documentsUploaded ? 'text-green-700' : 'text-gray-700'}`}>
+                        Dokumente hochgeladen
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {client?.documentsUploaded 
+                          ? 'Alle erforderlichen Dokumente wurden hochgeladen' 
+                          : 'Der Mandant muss die angeforderten Gläubigerbriefe hochladen'}
+                      </p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleSelectUploadType('request-again')}
+                        className="px-3 py-1 text-xs bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100"
+                      >
+                        Erneut anfordern
+                      </button>
+                      <button
+                        onClick={handleMarkDocumentsUploaded}
+                        className={`px-3 py-1 text-xs rounded-md ${
+                          client?.documentsUploaded 
+                            ? 'bg-green-100 text-green-700 cursor-default' 
+                            : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                        }`}
+                        disabled={client?.documentsUploaded}
+                      >
+                        {client?.documentsUploaded ? 'Erledigt' : 'Als erledigt markieren'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex-grow">
-                    <p className={`font-medium ${client?.firstPaymentReceived ? 'text-green-700' : 'text-gray-700'}`}>
-                      Erste Zahlung erhalten
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {client?.firstPaymentReceived 
-                        ? 'Die erste Ratenzahlung ist eingegangen' 
-                        : `Die erste Rate (${client?.monatlicheRate?.toFixed(2) || '0.00'} €) muss eingehen`}
-                    </p>
+                  
+                  <div className="flex items-center">
+                    <div className={`w-8 h-8 rounded-full ${client?.firstPaymentReceived ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'} flex items-center justify-center mr-3`}>
+                      {client?.firstPaymentReceived ? (
+                        <CheckIcon className="h-5 w-5" />
+                      ) : (
+                        <span className="text-sm font-medium">2</span>
+                      )}
+                    </div>
+                    <div className="flex-grow">
+                      <p className={`font-medium ${client?.firstPaymentReceived ? 'text-green-700' : 'text-gray-700'}`}>
+                        Erste Zahlung erhalten
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {client?.firstPaymentReceived 
+                          ? 'Die erste Ratenzahlung ist eingegangen' 
+                          : `Die erste Rate (${client?.monatlicheRate?.toFixed(2) || '0.00'} €) muss eingehen`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleMarkPaymentReceived}
+                      className={`ml-2 px-3 py-1 text-xs rounded-md ${
+                        client?.firstPaymentReceived 
+                          ? 'bg-green-100 text-green-700 cursor-default' 
+                          : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                      }`}
+                      disabled={client?.firstPaymentReceived}
+                    >
+                      {client?.firstPaymentReceived ? 'Erledigt' : 'Als erledigt markieren'}
+                    </button>
                   </div>
-                  <button
-                    onClick={handleMarkPaymentReceived}
-                    className={`ml-2 px-3 py-1 text-xs rounded-md ${
-                      client?.firstPaymentReceived 
-                        ? 'bg-green-100 text-green-700 cursor-default' 
-                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                    }`}
-                    disabled={client?.firstPaymentReceived}
-                  >
-                    {client?.firstPaymentReceived ? 'Erledigt' : 'Als erledigt markieren'}
-                  </button>
                 </div>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-gray-500">
+                  Wenn beide Punkte erledigt sind, kann zur nächsten Phase übergegangen werden.
+                </p>
+                
+                <button
+                  onClick={handleNextPhase}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    (client?.documentsUploaded && client?.firstPaymentReceived) || showAllPhases
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  }`}
+                  disabled={!(client?.documentsUploaded && client?.firstPaymentReceived) && !showAllPhases}
+                >
+                  Zur nächsten Phase
+                </button>
               </div>
             </div>
             
-            <div className="flex justify-between items-center">
-              <p className="text-sm text-gray-500">
-                Wenn beide Punkte erledigt sind, kann zur nächsten Phase übergegangen werden.
-              </p>
-              
-              <button
-                onClick={handleNextPhase}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  (client?.documentsUploaded && client?.firstPaymentReceived) || showAllPhases
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                }`}
-                disabled={!(client?.documentsUploaded && client?.firstPaymentReceived) && !showAllPhases}
-              >
-                Zur nächsten Phase
-              </button>
-            </div>
+            {/* Zusätzlicher Bereich für "Erneut anfordern" wenn ausgewählt */}
+            {selectedUploadType === 'request-again' && (
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200 animate-fadeIn">
+                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                  <EnvelopeIcon className="h-5 w-5 text-gray-500 mr-2" />
+                  Gläubigerbriefe erneut anfordern
+                </h3>
+                
+                <p className="text-gray-600 mb-6">
+                  Senden Sie eine Erinnerungs-E-Mail an den Mandanten, falls die angeforderten Gläubigerbriefe noch nicht hochgeladen wurden.
+                </p>
+                
+                {/* E-Mail-Vorschau */}
+                <div className="border border-gray-200 rounded-lg p-4 mb-6">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">E-Mail-Vorschau:</h4>
+                  <div className="bg-gray-50 p-3 rounded text-sm text-gray-700">
+                    <p><strong>An:</strong> {client.name} &lt;{client.email}&gt;</p>
+                    <p><strong>Betreff:</strong> Erinnerung: Gläubigerbriefe hochladen</p>
+                    <p className="mt-2">Sehr geehrte(r) {client.name},</p>
+                    <p className="mt-2">wir möchten Sie daran erinnern, die angeforderten Gläubigerbriefe über den bereits zugesandten Link hochzuladen.</p>
+                    <p className="mt-2">Diese Dokumente sind essenziell für den weiteren Verlauf Ihres Verfahrens. Sollten Sie Hilfe benötigen oder Fragen haben, zögern Sie bitte nicht, uns zu kontaktieren.</p>
+                    <p className="mt-2">Mit freundlichen Grüßen,<br/>Ihr Team von Scuric Rechtsanwälte</p>
+                  </div>
+                </div>
+                
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => setSelectedUploadType(null)}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Abbrechen
+                  </button>
+                  
+                  <button
+                    onClick={handleRequestDocuments}
+                    className="flex-1 px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                  >
+                    <EnvelopeIcon className="h-5 w-5 mr-2" />
+                    Erinnerung jetzt senden
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         );
         

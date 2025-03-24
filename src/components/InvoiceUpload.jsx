@@ -20,8 +20,9 @@ import { CheckIcon } from '@heroicons/react/24/solid';
  * @param {Function} props.onUploadComplete Callback when upload is complete
  * @param {Function} props.onEmailSent Callback when email is sent
  * @param {Function} props.onRequestDocuments Callback to request documents
+ * @param {Boolean} props.onlyUpload When true, only shows the upload functionality without email options
  */
-const InvoiceUpload = ({ client, onUploadComplete, onEmailSent, onRequestDocuments }) => {
+const InvoiceUpload = ({ client, onUploadComplete, onEmailSent, onRequestDocuments, onlyUpload = false }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
@@ -87,8 +88,10 @@ const InvoiceUpload = ({ client, onUploadComplete, onEmailSent, onRequestDocumen
         onUploadComplete(filePath, file.name);
       }
       
-      // Show preview option instead of automatically sending
-      setShowPreview(true);
+      // Only show preview if not in onlyUpload mode
+      if (!onlyUpload) {
+        setShowPreview(true);
+      }
     } catch (error) {
       console.error('Error uploading file:', error);
       alert('Fehler beim Hochladen der Datei. Bitte versuchen Sie es erneut.');
@@ -175,11 +178,13 @@ const InvoiceUpload = ({ client, onUploadComplete, onEmailSent, onRequestDocumen
   return (
     <div className="animate-fadeIn">
       {/* Upload container with premium Apple-style design */}
-      <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-          <DocumentTextIcon className="h-5 w-5 text-gray-500 mr-2" />
-          Rechnung senden
-        </h3>
+      <div className={onlyUpload ? '' : 'bg-white rounded-2xl shadow-sm p-6 border border-gray-200'}>
+        {!onlyUpload && (
+          <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+            <DocumentTextIcon className="h-5 w-5 text-gray-500 mr-2" />
+            Rechnung hochladen
+          </h3>
+        )}
         
         {emailSent ? (
           <div className="flex flex-col items-center justify-center py-8 animate-fadeIn">
@@ -197,7 +202,7 @@ const InvoiceUpload = ({ client, onUploadComplete, onEmailSent, onRequestDocumen
               Neue Rechnung hochladen
             </button>
           </div>
-        ) : showPreview ? (
+        ) : showPreview && !onlyUpload ? (
           <div className="animate-fadeIn">
             <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
               <div className="flex items-start">
@@ -293,25 +298,27 @@ const InvoiceUpload = ({ client, onUploadComplete, onEmailSent, onRequestDocumen
                 <span>Datei erfolgreich hochgeladen!</span>
               </div>
               
-              <div className="pt-4">
-                {emailSending ? (
-                  <button 
-                    disabled
-                    className="px-5 py-2.5 bg-gray-400 text-white rounded-lg shadow flex items-center"
-                  >
-                    <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
-                    E-Mail wird gesendet...
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setShowPreview(true)}
-                    className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow flex items-center"
-                  >
-                    <EnvelopeIcon className="h-4 w-4 mr-2" />
-                    E-Mail senden
-                  </button>
-                )}
-              </div>
+              {!onlyUpload && (
+                <div className="pt-4">
+                  {emailSending ? (
+                    <button 
+                      disabled
+                      className="px-5 py-2.5 bg-gray-400 text-white rounded-lg shadow flex items-center"
+                    >
+                      <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                      E-Mail wird gesendet...
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setShowPreview(true)}
+                      className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow flex items-center"
+                    >
+                      <EnvelopeIcon className="h-4 w-4 mr-2" />
+                      E-Mail senden
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -357,24 +364,26 @@ const InvoiceUpload = ({ client, onUploadComplete, onEmailSent, onRequestDocumen
               </div>
             </div>
             
-            <div className="flex justify-between mt-6">
-              <div>
-                <h5 className="text-sm font-medium text-gray-700 mb-1">Rechnungsdaten</h5>
-                <p className="text-xs text-gray-500">
-                  Gesamtbetrag: <span className="font-medium">{client.honorar || 1111} €</span> • 
-                  Raten: <span className="font-medium">{client.raten || 2} x {client.monatlicheRate?.toFixed(2) || (1111/2).toFixed(2)} €</span>
-                </p>
+            {!onlyUpload && (
+              <div className="flex justify-between mt-6">
+                <div>
+                  <h5 className="text-sm font-medium text-gray-700 mb-1">Rechnungsdaten</h5>
+                  <p className="text-xs text-gray-500">
+                    Gesamtbetrag: <span className="font-medium">{client.honorar || 1111} €</span> • 
+                    Raten: <span className="font-medium">{client.raten || 2} x {client.monatlicheRate?.toFixed(2) || (1111/2).toFixed(2)} €</span>
+                  </p>
+                </div>
+                
+                <button
+                  onClick={handleRequestDocuments}
+                  className="px-5 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center"
+                  disabled={isUploading}
+                >
+                  <EnvelopeIcon className="h-4 w-4 mr-2" />
+                  Gläubigerbriefe anfordern
+                </button>
               </div>
-              
-              <button
-                onClick={handleRequestDocuments}
-                className="px-5 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center"
-                disabled={isUploading}
-              >
-                <EnvelopeIcon className="h-4 w-4 mr-2" />
-                Gläubigerbriefe anfordern
-              </button>
-            </div>
+            )}
           </div>
         )}
       </div>
