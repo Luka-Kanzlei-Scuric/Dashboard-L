@@ -64,7 +64,7 @@ const ClientDetailPage = () => {
       alert('Dokument erfolgreich hochgeladen');
       
       // Client-Daten aktualisieren, um das neue Dokument anzuzeigen
-      fetchClient();
+      loadClient();
     } catch (error) {
       console.error('Fehler beim Hochladen der Datei:', error);
       alert(`Fehler beim Hochladen: ${error.message}`);
