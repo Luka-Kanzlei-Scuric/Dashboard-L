@@ -16,6 +16,7 @@ import {
   TrashIcon
 } from '@heroicons/react/24/outline';
 import ClientPhaseManager from '../components/ClientPhaseManager';
+import ProgressTracker from '../components/ProgressTracker';
 
 const ClientDetailPage = () => {
   const { id } = useParams();
@@ -1038,6 +1039,22 @@ const ClientDetailPage = () => {
           }`}>
             {client.status}
           </span>
+          
+          {/* Kompakte Prozessverfolgung neben dem Namen */}
+          <div className="ml-4 pl-4 border-l border-gray-200">
+            {client.currentPhase && (
+              <ProgressTracker 
+                currentPhase={client.currentPhase} 
+                phases={[
+                  { name: 'Erstberatung' },
+                  { name: 'Rechnung & Anfrage' },
+                  { name: 'Dokumente & Zahlung' },
+                  { name: 'Abschluss' }
+                ]}
+                compact={true}
+              />
+            )}
+          </div>
         </div>
         
         {/* Mandanten-ID hervorgehoben anzeigen */}
@@ -1065,7 +1082,7 @@ const ClientDetailPage = () => {
       <div className="border-b border-gray-200 mb-8">
         <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center mb-4">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-            {['overview', 'documents', 'formdata'].map((tab) => (
+            {['overview', 'process', 'documents', 'formdata'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1076,6 +1093,7 @@ const ClientDetailPage = () => {
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
               >
                 {tab === 'overview' && 'Übersicht'}
+                {tab === 'process' && 'Prozessablauf'}
                 {tab === 'documents' && 'Dokumente'}
                 {tab === 'formdata' && 'Angaben des Mandanten'}
               </button>
@@ -1311,19 +1329,36 @@ const ClientDetailPage = () => {
             </div>
           </div>
 
-          {/* Client Phase Manager */}
-          <ClientPhaseManager 
-            client={client}
-            onPhaseChange={(newPhase) => {
-              // Update client in state with new phase
-              setClient(prevClient => ({
-                ...prevClient,
-                currentPhase: newPhase,
-                ...(newPhase === 2 && { emailSent: true }),
-                ...(newPhase === 3 && { status: 'Aktiv' })
-              }));
-            }}
-          />
+          {/* Info-Box für Prozessbeschreibung */}
+          <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900 mb-4">Prozessmanagement</h2>
+                <p className="text-gray-600 mb-2">
+                  Status: <span className="font-medium">{client.currentPhase ? `Phase ${client.currentPhase}/4` : "Noch nicht gestartet"}</span>
+                </p>
+                <p className="text-sm text-gray-500">
+                  Der Mandant befindet sich aktuell im Prozessschritt 
+                  <span className="font-medium"> {
+                    client.currentPhase === 1 ? "Erstberatung" :
+                    client.currentPhase === 2 ? "Rechnung & Anfrage" :
+                    client.currentPhase === 3 ? "Dokumente & Zahlung" :
+                    client.currentPhase === 4 ? "Abschluss" : "Unbekannt"
+                  }</span>.
+                </p>
+              </div>
+              
+              <button 
+                onClick={() => setActiveTab('process')}
+                className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors duration-200 flex items-center"
+              >
+                Zum Prozessmanagement
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
 
           {/* ClickUp Information */}
           <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
@@ -1383,6 +1418,28 @@ const ClientDetailPage = () => {
         </div>
       )}
 
+      {/* Prozessablauf-Tab */}
+      {activeTab === 'process' && (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
+            <h2 className="text-xl font-medium text-gray-900 mb-6">Prozessablauf für {client.name}</h2>
+            
+            <ClientPhaseManager 
+              client={client}
+              onPhaseChange={(newPhase) => {
+                // Update client in state with new phase
+                setClient(prevClient => ({
+                  ...prevClient,
+                  currentPhase: newPhase,
+                  ...(newPhase === 2 && { emailSent: true }),
+                  ...(newPhase === 3 && { status: 'Aktiv' })
+                }));
+              }}
+            />
+          </div>
+        </div>
+      )}
+      
       {/* Dokumente-Tab */}
       {activeTab === 'documents' && (
         <div className="space-y-6 animate-fadeIn">
