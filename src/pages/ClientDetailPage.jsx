@@ -34,6 +34,8 @@ const ClientDetailPage = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [showEmailSuccess, setShowEmailSuccess] = useState(false);
 
   // Funktion zum Hochladen eines Dokuments
   const handleFileUpload = async (file) => {
@@ -82,8 +84,7 @@ const ClientDetailPage = () => {
   };
   
   // Handler für Anforderung von Dokumenten vom Mandanten
-  const [emailSending, setEmailSending] = useState(false);
-  const [showEmailSuccess, setShowEmailSuccess] = useState(false);
+  // State-Variablen werden nur am Anfang der Komponente deklariert
   
   const handleRequestDocuments = async () => {
     if (!client || !client._id) return;
@@ -960,8 +961,8 @@ const ClientDetailPage = () => {
     }
   };
 
-  const [showEmailSuccess, setShowEmailSuccess] = useState(false);
-  const [emailSending, setEmailSending] = useState(false);
+  // Verwende bereits existierende State-Variablen
+  // (keine Doppeldeklarationen hier mehr)
   
   const handleUpload = async (file) => {
     setIsUploading(true);
@@ -982,18 +983,6 @@ const ClientDetailPage = () => {
       console.error('Fehler beim Hochladen:', error);
       setIsUploading(false);
       alert("Fehler beim Hochladen der Datei: " + error.message);
-    }
-  };
-
-  const handleFileSelect = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const filePath = await handleUpload(file);
-      
-      // Automatisch die Email nach dem Upload anbieten
-      if (filePath && client) {
-        handleSendInvoiceEmail(filePath, file.name);
-      }
     }
   };
   
@@ -1030,29 +1019,7 @@ const ClientDetailPage = () => {
     }
   };
   
-  // Funktion zum Anfordern von Gläubigerschreiben
-  const handleRequestDocuments = async () => {
-    if (!client || !client._id) return;
-    
-    try {
-      setEmailSending(true);
-      
-      // Sende Email mit Anforderung für Gläubigerschreiben
-      await requestDocuments(client._id, "Gläubigerschreiben");
-      
-      setEmailSending(false);
-      setShowEmailSuccess(true);
-      
-      // Blende Erfolgsmeldung nach 5 Sekunden aus
-      setTimeout(() => {
-        setShowEmailSuccess(false);
-      }, 5000);
-    } catch (error) {
-      console.error('Fehler beim Anfordern von Dokumenten:', error);
-      setEmailSending(false);
-      alert("Fehler beim Anfordern von Dokumenten: " + error.message);
-    }
-  };
+  // Die Funktion zum Anfordern von Gläubigerschreiben ist bereits definiert
 
   if (loading) {
     return (
