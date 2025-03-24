@@ -301,9 +301,9 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                   >
                     <span className="text-sm font-medium">2</span>
                     
-                    {/* Subtle pulse animation for current step */}
+                    {/* Subtle pulse animation for current step - fixed size */}
                     {phase2Step === 2 && (
-                      <span className="absolute w-full h-full rounded-full bg-blue-100 opacity-50 animate-pulse"></span>
+                      <span className="absolute w-8 h-8 rounded-full bg-blue-100 opacity-50 animate-pulse"></span>
                     )}
                   </div>
                   
