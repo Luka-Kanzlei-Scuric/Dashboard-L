@@ -84,7 +84,7 @@ const ClientDetailPage = () => {
   };
   
   // Handler für Anforderung von Dokumenten vom Mandanten
-  // State-Variablen werden nur am Anfang der Komponente deklariert
+  // State-Variablen werden nur am Anfang der Komponente deklariert (emailSending, showEmailSuccess)
   
   const handleRequestDocuments = async () => {
     if (!client || !client._id) return;
@@ -961,8 +961,8 @@ const ClientDetailPage = () => {
     }
   };
 
-  // Verwende bereits existierende State-Variablen
-  // (keine Doppeldeklarationen hier mehr)
+  // Verwende die bereits am Anfang der Komponente definierten State-Variablen
+  // (emailSending, showEmailSuccess)
   
   const handleUpload = async (file) => {
     setIsUploading(true);
@@ -1019,7 +1019,8 @@ const ClientDetailPage = () => {
     }
   };
   
-  // Die Funktion zum Anfordern von Gläubigerschreiben ist bereits definiert
+  // Die Funktion handleRequestDocuments ist bereits am Anfang der Komponente definiert
+  // und wird im Dokumente-Tab verwendet (Zeile ~1540)
 
   if (loading) {
     return (
