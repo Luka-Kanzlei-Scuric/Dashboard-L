@@ -1,5 +1,38 @@
 import mongoose from 'mongoose';
 
+// Document subschema to track files uploaded by the client
+const documentSchema = new mongoose.Schema({
+  filename: {
+    type: String,
+    required: true
+  },
+  originalFilename: {
+    type: String,
+    required: true
+  },
+  path: {
+    type: String,
+    required: true
+  },
+  size: {
+    type: Number,
+    required: true
+  },
+  mimetype: {
+    type: String,
+    required: true
+  },
+  documentType: {
+    type: String,
+    enum: ['invoice', 'creditorLetter', 'other'],
+    default: 'other'
+  },
+  uploadDate: {
+    type: Date,
+    default: Date.now
+  }
+});
+
 const clientSchema = new mongoose.Schema(
   {
     name: {
@@ -76,6 +109,16 @@ const clientSchema = new mongoose.Schema(
     },
     formDataCacheTime: {
       type: Number, // Timestamp wann der Cache gesetzt wurde
+    },
+    // Document storage
+    documents: {
+      type: [documentSchema],
+      default: []
+    },
+    // Latest invoice document reference
+    currentInvoice: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Document'
     }
   },
   {

@@ -76,16 +76,35 @@ const InvoiceUpload = ({ client, onUploadComplete, onEmailSent, onRequestDocumen
     setIsUploading(true);
     
     try {
-      // Simulate upload progress
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Create FormData object
+      const formData = new FormData();
+      formData.append('invoice', file);
       
-      // Assume we get back a file path
-      const filePath = `/uploads/${file.name}`;
-      setUploadedFilePath(filePath);
+      // Get API base URL from environment or use default
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+      
+      // Make API call to upload invoice
+      const response = await fetch(`${apiBaseUrl}/clients/${client._id}/upload-invoice`, {
+        method: 'POST',
+        body: formData,
+        // Don't set Content-Type header - browser will set it with correct boundary
+      });
+      
+      // Check response
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Fehler beim Hochladen der Datei');
+      }
+      
+      // Parse successful response
+      const data = await response.json();
+      
+      // Set path and mark as complete
+      setUploadedFilePath(data.document.url);
       setUploadComplete(true);
       
       if (onUploadComplete) {
-        onUploadComplete(filePath, file.name);
+        onUploadComplete(data.document.url, data.document.originalFilename);
       }
       
       // Only show preview if not in onlyUpload mode
@@ -94,7 +113,7 @@ const InvoiceUpload = ({ client, onUploadComplete, onEmailSent, onRequestDocumen
       }
     } catch (error) {
       console.error('Error uploading file:', error);
-      alert('Fehler beim Hochladen der Datei. Bitte versuchen Sie es erneut.');
+      alert(`Fehler beim Hochladen der Datei: ${error.message}`);
     } finally {
       setIsUploading(false);
     }
@@ -121,13 +140,31 @@ const InvoiceUpload = ({ client, onUploadComplete, onEmailSent, onRequestDocumen
         fileName: selectedFile.name
       };
       
-      // In a real implementation, this would send the email with the invoice
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Get API base URL from environment or use default
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+      
+      // Send request to API to send invoice email
+      const response = await fetch(`${apiBaseUrl}/clients/${client._id}/send-invoice`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          invoiceData,
+          invoiceFilePath: uploadedFilePath
+        })
+      });
+      
+      // Check response
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Fehler beim Senden der E-Mail');
+      }
       
       setEmailSent(true);
       
       if (onEmailSent) {
-        onEmailSent(invoiceData);
+        onEmailSent(invoiceData, true); // true indicates document request is included
       }
       
       // Keep success state longer for better UX
@@ -141,21 +178,42 @@ const InvoiceUpload = ({ client, onUploadComplete, onEmailSent, onRequestDocumen
       
     } catch (error) {
       console.error('Error sending email:', error);
-      alert('Fehler beim Senden der E-Mail. Bitte versuchen Sie es erneut.');
+      alert(`Fehler beim Senden der E-Mail: ${error.message}`);
     } finally {
       setEmailSending(false);
     }
   };
   
   // Request creditor documents from the client
-  const handleRequestDocuments = () => {
+  const handleRequestDocuments = async () => {
     try {
+      // Get API base URL from environment or use default
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+      
+      // Send request to API to request documents from client
+      const response = await fetch(`${apiBaseUrl}/clients/${client._id}/request-documents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          documentType: 'Gläubigerschreiben'
+        })
+      });
+      
+      // Check response
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Fehler beim Anfordern der Dokumente');
+      }
+      
+      // Call callback if provided
       if (onRequestDocuments) {
         onRequestDocuments();
       }
     } catch (error) {
       console.error('Error requesting documents:', error);
-      alert('Fehler beim Anfordern der Dokumente. Bitte versuchen Sie es erneut.');
+      alert(`Fehler beim Anfordern der Dokumente: ${error.message}`);
     }
   };
   

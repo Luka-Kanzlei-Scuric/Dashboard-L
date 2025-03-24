@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import ClientPhaseManager from '../components/ClientPhaseManager';
 import ProgressTracker from '../components/ProgressTracker';
+import ClientDocuments from '../components/ClientDocuments';
 
 const ClientDetailPage = () => {
   const { id } = useParams();
@@ -34,12 +35,94 @@ const ClientDetailPage = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Mock-Daten für die Dokumentenliste (da diese nicht über die API kommen)
-  const mockDocuments = [
-    { id: 1, name: "Gläubigerschreiben.pdf", type: "pdf", date: "15.03.2025" },
-    { id: 2, name: "Vertrag.docx", type: "docx", date: "10.03.2025" },
-    { id: 3, name: "Vollmacht.pdf", type: "pdf", date: "05.03.2025" }
-  ];
+  // Funktion zum Hochladen eines Dokuments
+  const handleFileUpload = async (file) => {
+    if (!file || !client || !client._id) return;
+    
+    setIsUploading(true);
+    
+    try {
+      // Formular-Daten erstellen
+      const formData = new FormData();
+      formData.append('invoice', file);
+      
+      // API-Endpunkt für Datei-Upload
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+      const response = await fetch(`${apiBaseUrl}/clients/${client._id}/upload-invoice`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      // Überprüfe Antwort
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Fehler beim Hochladen der Datei');
+      }
+      
+      // Erfolgreich hochgeladen
+      const data = await response.json();
+      alert('Dokument erfolgreich hochgeladen');
+      
+      // Client-Daten aktualisieren, um das neue Dokument anzuzeigen
+      fetchClient();
+    } catch (error) {
+      console.error('Fehler beim Hochladen der Datei:', error);
+      alert(`Fehler beim Hochladen: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+  
+  // Handler für Dateiauswahl im Dokumenten-Tab
+  const handleFileSelect = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      handleFileUpload(selectedFile);
+    }
+  };
+  
+  // Handler für Anforderung von Dokumenten vom Mandanten
+  const [emailSending, setEmailSending] = useState(false);
+  const [showEmailSuccess, setShowEmailSuccess] = useState(false);
+  
+  const handleRequestDocuments = async () => {
+    if (!client || !client._id) return;
+    
+    setEmailSending(true);
+    
+    try {
+      // API-Endpunkt für Dokumentenanforderung
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+      const response = await fetch(`${apiBaseUrl}/clients/${client._id}/request-documents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          documentType: 'Gläubigerschreiben'
+        })
+      });
+      
+      // Überprüfe Antwort
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Fehler beim Senden der E-Mail');
+      }
+      
+      // Erfolgreich gesendet
+      setShowEmailSuccess(true);
+      
+      // Nach 5 Sekunden Erfolgsmeldung ausblenden
+      setTimeout(() => {
+        setShowEmailSuccess(false);
+      }, 5000);
+    } catch (error) {
+      console.error('Fehler beim Senden der E-Mail:', error);
+      alert(`Fehler beim Senden der E-Mail: ${error.message}`);
+    } finally {
+      setEmailSending(false);
+    }
+  };
 
   // Funktion zum Abrufen der Formulardaten vom Backend via Proxy
   // Direkter API-Endpunkt für Tests mit MOCK-ID
@@ -1448,10 +1531,11 @@ const ClientDetailPage = () => {
             
             {/* Button-Gruppe für Dokumente-Tab */}
             <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3">
-              {/* Dokument hochladen Button */}
+              {/* Rechnung hochladen Button */}
               <div className="relative">
                 <input
                   type="file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                   id="documentUpload"
                   onChange={handleFileSelect}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -1477,7 +1561,7 @@ const ClientDetailPage = () => {
                   ) : (
                     <span className="flex items-center">
                       <PaperClipIcon className="h-4 w-4 mr-2" />
-                      Dokument hochladen
+                      Rechnung hochladen
                     </span>
                   )}
                 </button>
@@ -1520,43 +1604,8 @@ const ClientDetailPage = () => {
             )}
           </div>
 
-          {/* Dokumente-Liste */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <ul className="divide-y divide-gray-200">
-              {client.documents.map((doc) => (
-                <li key={doc.id} className="hover:bg-gray-50 transition-colors duration-200">
-                  <div className="px-6 py-5 flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="p-2 bg-gray-100 rounded-lg mr-4">
-                        {doc.type === 'pdf' ? (
-                          <svg className="h-6 w-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12.75 2.75V9c0 .414.336.75.75.75h6.25m-15 3.75v10.5c0 .414.336.75.75.75h16.5c.414 0 .75-.336.75-.75v-15c0-.414-.336-.75-.75-.75H12.75c-.414 0-.75.336-.75.75v9c0 .414-.336.75-.75.75H5.75c-.414 0-.75-.336-.75-.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        ) : doc.type === 'docx' ? (
-                          <svg className="h-6 w-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12.75 2.75V9c0 .414.336.75.75.75h6.25m-15 3.75v10.5c0 .414.336.75.75.75h16.5c.414 0 .75-.336.75-.75v-15c0-.414-.336-.75-.75-.75H12.75c-.414 0-.75.336-.75.75v9c0 .414-.336.75-.75.75H5.75c-.414 0-.75-.336-.75-.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        ) : (
-                          <DocumentIcon className="h-6 w-6 text-gray-500" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-gray-900 font-medium">{doc.name}</p>
-                        <p className="text-gray-500 text-sm">{doc.date}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <button className="text-gray-500 hover:text-gray-700 transition-colors p-2 rounded-lg hover:bg-gray-100">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Dokumente-Komponente */}
+          <ClientDocuments client={client} allowDelete={true} />
         </div>
       )}
 

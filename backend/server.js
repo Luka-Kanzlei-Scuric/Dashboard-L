@@ -2,9 +2,11 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import axios from 'axios';
+import path from 'path';
 import connectDB from './src/config/db.js';
 import Client from './src/models/Client.js';
 import emailService from './src/services/emailService.js';
+import fileService from './src/services/fileService.js';
 
 // Load env variables
 dotenv.config();
@@ -85,6 +87,10 @@ app.use(cors(corsOptions));
 // Handle OPTIONS preflight requests (additional dedicated handler)
 app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(fileService.uploadsBaseDir));
 
 // Queue for changes that need to be sent to ClickUp via Make.com
 const changeQueue = [];
@@ -497,6 +503,222 @@ app.get('/api/verify-token', async (req, res) => {
     });
   } catch (error) {
     console.error('Error verifying token:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Upload an invoice for a client
+app.post('/api/clients/:id/upload-invoice', fileService.upload.single('invoice'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Keine Datei hochgeladen' });
+    }
+    
+    // Check if client exists
+    const client = await Client.findById(id);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Mandant nicht gefunden' });
+    }
+    
+    // Move file from temp to client-specific directory
+    const filePath = fileService.moveFileToClientDir(id, req.file.filename);
+    
+    // Create document record
+    const document = {
+      filename: req.file.filename,
+      originalFilename: req.file.originalname,
+      path: filePath,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      documentType: 'invoice',
+      uploadDate: new Date()
+    };
+    
+    // Add document to client's documents array
+    client.documents.push(document);
+    
+    // Set the current invoice reference to this document's ID
+    client.currentInvoice = client.documents[client.documents.length - 1]._id;
+    
+    // Save client with new document
+    await client.save();
+    
+    // Return success response with file details
+    res.status(200).json({
+      success: true,
+      message: 'Rechnung erfolgreich hochgeladen',
+      document: {
+        id: client.documents[client.documents.length - 1]._id,
+        filename: document.filename,
+        originalFilename: document.originalFilename,
+        path: filePath,
+        url: `/uploads/${filePath}`,
+        size: document.size,
+        mimetype: document.mimetype,
+        documentType: document.documentType,
+        uploadDate: document.uploadDate
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading invoice:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Upload documents for a client (used by client via token)
+app.post('/api/upload-documents', fileService.upload.array('documents', 10), async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Token ist erforderlich' });
+    }
+    
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: 'Keine Dateien hochgeladen' });
+    }
+    
+    // Verify token
+    const decodedToken = emailService.verifyToken(token);
+    if (!decodedToken) {
+      return res.status(401).json({ success: false, message: 'Ungültiger oder abgelaufener Token' });
+    }
+    
+    // Get client
+    const client = await Client.findById(decodedToken.id);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Mandant nicht gefunden' });
+    }
+    
+    // Process each uploaded file
+    const uploadedDocuments = [];
+    for (const file of req.files) {
+      // Move file from temp to client directory
+      const filePath = fileService.moveFileToClientDir(client._id, file.filename);
+      
+      // Create document record
+      const document = {
+        filename: file.filename,
+        originalFilename: file.originalname,
+        path: filePath,
+        size: file.size,
+        mimetype: file.mimetype,
+        documentType: 'creditorLetter',
+        uploadDate: new Date()
+      };
+      
+      // Add document to client's documents array
+      client.documents.push(document);
+      
+      // Add to response array
+      uploadedDocuments.push({
+        id: client.documents[client.documents.length - 1]._id,
+        filename: document.filename,
+        originalFilename: document.originalFilename,
+        url: `/uploads/${filePath}`
+      });
+    }
+    
+    // Mark documents as uploaded
+    client.documentsUploaded = true;
+    
+    // Save client with new documents
+    await client.save();
+    
+    res.status(200).json({
+      success: true,
+      message: `${req.files.length} Dokumente erfolgreich hochgeladen`,
+      documents: uploadedDocuments
+    });
+  } catch (error) {
+    console.error('Error uploading documents:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get all documents for a client
+app.get('/api/clients/:id/documents', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get client with all documents
+    const client = await Client.findById(id);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Mandant nicht gefunden' });
+    }
+    
+    // Map documents to add URLs
+    const documents = client.documents.map(doc => ({
+      id: doc._id,
+      filename: doc.filename,
+      originalFilename: doc.originalFilename,
+      path: doc.path,
+      url: `/uploads/${doc.path}`,
+      size: doc.size,
+      mimetype: doc.mimetype,
+      documentType: doc.documentType,
+      uploadDate: doc.uploadDate
+    }));
+    
+    res.status(200).json({
+      success: true,
+      count: documents.length,
+      documents
+    });
+  } catch (error) {
+    console.error('Error getting client documents:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete a document
+app.delete('/api/clients/:clientId/documents/:documentId', async (req, res) => {
+  try {
+    const { clientId, documentId } = req.params;
+    
+    // Get client with documents
+    const client = await Client.findById(clientId);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Mandant nicht gefunden' });
+    }
+    
+    // Find the document in the client's documents array
+    const documentIndex = client.documents.findIndex(doc => doc._id.toString() === documentId);
+    if (documentIndex === -1) {
+      return res.status(404).json({ success: false, message: 'Dokument nicht gefunden' });
+    }
+    
+    // Get document to delete
+    const documentToDelete = client.documents[documentIndex];
+    
+    // Delete file from disk
+    fileService.deleteFile(documentToDelete.path);
+    
+    // Remove document from client's documents array
+    client.documents.splice(documentIndex, 1);
+    
+    // If this was the current invoice, clear the reference
+    if (client.currentInvoice && client.currentInvoice.toString() === documentId) {
+      client.currentInvoice = null;
+    }
+    
+    // If no documents of type 'creditorLetter' remain and documentsUploaded is true, set it to false
+    const hasCreditorLetters = client.documents.some(doc => doc.documentType === 'creditorLetter');
+    if (!hasCreditorLetters && client.documentsUploaded) {
+      client.documentsUploaded = false;
+    }
+    
+    // Save client
+    await client.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Dokument erfolgreich gelöscht'
+    });
+  } catch (error) {
+    console.error('Error deleting document:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

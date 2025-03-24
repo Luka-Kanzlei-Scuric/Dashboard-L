@@ -71,9 +71,36 @@ const DocumentUploadPage = () => {
     setIsUploading(true);
     
     try {
-      // Hier würde der tatsächliche Upload an den Server stattfinden
-      // Für diese Demo simulieren wir den Upload-Prozess
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Erstellen eines FormData-Objekts für den Upload
+      const formData = new FormData();
+      
+      // Token hinzufügen
+      formData.append('token', token);
+      
+      // Alle Dateien hinzufügen
+      files.forEach(file => {
+        formData.append('documents', file);
+      });
+      
+      // API-Basis-URL abrufen
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+      
+      // API-Aufruf zum Hochladen der Dokumente
+      const response = await fetch(`${apiBaseUrl}/upload-documents`, {
+        method: 'POST',
+        body: formData,
+        // Content-Type nicht setzen - wird vom Browser mit korrektem boundary gesetzt
+      });
+      
+      // Antwort prüfen
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Fehler beim Hochladen der Dateien');
+      }
+      
+      // Erfolgreiche Antwort verarbeiten
+      const data = await response.json();
+      console.log('Upload successful:', data);
       
       setUploadSuccess(true);
       setFiles([]);
@@ -84,7 +111,7 @@ const DocumentUploadPage = () => {
       }, 5000);
     } catch (error) {
       console.error('Fehler beim Hochladen:', error);
-      alert('Fehler beim Hochladen der Dateien. Bitte versuchen Sie es später erneut.');
+      alert(`Fehler beim Hochladen der Dateien: ${error.message}`);
     } finally {
       setIsUploading(false);
     }
