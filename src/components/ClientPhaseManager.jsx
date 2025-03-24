@@ -250,37 +250,74 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
       case 2:
         return (
           <div className="space-y-6">
-            {/* Phase 2 Progress Steps */}
-            <div className="relative mb-8">
-              <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                <div className="w-full border-t border-gray-300"></div>
+            {/* Phase 2 Progress Steps - Apple-inspired Design */}
+            <div className="mb-10 mt-2">
+              {/* Step Connection Line - positioned below the circles and text */}
+              <div className="relative h-1 mx-12 mt-12 rounded-full overflow-hidden bg-gray-200">
+                <div 
+                  className="absolute top-0 left-0 h-full bg-blue-500 rounded-full transition-all duration-500 ease-in-out" 
+                  style={{ width: phase2Step === 1 ? '0%' : phase2Step === 2 ? '100%' : '0%' }}
+                ></div>
               </div>
-              <div className="relative flex justify-between">
-                <div className={`flex items-center ${phase2Step >= 1 ? 'text-blue-600' : 'text-gray-500'}`}>
-                  <span className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
-                    phase2Step > 1 ? 'bg-blue-600 text-white border-blue-600' :
-                    phase2Step === 1 ? 'border-blue-600 bg-white' : 'border-gray-300 bg-white'
-                  }`}>
+              
+              {/* Step Indicators positioned above the line */}
+              <div className="flex justify-between -mt-12">
+                <div className="flex flex-col items-center">
+                  {/* Step 1 Circle with subtle shadow and clean design */}
+                  <div 
+                    className={`flex h-12 w-12 items-center justify-center rounded-full shadow-sm transition-all duration-300 ${
+                      phase2Step > 1 
+                        ? 'bg-blue-500 text-white ring-4 ring-blue-50' 
+                        : phase2Step === 1 
+                          ? 'bg-white border-2 border-blue-500 text-blue-500 ring-4 ring-blue-50' 
+                          : 'bg-white border-2 border-gray-300 text-gray-500'
+                    }`}
+                  >
                     {phase2Step > 1 ? (
-                      <CheckIcon className="h-5 w-5" />
+                      <CheckIcon className="h-6 w-6 transition-all" />
                     ) : (
-                      <span>1</span>
+                      <span className="text-lg font-medium">1</span>
                     )}
+                  </div>
+                  
+                  {/* Step 1 Label - clean typography */}
+                  <span className={`mt-3 text-sm font-medium transition-colors duration-300 ${
+                    phase2Step >= 1 ? 'text-blue-600' : 'text-gray-500'
+                  }`}>
+                    Rechnung hochladen
                   </span>
-                  <span className="ml-2 text-sm font-medium">Rechnung hochladen</span>
                 </div>
                 
-                <div className={`flex items-center ${phase2Step >= 2 ? 'text-blue-600' : 'text-gray-500'}`}>
-                  <span className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
-                    phase2Step > 2 ? 'bg-blue-600 text-white border-blue-600' :
-                    phase2Step === 2 ? 'border-blue-600 bg-white' : 'border-gray-300 bg-white'
+                <div className="flex flex-col items-center">
+                  {/* Step 2 Circle with subtle shadow and clean design */}
+                  <div 
+                    className={`flex h-12 w-12 items-center justify-center rounded-full shadow-sm transition-all duration-300 ${
+                      phase2Step > 2 
+                        ? 'bg-blue-500 text-white ring-4 ring-blue-50' 
+                        : phase2Step === 2 
+                          ? 'bg-white border-2 border-blue-500 text-blue-500 ring-4 ring-blue-50' 
+                          : 'bg-white border-2 border-gray-300 text-gray-500'
+                    }`}
+                  >
+                    <span className="text-lg font-medium">2</span>
+                    
+                    {/* Subtle pulse animation for current step */}
+                    {phase2Step === 2 && (
+                      <span className="absolute w-full h-full rounded-full bg-blue-100 opacity-50 animate-pulse"></span>
+                    )}
+                  </div>
+                  
+                  {/* Step 2 Label - clean typography */}
+                  <span className={`mt-3 text-sm font-medium transition-colors duration-300 ${
+                    phase2Step >= 2 ? 'text-blue-600' : 'text-gray-500'
                   }`}>
-                    <span>2</span>
+                    E-Mail versenden
                   </span>
-                  <span className="ml-2 text-sm font-medium">E-Mail versenden</span>
                 </div>
               </div>
             </div>
+            
+            {/* Animation is handled by Tailwind's built-in animations */}
             
             {/* Step Content */}
             {phase2Step === 1 ? (
