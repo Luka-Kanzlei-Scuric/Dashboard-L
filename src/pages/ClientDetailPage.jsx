@@ -1391,7 +1391,7 @@ const ClientDetailPage = () => {
                 <div>
                   <p className="text-sm text-gray-500">Mandantenportal</p>
                   <a 
-                    href={`${window.location.origin}/#/portal/${client._id}`} 
+                    href={`${window.location.origin}/portal/${client._id}`} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-[#9c1a1b] hover:text-[#8a1718] transition-colors"
