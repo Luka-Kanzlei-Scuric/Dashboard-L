@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import CreditorUploadComponent from '../components/CreditorUploadComponent';
 import ClientDataComponent from '../components/ClientDataComponent';
 import ClientProgressTracker from '../components/ClientProgressTracker';
+import ClientDocumentsViewer from '../components/ClientDocumentsViewer';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import api from '../../config/api';
 
@@ -151,6 +152,9 @@ const ClientPortalPage = () => {
         
         {/* Client data */}
         <ClientDataComponent client={client} />
+        
+        {/* Previously uploaded documents viewer */}
+        <ClientDocumentsViewer client={client} />
         
         {/* Creditor upload component */}
         <CreditorUploadComponent 
