@@ -128,18 +128,16 @@ const ClientPortalPage = () => {
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <div className="h-10 flex items-center justify-center mr-3">
-              <img 
-                src="https://www.anwalt-privatinsolvenz-online.de/wp-content/uploads/2015/08/Logo-T-Scuric.png" 
-                alt="Logo T. Scuric" 
-                className="h-auto w-auto max-h-full max-w-[100px] object-contain" 
-              />
-            </div>
-            <h1 className="text-xl font-bold text-[#9c1a1b]">
-              Kundenportal
-            </h1>
+          <div className="h-10 flex items-center justify-center">
+            <img 
+              src="https://www.anwalt-privatinsolvenz-online.de/wp-content/uploads/2015/08/Logo-T-Scuric.png" 
+              alt="Logo T. Scuric" 
+              className="h-auto w-auto max-h-full max-w-[100px] object-contain" 
+            />
           </div>
+          <h1 className="text-xl font-bold text-[#9c1a1b]">
+            Kundenportal
+          </h1>
         </div>
       </header>
       
@@ -159,6 +157,35 @@ const ClientPortalPage = () => {
           client={client} 
           onUploadComplete={handleUploadComplete} 
         />
+        
+        {/* Rating prompt */}
+        <div className="rounded-lg bg-gray-50 border border-gray-100 p-4 mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-start flex-1">
+              <div className="flex-shrink-0 h-10 w-10 rounded-full bg-[#9c1a1b]/10 flex items-center justify-center mr-3">
+                <img 
+                  src="https://www.provenexpert.com/favicon.ico" 
+                  alt="ProvenExpert" 
+                  className="h-6 w-6 object-contain" 
+                />
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900 text-sm">Ihre Erfahrung zählt</h4>
+                <p className="text-gray-600 text-xs mt-1">
+                  Mit Ihrer Bewertung helfen Sie uns, unseren Service kontinuierlich zu verbessern.
+                </p>
+              </div>
+            </div>
+            <a 
+              href="https://www.provenexpert.com/rechtsanwalt-thomas-scuric/9298/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded-full bg-[#9c1a1b] text-white text-xs font-medium hover:bg-[#8a1718] transition-colors ml-4 whitespace-nowrap"
+            >
+              Jetzt bewerten
+            </a>
+          </div>
+        </div>
         
         {/* Footer note */}
         <div className="text-center text-xs text-gray-500 pt-4 pb-16">

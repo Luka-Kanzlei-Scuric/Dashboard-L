@@ -178,8 +178,8 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
           <InformationCircleIcon className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm text-blue-800">
-              Sie können mehrere Gläubigerbriefe hinzufügen, bevor Sie diese hochladen. 
-              Dateien werden erst nach dem Klick auf den "Hochladen"-Button übermittelt.
+              Sie können mehrere Gläubigerbriefe hinzufügen. Wischen Sie nach rechts, 
+              um Ihre Dateien hochzuladen, oder fügen Sie weitere Dokumente hinzu.
             </p>
           </div>
         </div>
@@ -342,29 +342,14 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
             </div>
           )}
           
-          {/* Standard buttons for desktop */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Add more files button */}
-            <button
-              onClick={handleUploadClick}
-              disabled={isUploading}
-              className={`px-3 py-2.5 rounded-lg border ${isUploading ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'} text-sm font-medium transition-colors`}
-            >
-              Dateien hinzufügen
-            </button>
-            
-            {/* Upload button */}
-            <button
-              onClick={handleUpload}
-              disabled={files.length === 0 || isUploading}
-              className={`px-3 py-2.5 rounded-lg font-medium transition-colors ${files.length === 0 || isUploading ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#9c1a1b] text-white hover:bg-[#8a1718]'}`}
-            >
-              {files.length > 0 ? 
-                `${files.length} ${files.length === 1 ? 'Datei' : 'Dateien'} hochladen` : 
-                'Dateien auswählen'
-              }
-            </button>
-          </div>
+          {/* Add files button */}
+          <button
+            onClick={handleUploadClick}
+            disabled={isUploading}
+            className={`w-full px-3 py-2.5 rounded-lg border ${isUploading ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'} text-sm font-medium transition-colors mb-2`}
+          >
+            Dateien hinzufügen
+          </button>
           
           {/* File count indicator */}
           {files.length > 0 && !isUploading && (
