@@ -19,11 +19,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         {sidebarOpen ? (
           <>
             <div className="flex items-center">
-              <div className="h-12 w-auto flex items-center justify-center">
+              <div className="h-10 w-auto flex items-center justify-center">
                 <img 
                   src="https://www.anwalt-privatinsolvenz-online.de/wp-content/uploads/2015/08/Logo-T-Scuric.png" 
                   alt="Logo T. Scuric" 
-                  className="h-auto w-auto max-h-full max-w-full object-contain" 
+                  className="h-auto w-auto max-h-full max-w-[90px] object-contain" 
                 />
               </div>
             </div>
@@ -36,7 +36,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
           </>
         ) : (
           <>
-            <div className="h-8 w-8 flex items-center justify-center">
+            <div className="h-7 w-7 flex items-center justify-center">
               <img 
                 src="https://www.anwalt-privatinsolvenz-online.de/wp-content/uploads/2015/08/Logo-T-Scuric.png" 
                 alt="Logo T. Scuric" 
