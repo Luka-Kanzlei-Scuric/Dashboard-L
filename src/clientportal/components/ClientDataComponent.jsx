@@ -12,7 +12,8 @@ import {
   ChevronUpIcon,
   ClockIcon,
   DocumentTextIcon,
-  CalendarIcon
+  CalendarIcon,
+  ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
 
 /**
@@ -86,6 +87,20 @@ const ClientDataComponent = ({ client }) => {
             Support
           </span>
         </button>
+      </div>
+      
+      {/* Data verification notice - Apple style */}
+      <div className="mb-4 p-3 rounded-xl bg-gray-50 border border-gray-100">
+        <div className="flex">
+          <div className="flex-shrink-0 mt-0.5">
+            <InformationCircleIcon className="h-5 w-5 text-gray-400" />
+          </div>
+          <div className="ml-2">
+            <p className="text-sm text-gray-700 leading-tight">
+              Bitte überprüfen Sie Ihre persönlichen Daten auf Korrektheit. Bei Unstimmigkeiten kontaktieren Sie uns bitte über die Support-Funktion.
+            </p>
+          </div>
+        </div>
       </div>
       
       {/* Client profile */}
