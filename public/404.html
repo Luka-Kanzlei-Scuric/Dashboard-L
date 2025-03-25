@@ -6,8 +6,18 @@
     <title>Anwaltskanzlei Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
-      // Redirect to index for client-side routing
-      window.location.replace('/' + window.location.pathname.split('/').slice(1).join('/'));
+      // Intelligente Weiterleitung für Client-Side-Routing
+      const path = window.location.pathname;
+      const origin = window.location.origin;
+      // Falls es sich um einen Portal-Pfad handelt, behalte den Pfad bei
+      // und leite zur Haupt-URL zurück, damit die SPA-Router ihn übernehmen kann
+      if (path.startsWith('/portal/')) {
+        sessionStorage.setItem('redirect', path);
+        window.location.href = origin;
+      } else {
+        // Ansonsten die Standard-Weiterleitung
+        window.location.href = origin + '/#' + path;
+      }
     </script>
   </head>
   <body class="bg-neutral-lightest">
