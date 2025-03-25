@@ -126,11 +126,20 @@ const ClientPortalPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-4 py-4">
+      <header className="bg-white shadow-sm border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-[#9c1a1b]">
-            Scuric Kundenportal
-          </h1>
+          <div className="flex items-center">
+            <div className="h-10 flex items-center justify-center mr-3">
+              <img 
+                src="https://www.anwalt-privatinsolvenz-online.de/wp-content/uploads/2015/08/Logo-T-Scuric.png" 
+                alt="Logo T. Scuric" 
+                className="h-auto w-auto max-h-full max-w-[100px] object-contain" 
+              />
+            </div>
+            <h1 className="text-xl font-bold text-[#9c1a1b]">
+              Kundenportal
+            </h1>
+          </div>
         </div>
       </header>
       
@@ -153,7 +162,16 @@ const ClientPortalPage = () => {
         
         {/* Footer note */}
         <div className="text-center text-xs text-gray-500 pt-4 pb-16">
-          <p>© 2025 Scuric Rechtsanwälte</p>
+          <div className="flex justify-center mb-3">
+            <div className="h-8 flex items-center justify-center">
+              <img 
+                src="https://www.anwalt-privatinsolvenz-online.de/wp-content/uploads/2015/08/Logo-T-Scuric.png" 
+                alt="Logo T. Scuric" 
+                className="h-auto w-auto max-h-full max-w-[80px] object-contain opacity-70" 
+              />
+            </div>
+          </div>
+          <p>© 2025 T. Scuric Rechtsanwälte</p>
           <p className="mt-1">Bei Fragen nutzen Sie bitte die Support-Funktion</p>
         </div>
       </main>
