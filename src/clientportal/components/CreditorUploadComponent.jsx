@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { ArrowPathIcon, PaperClipIcon, CheckIcon, DocumentIcon, XMarkIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import React, { useState, useRef, useEffect } from 'react';
+import { ArrowPathIcon, PaperClipIcon, CheckIcon, DocumentIcon, XMarkIcon, InformationCircleIcon, ArrowRightIcon, StarIcon } from '@heroicons/react/24/outline';
 
 /**
  * A mobile-optimized creditor upload component with manual upload functionality
@@ -12,7 +12,13 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
   const [files, setFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showRating, setShowRating] = useState(false);
+  const [swipeStartX, setSwipeStartX] = useState(0);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
+  const uploadButtonRef = useRef(null);
   
   // Format file size helper
   const formatFileSize = (bytes) => {
@@ -76,11 +82,15 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
         onUploadComplete(data.documents);
       }
       
-      // Clear files after successful upload
+      // Show success state and rating prompt
       setTimeout(() => {
-        setFiles([]);
+        setShowSuccess(true);
         setIsUploading(false);
-        setUploadProgress(0);
+        
+        // Show rating request after a delay
+        setTimeout(() => {
+          setShowRating(true);
+        }, 2000);
       }, 1500);
       
     } catch (error) {
@@ -99,6 +109,63 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
   // Handle click on upload area
   const handleUploadClick = () => {
     fileInputRef.current.click();
+  };
+  
+  // Handle touch events for swipe
+  const handleTouchStart = (e) => {
+    if (!files.length || isUploading || showSuccess) return;
+    setSwipeStartX(e.touches[0].clientX);
+  };
+  
+  const handleTouchMove = (e) => {
+    if (!files.length || isUploading || swipeStartX === 0 || showSuccess) return;
+    
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - swipeStartX;
+    
+    // Only allow right swipe with a maximum offset
+    if (diff > 0) {
+      const maxOffset = 150; // Maximum swipe distance
+      let newOffset = diff;
+      
+      if (newOffset > maxOffset) {
+        newOffset = maxOffset;
+      }
+      
+      setSwipeOffset(newOffset);
+      
+      // If swiped past threshold, start submission process
+      if (newOffset >= maxOffset && !isSubmitting) {
+        setIsSubmitting(true);
+        handleUpload();
+      }
+    }
+  };
+  
+  const handleTouchEnd = () => {
+    if (!files.length || isUploading || showSuccess) return;
+    
+    // Reset if not fully swiped
+    if (!isSubmitting) {
+      setSwipeOffset(0);
+    }
+    setSwipeStartX(0);
+  };
+  
+  // Reset everything when needed
+  const resetComponent = () => {
+    setFiles([]);
+    setShowSuccess(false);
+    setShowRating(false);
+    setSwipeOffset(0);
+    setIsSubmitting(false);
+    setUploadProgress(0);
+  };
+  
+  // Open rating page
+  const openRatingPage = () => {
+    window.open('https://www.provenexpert.com/rechtsanwalt-thomas-scuric/9298/', '_blank');
+    resetComponent();
   };
   
   return (
@@ -192,35 +259,120 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
         </div>
       )}
       
-      {/* Upload button - always shown when files are selected and not currently uploading */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Add more files button */}
-        <button
-          onClick={handleUploadClick}
-          disabled={isUploading}
-          className={`px-3 py-2.5 rounded-lg border ${isUploading ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'} text-sm font-medium transition-colors`}
-        >
-          Dateien hinzufügen
-        </button>
-        
-        {/* Upload button */}
-        <button
-          onClick={handleUpload}
-          disabled={files.length === 0 || isUploading}
-          className={`px-3 py-2.5 rounded-lg font-medium transition-colors ${files.length === 0 || isUploading ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#9c1a1b] text-white hover:bg-[#8a1718]'}`}
-        >
-          {files.length > 0 ? 
-            `${files.length} ${files.length === 1 ? 'Datei' : 'Dateien'} hochladen` : 
-            'Dateien auswählen'
-          }
-        </button>
-      </div>
-      
-      {/* File count indicator */}
-      {files.length > 0 && !isUploading && (
-        <div className="text-center text-xs text-gray-500 mt-3">
-          {files.length} {files.length === 1 ? 'Datei' : 'Dateien'} ausgewählt
+      {/* Success and rating state */}
+      {showSuccess && (
+        <div className="mt-4">
+          <div className="rounded-lg bg-green-50 border border-green-100 p-4 mb-4">
+            <div className="flex items-center">
+              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center mr-3">
+                <CheckIcon className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-green-800 text-sm">Vielen Dank!</h4>
+                <p className="text-green-700 text-xs mt-1">
+                  Ihre Dokumente wurden erfolgreich hochgeladen und werden nun bearbeitet.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Rating request */}
+          {showRating && (
+            <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 mb-4 transform transition-all duration-700 ease-out">
+              <div className="flex items-center justify-between">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 h-10 w-10 rounded-full bg-[#9c1a1b]/10 flex items-center justify-center mr-3">
+                    <StarIcon className="h-5 w-5 text-[#9c1a1b]" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-900 text-sm">Zufrieden mit unserem Service?</h4>
+                    <p className="text-gray-600 text-xs mt-1">
+                      Unterstützen Sie uns mit einer Bewertung.
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={openRatingPage}
+                  className="px-3 py-1.5 rounded-full bg-[#9c1a1b] text-white text-xs font-medium hover:bg-[#8a1718] transition-colors"
+                >
+                  Bewerten
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <button
+            onClick={resetComponent}
+            className="w-full px-3 py-2.5 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+          >
+            Weitere Dokumente hochladen
+          </button>
         </div>
+      )}
+      
+      {/* Upload area and buttons - shown when not in success state */}
+      {!showSuccess && (
+        <>
+          {/* Swipeable upload button for mobile - shown when files are selected and not uploading */}
+          {files.length > 0 && !isUploading && (
+            <div 
+              className="relative w-full h-12 rounded-lg bg-gray-100 mb-4 overflow-hidden touch-none"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              ref={uploadButtonRef}
+            >
+              <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm font-medium">
+                Nach rechts swipen zum Hochladen
+                <ArrowRightIcon className="h-4 w-4 ml-2" />
+              </div>
+              
+              <div 
+                className="absolute inset-y-0 left-0 bg-[#9c1a1b] flex items-center px-4 rounded-lg text-white font-medium transition-transform"
+                style={{ 
+                  transform: `translateX(${swipeOffset - 100}%)`,
+                  width: `calc(100% + ${swipeOffset}px)`
+                }}
+              >
+                <div className="flex items-center ml-auto mr-auto">
+                  <CheckIcon className="h-5 w-5 mr-2" />
+                  Dateien hochladen
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Standard buttons for desktop */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Add more files button */}
+            <button
+              onClick={handleUploadClick}
+              disabled={isUploading}
+              className={`px-3 py-2.5 rounded-lg border ${isUploading ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'} text-sm font-medium transition-colors`}
+            >
+              Dateien hinzufügen
+            </button>
+            
+            {/* Upload button */}
+            <button
+              onClick={handleUpload}
+              disabled={files.length === 0 || isUploading}
+              className={`px-3 py-2.5 rounded-lg font-medium transition-colors ${files.length === 0 || isUploading ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#9c1a1b] text-white hover:bg-[#8a1718]'}`}
+            >
+              {files.length > 0 ? 
+                `${files.length} ${files.length === 1 ? 'Datei' : 'Dateien'} hochladen` : 
+                'Dateien auswählen'
+              }
+            </button>
+          </div>
+          
+          {/* File count indicator */}
+          {files.length > 0 && !isUploading && (
+            <div className="text-center text-xs text-gray-500 mt-3">
+              {files.length} {files.length === 1 ? 'Datei' : 'Dateien'} ausgewählt
+            </div>
+          )}
+        </>
       )}
     </div>
   );
