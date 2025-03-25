@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowPathIcon, PaperClipIcon, CheckIcon, DocumentIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { ChevronRightIcon } from '@heroicons/react/24/solid';
+import React, { useState, useRef } from 'react';
+import { ArrowPathIcon, PaperClipIcon, CheckIcon, DocumentIcon, XMarkIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 
 /**
- * A mobile-optimized creditor upload component with auto-save and swipe functionality
+ * A mobile-optimized creditor upload component with manual upload functionality
  * 
  * @param {Object} props Component props
  * @param {Function} props.onUploadComplete Callback when upload is complete
@@ -13,22 +12,8 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
   const [files, setFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [autoSaving, setAutoSaving] = useState(false);
-  const [swipePosition, setSwipePosition] = useState(0);
-  const [touchStart, setTouchStart] = useState(null);
   const fileInputRef = useRef(null);
   
-  useEffect(() => {
-    // Auto-save effect whenever files change
-    if (files.length > 0 && !isUploading) {
-      const saveTimer = setTimeout(() => {
-        handleUpload();
-      }, 1500);
-      
-      return () => clearTimeout(saveTimer);
-    }
-  }, [files]);
-
   // Format file size helper
   const formatFileSize = (bytes) => {
     if (bytes < 1024) return bytes + ' B';
@@ -41,7 +26,6 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
     const newFiles = Array.from(e.target.files);
     if (newFiles.length > 0) {
       setFiles(prev => [...prev, ...newFiles]);
-      setAutoSaving(true);
     }
   };
   
@@ -97,7 +81,6 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
         setFiles([]);
         setIsUploading(false);
         setUploadProgress(0);
-        setAutoSaving(false);
       }, 1500);
       
     } catch (error) {
@@ -105,36 +88,7 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
       alert(`Fehler beim Hochladen: ${error.message}`);
       setIsUploading(false);
       setUploadProgress(0);
-      setAutoSaving(false);
     }
-  };
-  
-  // Touch handlers for swipe functionality
-  const handleTouchStart = (e) => {
-    setTouchStart(e.touches[0].clientX);
-  };
-  
-  const handleTouchMove = (e) => {
-    if (touchStart === null) return;
-    
-    const currentTouch = e.touches[0].clientX;
-    const diff = touchStart - currentTouch;
-    
-    // Limit swipe range
-    if (diff > 0 && diff < 100) {
-      setSwipePosition(-diff);
-    }
-  };
-  
-  const handleTouchEnd = () => {
-    if (swipePosition < -50) {
-      // Swipe action threshold reached
-      handleUpload();
-    }
-    
-    // Reset position
-    setSwipePosition(0);
-    setTouchStart(null);
   };
   
   // Handle removing a file
@@ -151,6 +105,19 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
     <div className="px-4 py-5 bg-white rounded-lg shadow-sm border border-gray-200">
       <h3 className="text-lg font-medium text-gray-900 mb-3">Gläubigerbriefe hochladen</h3>
       
+      {/* Information box */}
+      <div className="bg-blue-50 rounded-lg border border-blue-100 p-3 mb-4">
+        <div className="flex">
+          <InformationCircleIcon className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-blue-800">
+              Sie können mehrere Gläubigerbriefe hinzufügen, bevor Sie diese hochladen. 
+              Dateien werden erst nach dem Klick auf den "Hochladen"-Button übermittelt.
+            </p>
+          </div>
+        </div>
+      </div>
+      
       {/* File list */}
       {files.length > 0 && (
         <div className="mb-4 space-y-2">
@@ -158,10 +125,6 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
             <div 
               key={index}
               className="flex items-center p-3 rounded-lg bg-gray-50 border border-gray-200"
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              style={{ transform: `translateX(${swipePosition}px)`, transition: touchStart ? 'none' : 'transform 0.3s ease' }}
             >
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#9c1a1b]/10 flex items-center justify-center mr-3">
                 <DocumentIcon className="h-5 w-5 text-[#9c1a1b]" />
@@ -178,18 +141,6 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
               </button>
             </div>
           ))}
-          
-          <div className="text-xs text-gray-500 flex items-center mt-1 ml-2">
-            <span className="mr-1">⟵ Nach links wischen zum Hochladen</span>
-            <ChevronRightIcon className="h-3 w-3" />
-          </div>
-          
-          {autoSaving && !isUploading && (
-            <div className="flex items-center text-xs text-blue-600 mt-1 ml-2">
-              <ArrowPathIcon className="h-3 w-3 mr-1 animate-spin" />
-              Auto-Speichern in Kürze...
-            </div>
-          )}
         </div>
       )}
       
@@ -218,7 +169,7 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
       {/* Upload area */}
       {!isUploading && (
         <div 
-          className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#9c1a1b]/50 transition-colors"
+          className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#9c1a1b]/50 transition-colors mb-4"
           onClick={handleUploadClick}
         >
           <input
@@ -241,14 +192,35 @@ const CreditorUploadComponent = ({ onUploadComplete, client }) => {
         </div>
       )}
       
-      {/* Upload button - only shown when there are files and not currently uploading */}
-      {files.length > 0 && !isUploading && (
+      {/* Upload button - always shown when files are selected and not currently uploading */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Add more files button */}
+        <button
+          onClick={handleUploadClick}
+          disabled={isUploading}
+          className={`px-3 py-2.5 rounded-lg border ${isUploading ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'} text-sm font-medium transition-colors`}
+        >
+          Dateien hinzufügen
+        </button>
+        
+        {/* Upload button */}
         <button
           onClick={handleUpload}
-          className="w-full mt-4 px-4 py-3 bg-[#9c1a1b] text-white rounded-lg font-medium"
+          disabled={files.length === 0 || isUploading}
+          className={`px-3 py-2.5 rounded-lg font-medium transition-colors ${files.length === 0 || isUploading ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#9c1a1b] text-white hover:bg-[#8a1718]'}`}
         >
-          {files.length} {files.length === 1 ? 'Datei' : 'Dateien'} jetzt hochladen
+          {files.length > 0 ? 
+            `${files.length} ${files.length === 1 ? 'Datei' : 'Dateien'} hochladen` : 
+            'Dateien auswählen'
+          }
         </button>
+      </div>
+      
+      {/* File count indicator */}
+      {files.length > 0 && !isUploading && (
+        <div className="text-center text-xs text-gray-500 mt-3">
+          {files.length} {files.length === 1 ? 'Datei' : 'Dateien'} ausgewählt
+        </div>
       )}
     </div>
   );
