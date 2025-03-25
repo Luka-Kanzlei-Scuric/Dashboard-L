@@ -30,8 +30,25 @@ const ClientPortalPage = () => {
     const fetchClientData = async () => {
       try {
         setLoading(true);
+        // First get the client data
         const response = await api.get(`/clients/${clientId}`);
-        setClient(response.data);
+        const clientData = response.data;
+        
+        // Then get the form data from the special form endpoint
+        if (clientData.clickupId) {
+          try {
+            const formResponse = await api.get(`/proxy/forms/${clientData.clickupId}`);
+            if (formResponse.data) {
+              // Create a complete client object with form data included
+              clientData.formData = formResponse.data;
+            }
+          } catch (formErr) {
+            console.error('Error fetching form data:', formErr);
+            // Continue with partial data - don't fail the whole request
+          }
+        }
+        
+        setClient(clientData);
         setError(null);
       } catch (err) {
         console.error('Error fetching client data:', err);
@@ -53,8 +70,25 @@ const ClientPortalPage = () => {
     if (clientId) {
       const fetchClientData = async () => {
         try {
+          // First get the client data
           const response = await api.get(`/clients/${clientId}`);
-          setClient(response.data);
+          const clientData = response.data;
+          
+          // Then get the form data from the special form endpoint
+          if (clientData.clickupId) {
+            try {
+              const formResponse = await api.get(`/proxy/forms/${clientData.clickupId}`);
+              if (formResponse.data) {
+                // Create a complete client object with form data included
+                clientData.formData = formResponse.data;
+              }
+            } catch (formErr) {
+              console.error('Error fetching form data:', formErr);
+              // Continue with partial data
+            }
+          }
+          
+          setClient(clientData);
         } catch (err) {
           console.error('Error refreshing client data:', err);
         }

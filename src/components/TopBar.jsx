@@ -23,9 +23,9 @@ const TopBar = ({ sidebarOpen, setSidebarOpen }) => {
         <div className="relative flex items-center">
           <div className="flex items-center">
             <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-white font-medium">
-              KA
+              TS
             </div>
-            <span className="ml-2 text-sm font-medium text-primary hidden md:block">Kanzlei Admin</span>
+            <span className="ml-2 text-sm font-medium text-primary hidden md:block">T. Scuric</span>
           </div>
         </div>
       </div>

@@ -18,7 +18,14 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       <div className="flex items-center justify-between h-16 border-b border-neutral-light px-4">
         {sidebarOpen ? (
           <>
-            <h1 className="text-xl font-semibold text-primary">Kanzlei</h1>
+            <div className="flex items-center">
+              <img 
+                src="https://www.anwalt-privatinsolvenz-online.de/wp-content/uploads/2015/08/Logo-T-Scuric.png" 
+                alt="Logo T. Scuric" 
+                className="h-12 mr-2" 
+              />
+              <h1 className="text-xl font-semibold text-primary">Scuric</h1>
+            </div>
             <button 
               onClick={() => setSidebarOpen(false)}
               className="p-1 rounded-full text-neutral-medium hover:text-secondary transition-colors"
@@ -28,9 +35,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
           </>
         ) : (
           <>
-            <svg className="w-8 h-8 text-secondary" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-            </svg>
+            <img 
+              src="https://www.anwalt-privatinsolvenz-online.de/wp-content/uploads/2015/08/Logo-T-Scuric.png" 
+              alt="Logo T. Scuric" 
+              className="h-8" 
+            />
             <button 
               onClick={() => setSidebarOpen(true)}
               className="p-1 rounded-full text-neutral-medium hover:text-secondary transition-colors"

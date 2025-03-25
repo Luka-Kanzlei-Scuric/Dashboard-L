@@ -62,7 +62,16 @@ const ClientDataComponent = ({ client }) => {
   };
 
   // Get form data from client object
-  const formData = client.formData || {};
+  let formData = client.formData || {};
+  
+  // If formDataCache is available and formData is empty, try to parse it
+  if (Object.keys(formData).length === 0 && client.formDataCache) {
+    try {
+      formData = JSON.parse(client.formDataCache);
+    } catch (err) {
+      console.error('Error parsing formDataCache:', err);
+    }
+  }
   
   return (
     <div className="px-4 py-5 bg-white rounded-lg shadow-sm border border-gray-200">
