@@ -69,10 +69,10 @@ const ClientDocuments = ({ client, allowDelete = true }) => {
       // Parse response
       const data = await response.json();
       
-      // Korrigiere URLs für die Dokumente, indem der komplette API-Basispfad vorangestellt wird
+      // Korrigiere URLs für die Dokumente, indem der API-Basispfad ohne /api vorangestellt wird
       const documentsWithFixedUrls = (data.documents || []).map(doc => ({
         ...doc,
-        url: `${apiBaseUrl}${doc.url}` // Absolute URL mit API-Basispfad
+        url: `${apiBaseUrl.replace(/\/api$/, '')}${doc.url}` // Absolute URL mit korrigiertem Basispfad
       }));
       
       setDocuments(documentsWithFixedUrls);
