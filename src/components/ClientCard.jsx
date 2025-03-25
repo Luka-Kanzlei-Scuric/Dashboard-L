@@ -109,7 +109,7 @@ const ClientCard = ({ client }) => {
         <div className="flex items-center space-x-4">
           {/* Portal-Link */}
           <a 
-            href={`/portal/${_id}`} 
+            href={`/portal/${client._id}`} 
             target="_blank" 
             rel="noopener noreferrer"
             className="text-sm font-medium text-[#9c1a1b] hover:text-[#8a1718] transition-colors"
