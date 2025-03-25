@@ -68,7 +68,14 @@ const ClientDocuments = ({ client, allowDelete = true }) => {
       
       // Parse response
       const data = await response.json();
-      setDocuments(data.documents || []);
+      
+      // Korrigiere URLs für die Dokumente, indem der komplette API-Basispfad vorangestellt wird
+      const documentsWithFixedUrls = (data.documents || []).map(doc => ({
+        ...doc,
+        url: `${apiBaseUrl}${doc.url}` // Absolute URL mit API-Basispfad
+      }));
+      
+      setDocuments(documentsWithFixedUrls);
     } catch (error) {
       console.error('Error fetching documents:', error);
       setError(error.message);
@@ -105,6 +112,10 @@ const ClientDocuments = ({ client, allowDelete = true }) => {
       if (activePreview === documentId) {
         setActivePreview(null);
       }
+      
+      // Erfolgsmeldung anzeigen
+      alert('Dokument erfolgreich gelöscht');
+      
     } catch (error) {
       console.error('Error deleting document:', error);
       alert(`Fehler beim Löschen des Dokuments: ${error.message}`);
