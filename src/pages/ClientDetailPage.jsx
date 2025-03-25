@@ -81,6 +81,8 @@ const ClientDetailPage = () => {
     if (selectedFile) {
       handleFileUpload(selectedFile);
     }
+    // Setze den Dateiwert zurück, damit man die gleiche Datei erneut auswählen kann
+    e.target.value = '';
   };
   
   // Handler für Anforderung von Dokumenten vom Mandanten
@@ -1502,7 +1504,7 @@ const ClientDetailPage = () => {
             
             {/* Button-Gruppe für Dokumente-Tab */}
             <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3">
-              {/* Rechnung hochladen Button */}
+              {/* Dokument hochladen Button */}
               <div className="relative">
                 <input
                   type="file"
@@ -1531,35 +1533,12 @@ const ClientDetailPage = () => {
                     </span>
                   ) : (
                     <span className="flex items-center">
-                      <PaperClipIcon className="h-4 w-4 mr-2" />
-                      Rechnung hochladen
+                      <DocumentIcon className="h-4 w-4 mr-2" />
+                      Dokument hochladen
                     </span>
                   )}
                 </button>
               </div>
-              
-              {/* Gläubigerschreiben anfordern Button */}
-              <button 
-                onClick={handleRequestDocuments}
-                className={`w-full md:w-auto px-5 py-2.5 rounded-lg shadow-sm transition-all duration-300 ${
-                  emailSending
-                    ? 'bg-gray-400 text-white cursor-wait' 
-                    : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:shadow-md'
-                }`}
-                disabled={emailSending}
-              >
-                {emailSending ? (
-                  <span className="flex items-center">
-                    <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
-                    Email wird gesendet...
-                  </span>
-                ) : (
-                  <span className="flex items-center">
-                    <EnvelopeIcon className="h-4 w-4 mr-2" />
-                    Gläubigerschreiben anfordern
-                  </span>
-                )}
-              </button>
             </div>
             
             {/* Erfolgsmeldung */}
