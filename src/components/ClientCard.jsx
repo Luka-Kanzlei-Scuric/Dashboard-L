@@ -106,18 +106,7 @@ const ClientCard = ({ client }) => {
           <span className="text-neutral-medium">Aktualisiert: {formattedDate}</span>
         </div>
         
-        <div className="flex items-center space-x-4">
-          {/* Portal-Link */}
-          <a 
-            href={`/portal/${client._id}`} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-sm font-medium text-[#9c1a1b] hover:text-[#8a1718] transition-colors"
-            onClick={(e) => e.stopPropagation()}
-          >
-            Mandantenportal
-          </a>
-          
+        <div className="flex items-center">
           {/* ClickUp-Link */}
           {client.clickupId ? (
             <a 
