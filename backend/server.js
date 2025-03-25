@@ -409,6 +409,213 @@ app.get('/api/health', cors(corsOptions), (req, res) => {
   });
 });
 
+// Client Portal API Endpoints
+
+// Get client portal data
+app.get('/api/clients/:id/portal', async (req, res) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    
+    // Update last login date for portal access
+    if (client.portal) {
+      client.portal.lastLogin = new Date();
+      await client.save();
+    }
+    
+    // Return client data filtered for portal display
+    res.json({
+      _id: client._id,
+      name: client.name,
+      email: client.email,
+      phone: client.phone,
+      caseNumber: client.caseNumber,
+      status: client.status,
+      phase: client.currentPhase,
+      honorar: client.honorar,
+      raten: client.raten,
+      ratenStart: client.ratenStart,
+      monatlicheRate: client.monatlicheRate,
+      zahlungStatus: client.zahlungStatus,
+      createdAt: client.createdAt
+    });
+  } catch (error) {
+    console.error('Error fetching client portal data:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get creditors for a client
+app.get('/api/clients/:id/creditors', async (req, res) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    
+    // Return client creditors
+    res.json(client.creditors || []);
+  } catch (error) {
+    console.error('Error fetching client creditors:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Save creditors for a client (used for auto-save)
+app.post('/api/clients/:id/creditors', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { creditors } = req.body;
+    
+    if (!Array.isArray(creditors)) {
+      return res.status(400).json({ success: false, message: 'Creditors must be an array' });
+    }
+    
+    const client = await Client.findById(id);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    
+    // Update client creditors
+    client.creditors = creditors;
+    await client.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Creditors saved successfully',
+      count: creditors.length
+    });
+  } catch (error) {
+    console.error('Error saving client creditors:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Submit all creditors (final submission)
+app.post('/api/clients/:id/submit-creditors', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { creditors } = req.body;
+    
+    if (!Array.isArray(creditors)) {
+      return res.status(400).json({ success: false, message: 'Creditors must be an array' });
+    }
+    
+    const client = await Client.findById(id);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    
+    // Update client creditors
+    client.creditors = creditors;
+    
+    // Mark as submitted in portal info
+    if (!client.portal) {
+      client.portal = {
+        active: true,
+        creditorSubmitted: true,
+        submissionDate: new Date()
+      };
+    } else {
+      client.portal.creditorSubmitted = true;
+      client.portal.submissionDate = new Date();
+    }
+    
+    // Update client phase if still in early phases
+    if (client.currentPhase <= 2) {
+      client.currentPhase = 3;
+      
+      // Update phase completion dates
+      if (!client.phaseCompletionDates) {
+        client.phaseCompletionDates = new Map();
+      }
+      client.phaseCompletionDates.set('2', new Date());
+      client.phaseCompletionDates.set('3', new Date());
+    }
+    
+    await client.save();
+    
+    // Queue this change for Make.com to sync to ClickUp
+    queueClientChange(client, 'update');
+    
+    res.status(200).json({
+      success: true,
+      message: 'Creditors submitted successfully',
+      count: creditors.length
+    });
+  } catch (error) {
+    console.error('Error submitting client creditors:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Upload creditor documents
+app.post('/api/clients/:id/upload-creditor-documents', fileService.upload.array('creditorDocuments', 10), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: 'Keine Dateien hochgeladen' });
+    }
+    
+    // Check if client exists
+    const client = await Client.findById(id);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Mandant nicht gefunden' });
+    }
+    
+    // Process each uploaded file
+    const uploadedDocuments = [];
+    for (const file of req.files) {
+      // Move file from temp to client directory
+      const filePath = fileService.moveFileToClientDir(client._id, file.filename);
+      
+      // Create document record
+      const document = {
+        filename: file.filename,
+        originalFilename: file.originalname,
+        path: filePath,
+        size: file.size,
+        mimetype: file.mimetype,
+        documentType: 'creditorLetter',
+        uploadDate: new Date()
+      };
+      
+      // Add document to client's documents array
+      client.documents.push(document);
+      
+      // Add to response array
+      uploadedDocuments.push({
+        id: client.documents[client.documents.length - 1]._id,
+        filename: document.filename,
+        originalFilename: document.originalFilename,
+        url: `/uploads/${filePath}`,
+        size: document.size,
+        mimetype: document.mimetype,
+        documentType: document.documentType,
+        uploadDate: document.uploadDate
+      });
+    }
+    
+    // Mark documents as uploaded
+    client.documentsUploaded = true;
+    
+    // Save client with new documents
+    await client.save();
+    
+    res.status(200).json({
+      success: true,
+      message: `${req.files.length} Dokumente erfolgreich hochgeladen`,
+      documents: uploadedDocuments
+    });
+  } catch (error) {
+    console.error('Error uploading creditor documents:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Send invoice to client
 app.post('/api/clients/:id/send-invoice', async (req, res) => {
   try {

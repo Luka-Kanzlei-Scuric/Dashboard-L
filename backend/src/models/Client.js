@@ -33,6 +33,60 @@ const documentSchema = new mongoose.Schema({
   }
 });
 
+// Creditor subschema for tracking client creditors
+const creditorSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true
+  },
+  amount: {
+    type: Number,
+    default: 0
+  },
+  contactInfo: {
+    type: String
+  },
+  notes: {
+    type: String
+  },
+  documentIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Document'
+  }],
+  verified: {
+    type: Boolean,
+    default: false
+  },
+  addedDate: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Portal access schema
+const portalAccessSchema = new mongoose.Schema({
+  active: {
+    type: Boolean,
+    default: true
+  },
+  lastLogin: {
+    type: Date
+  },
+  accessToken: {
+    type: String
+  },
+  tokenExpiry: {
+    type: Date
+  },
+  creditorSubmitted: {
+    type: Boolean,
+    default: false
+  },
+  submissionDate: {
+    type: Date
+  }
+});
+
 const clientSchema = new mongoose.Schema(
   {
     name: {
@@ -119,6 +173,42 @@ const clientSchema = new mongoose.Schema(
     currentInvoice: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Document'
+    },
+    // Client portal information
+    portal: {
+      type: portalAccessSchema,
+      default: () => ({
+        active: true,
+        accessToken: null,
+        tokenExpiry: null,
+        creditorSubmitted: false
+      })
+    },
+    // Creditors list
+    creditors: {
+      type: [creditorSchema],
+      default: []
+    },
+    // Payment status tracking
+    zahlungStatus: {
+      type: String,
+      enum: ['Ausstehend', 'Teilweise bezahlt', 'Vollständig bezahlt'],
+      default: 'Ausstehend'
+    },
+    zahlung: {
+      totalPaid: {
+        type: Number, 
+        default: 0
+      },
+      lastPaymentDate: {
+        type: Date
+      },
+      paymentHistory: [{
+        amount: Number,
+        date: Date,
+        method: String,
+        notes: String
+      }]
     }
   },
   {
