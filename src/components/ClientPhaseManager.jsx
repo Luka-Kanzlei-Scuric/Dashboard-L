@@ -60,6 +60,9 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
   const [showInstructions, setShowInstructions] = useState(false);
   const [showAllPhases, setShowAllPhases] = useState(false);
   const [selectedUploadType, setSelectedUploadType] = useState(null);
+  const [emailPreviewContent, setEmailPreviewContent] = useState(null);
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [loading, setLoading] = useState(false);
   
   const { updateClient, markDocumentsUploaded, markPaymentReceived } = useClients();
   
@@ -154,9 +157,56 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     }
   };
   
+  // Generate and fetch full HTML email preview from server
+  const generateEmailPreview = async () => {
+    if (!client || !client._id) return;
+    
+    try {
+      setLoading(true);
+      
+      // Prepare invoice data
+      const invoiceData = {
+        invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
+        date: new Date().toLocaleDateString('de-DE'),
+        amount: client.honorar || 1111,
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
+      };
+      
+      // Get API base URL from environment variables or use default
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+      
+      // Make API request to generate email preview
+      const emailPreviewResponse = await fetch(`${apiBaseUrl}/clients/${client._id}/generate-email-preview`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ invoiceData })
+      });
+      
+      if (!emailPreviewResponse.ok) {
+        throw new Error('Fehler beim Generieren der Email-Vorschau');
+      }
+      
+      // Get HTML preview from response
+      const emailPreviewData = await emailPreviewResponse.json();
+      
+      // Set HTML preview content and show modal
+      setEmailPreviewContent(emailPreviewData.html);
+      setShowEmailPreview(true);
+      
+    } catch (error) {
+      console.error('Fehler beim Generieren der Email-Vorschau:', error);
+      alert('Fehler beim Generieren der Email-Vorschau: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   // Handle email sent
   const handleEmailSent = (invoiceData, includesDocumentRequest = false) => {
     setShowEmailSuccess(true);
+    setShowEmailPreview(false);
     
     // Move to the next phase after email is sent
     if (currentPhase === 1) {
@@ -196,6 +246,72 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
   // Handle toggle for showing all phases
   const handleToggleAllPhases = () => {
     setShowAllPhases(!showAllPhases);
+  };
+  
+  // Email Preview Modal Component
+  const renderEmailPreviewModal = () => {
+    if (!showEmailPreview || !emailPreviewContent) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full h-full max-h-[90vh] flex flex-col">
+          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-800">Email-Vorschau (Vollständige HTML-Version)</h2>
+            <button 
+              onClick={() => setShowEmailPreview(false)}
+              className="p-1 rounded-full hover:bg-gray-100"
+              aria-label="Schließen"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-auto p-1 bg-gray-100">
+            <div className="bg-white rounded border shadow-sm">
+              <iframe 
+                srcDoc={emailPreviewContent}
+                title="Email Vorschau" 
+                className="w-full h-full min-h-[60vh]"
+                sandbox="allow-same-origin"
+              />
+            </div>
+          </div>
+          
+          <div className="p-4 border-t border-gray-200 flex justify-end space-x-3">
+            <button
+              onClick={() => setShowEmailPreview(false)}
+              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={() => {
+                const invoiceData = {
+                  invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
+                  date: new Date().toLocaleDateString('de-DE'),
+                  amount: client.honorar || 1111,
+                  dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
+                };
+                handleEmailSent(invoiceData, true);
+              }}
+              className="px-4 py-2 text-white bg-green-600 hover:bg-green-700 rounded"
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="flex items-center">
+                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                  Wird gesendet...
+                </span>
+              ) : (
+                'Email jetzt senden'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
   
   // Handle selecting upload type
@@ -362,8 +478,35 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                 
                 {/* E-Mail-Vorschau */}
                 <div className="border border-gray-200 rounded-lg p-4 mb-6">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">E-Mail-Vorschau:</h4>
-                  <div className="bg-gray-50 p-3 rounded text-sm text-gray-700">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-sm font-medium text-gray-900">E-Mail-Vorschau:</h4>
+                    <button 
+                      onClick={generateEmailPreview}
+                      className="text-sm text-blue-600 hover:text-blue-800 transition-colors flex items-center"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <span className="flex items-center">
+                          <ArrowPathIcon className="h-4 w-4 mr-1 animate-spin" />
+                          Lädt...
+                        </span>
+                      ) : (
+                        <span className="flex items-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          Vollständige HTML-Vorschau anzeigen
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded text-sm text-gray-700 relative">
+                    <div className="absolute inset-0 bg-gray-50 bg-opacity-70 flex items-center justify-center" style={{ display: 'none' }}>
+                      <p className="text-sm text-blue-700 bg-blue-50 px-3 py-1 rounded-lg shadow-sm border border-blue-100">
+                        Diese ist nur eine vereinfachte Vorschau. Klicken Sie oben für die vollständige HTML-Vorschau.
+                      </p>
+                    </div>
                     <p><strong>An:</strong> {client.name} &lt;{client.email}&gt;</p>
                     <p><strong>Betreff:</strong> Ihre Rechnung und Anforderung von Dokumenten</p>
                     <p className="mt-2">Sehr geehrte(r) {client.name},</p>
@@ -649,6 +792,9 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
       
       {/* Phase-specific content */}
       {getPhaseContent()}
+      
+      {/* Email Preview Modal */}
+      {renderEmailPreviewModal()}
     </div>
   );
 };
