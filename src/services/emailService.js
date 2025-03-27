@@ -4,8 +4,8 @@ import dotenv from 'dotenv';
 // Ensure environment variables are loaded
 dotenv.config();
 
-// Make.com webhook URL for sending emails
-const MAKE_WEBHOOK_URL = process.env.MAKE_EMAIL_WEBHOOK_URL || 'https://hook.eu2.make.com/pdlivjtccwyrtr0j8u1ovpxz184lqnki';
+// Make.com webhook URL for sending emails - Direkte URL verwenden
+const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/pdlivjtccwyrtr0j8u1ovpxz184lqnki';
 
 /**
  * Generate the client portal URL

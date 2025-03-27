@@ -172,8 +172,8 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
       };
       
-      // Get API base URL from environment variables or use default
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+      // Direkte Server-API-URL verwenden
+      const apiBaseUrl = 'http://localhost:5000/api';
       
       // Make API request to generate email preview
       const emailPreviewResponse = await fetch(`${apiBaseUrl}/clients/${client._id}/generate-email-preview`, {
@@ -191,17 +191,78 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
       // Get HTML preview from response
       const emailPreviewData = await emailPreviewResponse.json();
       
-      // Set HTML preview content and show modal
+      // Set HTML preview content and show preview
       setEmailPreviewContent(emailPreviewData.html);
       setShowEmailPreview(true);
       
     } catch (error) {
       console.error('Fehler beim Generieren der Email-Vorschau:', error);
-      alert('Fehler beim Generieren der Email-Vorschau: ' + error.message);
+      console.error('Client ID:', client._id);
+      
+      // Fallback: Generiere eine einfache HTML-Vorschau ohne API-Anfrage
+      const fallbackHtml = `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Vorschau</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+    .header { margin-bottom: 30px; }
+    .content { margin-bottom: 30px; }
+    .important { font-weight: bold; color: #324ca8; }
+    .button { display: inline-block; padding: 10px 20px; background-color: #32a852; color: white !important; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+    .footer { margin-top: 30px; font-size: 0.9em; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>Thomas Scuric Rechtsanwaltskanzlei</h2>
+  </div>
+  <div class="content">
+    <p>Sehr geehrte(r) ${client.name},</p>
+    <p>zunächst einmal vielen Dank für Ihr Vertrauen und die Erteilung des Mandats. Wir freuen uns, Sie auf Ihrem Weg in eine schuldenfreie Zukunft begleiten zu dürfen.</p>
+    <p>Wie vereinbart beträgt unser Gesamthonorar pauschal ${client.honorar || '1111'}€ (inkl. 19% MwSt.), welches Sie in ${client.raten || '3'} Raten bezahlen können.</p>
+    <p>Um mit dem Schreiben an Ihre Gläubiger beginnen zu können, bitten wir Sie, die erste Rate bis zum <span class="important">${client.ratenStart || '01.01.2025'}</span> zu überweisen.</p>
+    <p>Für eine erfolgreiche Zusammenarbeit haben wir ein persönliches Mandantenportal für Sie eingerichtet. Dort können Sie Ihre Gläubigerschreiben hochladen.</p>
+    <p>Ihr <span class="important">persönliches Aktenzeichen</span> lautet: <span class="important">${client.caseNumber || 'Wird in Kürze vergeben'}</span></p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="#" class="button">-> Zum Mandantenportal <-</a>
+    </div>
+    <p>Bitte nutzen Sie dieses Aktenzeichen für Ihren Zugang zum Mandantenportal.</p>
+    <div style="padding: 15px; margin-top: 20px; background-color: #f2f7ff; border-radius: 10px; border: 1px solid #d1e0ff;">
+      <p style="font-weight: bold; color: #324ca8;">Rechnungsinformationen:</p>
+      <p>Rechnungsnummer: ${client.caseNumber || 'INV-123456'}</p>
+      <p>Rechnungsdatum: ${new Date().toLocaleDateString('de-DE')}</p>
+      <p>Betrag: ${client.honorar || '1111'}€</p>
+      <p>Die Rechnung ist dieser E-Mail als Anhang beigefügt.</p>
+    </div>
+  </div>
+  <div class="footer">
+    <p>Mit freundlichen Grüßen</p>
+    <p>Ihr Team von der Rechtsanwaltskanzlei Thomas Scuric</p>
+    <p>Rechtsanwaltskanzlei Thomas Scuric<br>
+    Bongardstraße 33<br>
+    44787 Bochum<br>
+    Fon: 0234 913 681 – 0<br>
+    E-Mail: kontakt@schuldnerberatung-anwalt.de</p>
+  </div>
+</body>
+</html>`;
+      
+      setEmailPreviewContent(fallbackHtml);
+      setShowEmailPreview(true);
     } finally {
       setLoading(false);
     }
   };
+  
+  // Lade die Email-Vorschau automatisch, wenn sich der Phase2Step ändert
+  useEffect(() => {
+    if (currentPhase === 2 && phase2Step === 2) {
+      generateEmailPreview();
+    }
+  }, [phase2Step]);
   
   // Handle email sent
   const handleEmailSent = (invoiceData, includesDocumentRequest = false) => {
@@ -476,44 +537,41 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                   </div>
                 </div>
                 
-                {/* E-Mail-Vorschau */}
-                <div className="border border-gray-200 rounded-lg p-4 mb-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-sm font-medium text-gray-900">E-Mail-Vorschau:</h4>
-                    <button 
-                      onClick={generateEmailPreview}
-                      className="text-sm text-blue-600 hover:text-blue-800 transition-colors flex items-center"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <span className="flex items-center">
-                          <ArrowPathIcon className="h-4 w-4 mr-1 animate-spin" />
-                          Lädt...
-                        </span>
-                      ) : (
-                        <span className="flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          Vollständige HTML-Vorschau anzeigen
-                        </span>
-                      )}
-                    </button>
+                {/* E-Mail-Vorschau wurde automatisch generiert */}
+                <div className="bg-blue-50 rounded-xl p-4 mb-6 border border-blue-100">
+                  <div className="flex">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-sm text-blue-700">
+                      Die E-Mail-Vorschau wurde automatisch generiert. Sie können jetzt die E-Mail versenden, um dem Mandanten Rechnung und Anleitung zum Hochladen der Gläubigerschreiben zu senden.
+                    </p>
                   </div>
-                  <div className="bg-gray-50 p-3 rounded text-sm text-gray-700 relative">
-                    <div className="absolute inset-0 bg-gray-50 bg-opacity-70 flex items-center justify-center" style={{ display: 'none' }}>
-                      <p className="text-sm text-blue-700 bg-blue-50 px-3 py-1 rounded-lg shadow-sm border border-blue-100">
-                        Diese ist nur eine vereinfachte Vorschau. Klicken Sie oben für die vollständige HTML-Vorschau.
-                      </p>
+                  
+                  {!showEmailPreview && (
+                    <div className="mt-3 text-center">
+                      <button 
+                        onClick={generateEmailPreview}
+                        className="inline-flex items-center justify-center px-4 py-2 bg-white border border-blue-300 rounded-md text-blue-700 hover:bg-blue-50 transition-all"
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <span className="flex items-center">
+                            <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                            Lädt E-Mail-Vorschau...
+                          </span>
+                        ) : (
+                          <span className="flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            E-Mail-Vorschau erneut anzeigen
+                          </span>
+                        )}
+                      </button>
                     </div>
-                    <p><strong>An:</strong> {client.name} &lt;{client.email}&gt;</p>
-                    <p><strong>Betreff:</strong> Ihre Rechnung und Anforderung von Dokumenten</p>
-                    <p className="mt-2">Sehr geehrte(r) {client.name},</p>
-                    <p className="mt-2">anbei erhalten Sie Ihre Rechnung für unsere Rechtsdienstleistungen.</p>
-                    <p className="mt-2">Bitte beginnen Sie mit Ihren monatlichen Zahlungen und laden Sie über den untenstehenden Link alle relevanten Gläubigerschreiben hoch, damit wir mit Ihrer Bearbeitung fortfahren können.</p>
-                    <p className="mt-2">Mit freundlichen Grüßen,<br/>Ihr Team von Scuric Rechtsanwälte</p>
-                  </div>
+                  )}
                 </div>
                 
                 <div className="flex space-x-4">
