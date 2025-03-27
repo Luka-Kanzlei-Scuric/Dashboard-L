@@ -317,6 +317,34 @@ app.get('/api/clients/:id/portal-url', async (req, res) => {
   }
 });
 
+// Generate email preview
+app.post('/api/clients/:id/generate-email-preview', async (req, res) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    
+    // Extrahiere Rechnungsdaten aus dem Request-Body, falls vorhanden
+    const invoiceData = req.body.invoiceData || null;
+    
+    // Import emailService dynamically
+    const { generateWelcomeEmailContent } = await import('./src/services/emailService.js');
+    
+    // Generiere HTML-Inhalt der Email
+    const html = generateWelcomeEmailContent(client, invoiceData);
+    
+    res.status(200).json({
+      success: true,
+      html
+    });
+  } catch (error) {
+    console.error('Error generating email preview:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

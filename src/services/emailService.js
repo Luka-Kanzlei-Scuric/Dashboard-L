@@ -26,21 +26,35 @@ export function generateClientPortalUrl(client) {
 }
 
 /**
- * Send welcome email with payment and portal information
- * @param {Object} client - Client object with all data
- * @param {Object} invoiceData - Optional invoice data with filePath
- * @returns {Promise} Email sending result
+ * Generate email content for preview or sending
+ * @param {Object} client - Client data
+ * @param {Object} invoiceData - Optional invoice data
+ * @returns {String} HTML content of the email
  */
-export async function sendWelcomePortalEmail(client, invoiceData = null) {
+export function generateWelcomeEmailContent(client, invoiceData = null) {
   // Format date for payment
   const formattedRatenStart = client.ratenStart || '01.01.2025';
   const honorarDisplay = client.honorar ? `${client.honorar}€` : 'den vereinbarten Betrag';
   const portalUrl = generateClientPortalUrl(client);
   const ratenValue = client.raten || 3;
   
+  // Generate invoice info if available
+  let invoiceInfo = '';
+  if (invoiceData) {
+    invoiceInfo = `
+    <div style="padding: 15px; margin-top: 20px; background-color: #f2f7ff; border-radius: 10px; border: 1px solid #d1e0ff;">
+      <p style="font-weight: bold; color: #324ca8;">Rechnungsinformationen:</p>
+      <p>Rechnungsnummer: ${invoiceData.invoiceNumber || '-'}</p>
+      <p>Rechnungsdatum: ${invoiceData.date || new Date().toLocaleDateString('de-DE')}</p>
+      <p>Betrag: ${invoiceData.amount || client.honorar || 1111}€</p>
+      <p>Zahlbar bis: ${invoiceData.dueDate || ''}</p>
+      <p>Die Rechnung ist dieser E-Mail als Anhang beigefügt.</p>
+    </div>
+    `;
+  }
+  
   // Construct email HTML
-  const htmlContent = `
-<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
@@ -144,6 +158,9 @@ body {
     Falls der Button nicht funktioniert, kopieren Sie bitte diese URL direkt in Ihren Browser:<br>
     <span class="direct-url">${portalUrl}</span>
   </div>
+  
+  ${invoiceInfo}
+
   <div class="media-section">
     <img src="https://www.anwalt-privatinsolvenz-online.de/wp-content/uploads/2019/11/medien.png" alt="RTL, Focus Online, Frankfurter Rundschau" class="media-logos">
     <p class="media-text">Vielleicht kennen Sie uns auch aus diesen Medien</p>
@@ -161,9 +178,19 @@ body {
     E-Mail: kontakt@schuldnerberatung-anwalt.de</p>
   </div>
 </body>
-</html>
-  `;
+</html>`;
+}
 
+/**
+ * Send welcome email with payment and portal information
+ * @param {Object} client - Client object with all data
+ * @param {Object} invoiceData - Optional invoice data with filePath
+ * @returns {Promise} Email sending result
+ */
+export async function sendWelcomePortalEmail(client, invoiceData = null) {
+  // Generate the email content
+  const htmlContent = generateWelcomeEmailContent(client, invoiceData);
+  
   // Erstelle E-Mail-Optionen
   const mailOptions = {
     from: process.env.EMAIL_FROM || '"Rechtsanwaltskanzlei Scuric" <kontakt@schuldnerberatung-anwalt.de>',
@@ -238,5 +265,6 @@ body {
 // For backwards compatibility
 export default {
   sendWelcomePortalEmail,
-  generateClientPortalUrl
+  generateClientPortalUrl,
+  generateWelcomeEmailContent
 };

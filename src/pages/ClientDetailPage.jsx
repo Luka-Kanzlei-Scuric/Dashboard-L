@@ -36,6 +36,8 @@ const ClientDetailPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [showEmailSuccess, setShowEmailSuccess] = useState(false);
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [emailPreviewContent, setEmailPreviewContent] = useState(null);
 
   // Funktion zum Hochladen eines Dokuments
   const handleFileUpload = async (file) => {
@@ -1007,29 +1009,66 @@ const ClientDetailPage = () => {
         fileName: fileName
       };
       
-      // Vorschau-Dialog für Email-Inhalte anzeigen (optional)
-      if (confirm('Soll die Email mit Rechnung und Mandantenportal-Zugang gesendet werden?')) {
-        // Sende Email mit Rechnung an den Mandanten
-        await sendInvoiceEmail(client._id, invoiceData);
+      // Importiere die Funktion zur Generierung des Email-Inhalts
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+      const emailPreviewResponse = await fetch(`${apiBaseUrl}/clients/${client._id}/generate-email-preview`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ invoiceData })
+      });
       
-        // Aktualisiere lokalen Zustand
-        setClient(prevClient => ({
-          ...prevClient,
-          emailSent: true,
-          // Wenn Client in Phase 1 ist, wechseln zu Phase 2
-          currentPhase: prevClient.currentPhase === 1 ? 2 : prevClient.currentPhase
-        }));
-        
-        setEmailSending(false);
-        setShowEmailSuccess(true);
-        
-        // Blende Erfolgsmeldung nach 5 Sekunden aus
-        setTimeout(() => {
-          setShowEmailSuccess(false);
-        }, 5000);
-      } else {
-        setEmailSending(false);
+      if (!emailPreviewResponse.ok) {
+        throw new Error('Fehler beim Generieren der Email-Vorschau');
       }
+      
+      // Email-Vorschau als HTML erhalten
+      const emailPreviewData = await emailPreviewResponse.json();
+      
+      // Email-Vorschau anzeigen
+      setEmailPreviewContent(emailPreviewData.html);
+      setShowEmailPreview(true);
+      
+      // Warten auf Bestätigung durch den Benutzer (mit modaler Vorschau)
+      // Der weitere Prozess wird über die Benutzeroberfläche gesteuert
+      // Die Funktion handleConfirmSendEmail wird aufgerufen, wenn der Benutzer die Vorschau bestätigt
+      
+      // Email-Senden-Prozess aussetzen, bis der Benutzer die Vorschau bestätigt hat
+      setEmailSending(false);
+    } catch (error) {
+      console.error('Fehler beim Senden der Email:', error);
+      setEmailSending(false);
+      alert("Fehler beim Senden der Email: " + error.message);
+    }
+  };
+  
+  // Funktion zum Bestätigen und Senden der Email nach der Vorschau
+  const handleConfirmSendEmail = async (invoiceData) => {
+    if (!client || !client._id) return;
+    
+    try {
+      setEmailSending(true);
+      setShowEmailPreview(false);
+      
+      // Sende Email mit Rechnung an den Mandanten
+      await sendInvoiceEmail(client._id, invoiceData);
+    
+      // Aktualisiere lokalen Zustand
+      setClient(prevClient => ({
+        ...prevClient,
+        emailSent: true,
+        // Wenn Client in Phase 1 ist, wechseln zu Phase 2
+        currentPhase: prevClient.currentPhase === 1 ? 2 : prevClient.currentPhase
+      }));
+      
+      setEmailSending(false);
+      setShowEmailSuccess(true);
+      
+      // Blende Erfolgsmeldung nach 5 Sekunden aus
+      setTimeout(() => {
+        setShowEmailSuccess(false);
+      }, 5000);
     } catch (error) {
       console.error('Fehler beim Senden der Email:', error);
       setEmailSending(false);
@@ -1086,8 +1125,78 @@ const ClientDetailPage = () => {
     );
   }
 
+  // Email Preview Modal
+  const renderEmailPreviewModal = () => {
+    if (!showEmailPreview || !emailPreviewContent) return null;
+    
+    // Aktuelle Rechnungsdaten für den Bestätigungs-Button
+    const currentInvoiceData = {
+      invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
+      date: new Date().toLocaleDateString('de-DE'),
+      amount: client.honorar || 1111,
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE'),
+      filePath: client.currentInvoice?.filePath,
+      fileName: client.currentInvoice?.fileName
+    };
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full h-full max-h-[90vh] flex flex-col">
+          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-800">Email-Vorschau</h2>
+            <button 
+              onClick={() => setShowEmailPreview(false)}
+              className="p-1 rounded-full hover:bg-gray-100"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-auto p-1 bg-gray-100">
+            <div className="bg-white rounded border shadow-sm">
+              <iframe 
+                srcDoc={emailPreviewContent}
+                title="Email Vorschau" 
+                className="w-full h-full min-h-[60vh]"
+                sandbox="allow-same-origin"
+              />
+            </div>
+          </div>
+          
+          <div className="p-4 border-t border-gray-200 flex justify-end space-x-3">
+            <button
+              onClick={() => setShowEmailPreview(false)}
+              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={() => handleConfirmSendEmail(currentInvoiceData)}
+              className="px-4 py-2 text-white bg-green-600 hover:bg-green-700 rounded"
+              disabled={emailSending}
+            >
+              {emailSending ? (
+                <span className="flex items-center">
+                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                  Wird gesendet...
+                </span>
+              ) : (
+                'Email jetzt senden'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-screen-lg mx-auto pb-20 px-4 animate-fadeIn">
+      {/* Email-Vorschau Modal */}
+      {renderEmailPreviewModal()}
+      
       {/* Header mit Zurück-Button und Mandanten-Name */}
       <div className="flex flex-col mb-8 pt-6">
         <div className="flex items-center mb-2">
