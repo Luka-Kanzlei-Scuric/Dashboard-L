@@ -1007,16 +1007,29 @@ const ClientDetailPage = () => {
         fileName: fileName
       };
       
-      // Sende Email mit Rechnung an den Mandanten
-      await sendInvoiceEmail(client._id, invoiceData);
+      // Vorschau-Dialog für Email-Inhalte anzeigen (optional)
+      if (confirm('Soll die Email mit Rechnung und Mandantenportal-Zugang gesendet werden?')) {
+        // Sende Email mit Rechnung an den Mandanten
+        await sendInvoiceEmail(client._id, invoiceData);
       
-      setEmailSending(false);
-      setShowEmailSuccess(true);
-      
-      // Blende Erfolgsmeldung nach 5 Sekunden aus
-      setTimeout(() => {
-        setShowEmailSuccess(false);
-      }, 5000);
+        // Aktualisiere lokalen Zustand
+        setClient(prevClient => ({
+          ...prevClient,
+          emailSent: true,
+          // Wenn Client in Phase 1 ist, wechseln zu Phase 2
+          currentPhase: prevClient.currentPhase === 1 ? 2 : prevClient.currentPhase
+        }));
+        
+        setEmailSending(false);
+        setShowEmailSuccess(true);
+        
+        // Blende Erfolgsmeldung nach 5 Sekunden aus
+        setTimeout(() => {
+          setShowEmailSuccess(false);
+        }, 5000);
+      } else {
+        setEmailSending(false);
+      }
     } catch (error) {
       console.error('Fehler beim Senden der Email:', error);
       setEmailSending(false);
@@ -1390,64 +1403,14 @@ const ClientDetailPage = () => {
                 </svg>
                 <div>
                   <p className="text-sm text-gray-500">Mandantenportal</p>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                    <a 
-                      href={`${window.location.origin}/portal/${client._id}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-[#9c1a1b] hover:text-[#8a1718] transition-colors"
-                    >
-                      Zum Mandantenportal
-                    </a>
-                    <button 
-                      onClick={async () => {
-                        try {
-                          setEmailSending(true);
-                          
-                          // Sende Willkommens-Email mit Portal-Zugang über Context
-                          await sendWelcomeEmail(client._id);
-                          
-                          // Erfolgreich gesendet
-                          setShowEmailSuccess(true);
-                          
-                          // Aktualisiere lokalen Zustand
-                          setClient(prevClient => ({
-                            ...prevClient,
-                            emailSent: true
-                          }));
-                          
-                          // Nach 5 Sekunden Erfolgsmeldung ausblenden
-                          setTimeout(() => {
-                            setShowEmailSuccess(false);
-                          }, 5000);
-                        } catch (error) {
-                          console.error('Fehler beim Senden der E-Mail:', error);
-                          alert(`Fehler beim Senden der E-Mail: ${error.message}`);
-                        } finally {
-                          setEmailSending(false);
-                        }
-                      }}
-                      disabled={emailSending || client.emailSent}
-                      className={`text-xs py-1 px-2 rounded ${
-                        client.emailSent 
-                          ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
-                          : emailSending
-                          ? 'bg-gray-200 text-gray-600 cursor-wait'
-                          : 'bg-green-100 text-green-700 hover:bg-green-200'
-                      }`}
-                    >
-                      {emailSending ? (
-                        <span className="flex items-center">
-                          <ArrowPathIcon className="h-3 w-3 mr-1 animate-spin" />
-                          Wird gesendet...
-                        </span>
-                      ) : client.emailSent ? (
-                        'Email bereits gesendet'
-                      ) : (
-                        'Portal-Zugangsdaten senden'
-                      )}
-                    </button>
-                  </div>
+                  <a 
+                    href={`${window.location.origin}/portal/${client._id}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-[#9c1a1b] hover:text-[#8a1718] transition-colors"
+                  >
+                    Zum Mandantenportal
+                  </a>
                 </div>
               </div>
             </div>

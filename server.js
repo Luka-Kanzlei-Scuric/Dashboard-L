@@ -257,10 +257,14 @@ app.post('/api/clients/:id/email/welcome', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Client not found' });
     }
     
+    // Extrahiere Rechnungsdaten aus dem Request-Body, falls vorhanden
+    const invoiceData = req.body.invoiceData || null;
+    
     // Import emailService dynamically (since we're using ES modules)
     const { sendWelcomePortalEmail } = await import('./src/services/emailService.js');
     
-    const result = await sendWelcomePortalEmail(client);
+    // Übergebe die Rechnungsdaten an die Email-Funktion
+    const result = await sendWelcomePortalEmail(client, invoiceData);
     
     if (result.success) {
       // Update client to mark email as sent

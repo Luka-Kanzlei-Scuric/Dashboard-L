@@ -297,15 +297,19 @@ export const ClientProvider = ({ children }) => {
   // Send invoice email to client
   const sendInvoiceEmail = async (clientId, invoiceData) => {
     try {
-      const response = await api.post(`/clients/${clientId}/send-invoice`, { 
+      // Holen Sie den Client, um Ihre Daten zu bekommen
+      const client = clients.find(c => c._id === clientId) || await getClient(clientId);
+      
+      // Rufen Sie direkt den Welcome-Email mit Rechnung-Service auf
+      const response = await api.post(`/clients/${clientId}/email/welcome`, { 
         invoiceData,
-        invoiceFilePath: invoiceData.filePath // Pass the file path to the server
+        invoiceFilePath: invoiceData.filePath // Übergeben Sie den Dateipfad an den Server
       });
       
-      // Update client in state to reflect that email has been sent
+      // Aktualisieren Sie den Client-Status
       const updatedClient = await updateClient(clientId, { 
         emailSent: true,
-        // If client is in phase 1, move to phase 2
+        // Wenn Client in Phase 1 ist, wechseln Sie zu Phase 2
         currentPhase: 2 
       });
       

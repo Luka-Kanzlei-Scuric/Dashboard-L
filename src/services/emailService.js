@@ -28,9 +28,10 @@ export function generateClientPortalUrl(client) {
 /**
  * Send welcome email with payment and portal information
  * @param {Object} client - Client object with all data
+ * @param {Object} invoiceData - Optional invoice data with filePath
  * @returns {Promise} Email sending result
  */
-export async function sendWelcomePortalEmail(client) {
+export async function sendWelcomePortalEmail(client, invoiceData = null) {
   // Format date for payment
   const formattedRatenStart = client.ratenStart || '01.01.2025';
   const honorarDisplay = client.honorar ? `${client.honorar}€` : 'den vereinbarten Betrag';
@@ -163,12 +164,61 @@ body {
 </html>
   `;
 
+  // Erstelle E-Mail-Optionen
   const mailOptions = {
     from: process.env.EMAIL_FROM || '"Rechtsanwaltskanzlei Scuric" <kontakt@schuldnerberatung-anwalt.de>',
     to: client.email,
     subject: `Ihr Mandantenportal und Zahlungsinformationen - ${client.caseNumber || 'Neue Mandatschaft'}`,
     html: htmlContent
   };
+  
+  // Wenn eine Rechnung vorhanden ist, füge sie als Anhang hinzu
+  if (invoiceData && invoiceData.filePath) {
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      // Absoluten Dateipfad erstellen
+      const rootDir = process.cwd();
+      const filePath = invoiceData.filePath.startsWith('/')
+        ? invoiceData.filePath
+        : path.join(rootDir, invoiceData.filePath.replace(/^\/+/, ''));
+      
+      // Prüfe, ob die Datei existiert
+      await fs.access(filePath);
+      
+      // Dateityp bestimmen (aus Dateiname oder manuell gesetzt)
+      const fileExtension = path.extname(filePath).toLowerCase();
+      let contentType = 'application/pdf'; // Standard
+      
+      if (fileExtension === '.pdf') {
+        contentType = 'application/pdf';
+      } else if (['.jpg', '.jpeg'].includes(fileExtension)) {
+        contentType = 'image/jpeg';
+      } else if (fileExtension === '.png') {
+        contentType = 'image/png';
+      } else if (['.doc', '.docx'].includes(fileExtension)) {
+        contentType = 'application/msword';
+      }
+      
+      // Datei einlesen und als Anhang hinzufügen
+      const fileContent = await fs.readFile(filePath);
+      
+      // Anhang hinzufügen
+      mailOptions.attachments = [
+        {
+          filename: invoiceData.fileName || path.basename(filePath),
+          content: fileContent,
+          contentType: contentType
+        }
+      ];
+      
+      console.log(`Rechnung als Anhang hinzugefügt: ${filePath}`);
+    } catch (fileError) {
+      console.error('Fehler beim Hinzufügen der Rechnung als Anhang:', fileError);
+      // Fehler beim Hinzufügen des Anhangs unterdrücken und E-Mail trotzdem senden
+    }
+  }
 
   try {
     const result = await transporter.sendMail(mailOptions);
