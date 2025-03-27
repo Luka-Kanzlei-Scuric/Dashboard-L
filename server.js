@@ -248,6 +248,71 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Email routes
+app.post('/api/clients/:id/email/welcome', async (req, res) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    
+    // Import emailService dynamically (since we're using ES modules)
+    const { sendWelcomePortalEmail } = await import('./src/services/emailService.js');
+    
+    const result = await sendWelcomePortalEmail(client);
+    
+    if (result.success) {
+      // Update client to mark email as sent
+      client.emailSent = true;
+      await client.save();
+      
+      // Queue this change for Make.com to sync to ClickUp
+      queueClientChange(client, 'update');
+      
+      res.status(200).json({
+        success: true,
+        message: 'Welcome email sent successfully',
+        messageId: result.messageId
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to send welcome email', 
+        error: result.error 
+      });
+    }
+  } catch (error) {
+    console.error('Error sending welcome email:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get client portal URL
+app.get('/api/clients/:id/portal-url', async (req, res) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    
+    // Import emailService dynamically
+    const { generateClientPortalUrl } = await import('./src/services/emailService.js');
+    
+    const portalUrl = generateClientPortalUrl(client);
+    
+    res.status(200).json({ 
+      success: true,
+      portalUrl,
+      caseNumber: client.caseNumber || 'Pending'
+    });
+  } catch (error) {
+    console.error('Error generating portal URL:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

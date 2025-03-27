@@ -340,6 +340,28 @@ export const ClientProvider = ({ children }) => {
     }
   };
   
+  // Send welcome email with portal details to client
+  const sendWelcomeEmail = async (clientId) => {
+    try {
+      const response = await api.post(`/clients/${clientId}/email/welcome`);
+      
+      // Update client in state to reflect that email has been sent
+      const client = clients.find(c => c._id === clientId);
+      if (client) {
+        await updateClient(clientId, { 
+          emailSent: true,
+          // If client is in phase 1, move to phase 2
+          currentPhase: client.currentPhase === 1 ? 2 : client.currentPhase
+        });
+      }
+      
+      return response.data;
+    } catch (err) {
+      console.error('Error sending welcome email:', err);
+      throw new Error(err.response?.data?.message || err.message || 'Failed to send welcome email');
+    }
+  };
+  
   // Mark client documents as uploaded
   const markDocumentsUploaded = async (clientId) => {
     try {
@@ -387,6 +409,7 @@ export const ClientProvider = ({ children }) => {
         resetError,
         sendInvoiceEmail,
         requestDocuments,
+        sendWelcomeEmail,
         markDocumentsUploaded,
         markPaymentReceived
       }}
