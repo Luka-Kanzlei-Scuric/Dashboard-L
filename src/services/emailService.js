@@ -1,19 +1,11 @@
-import nodemailer from 'nodemailer';
+import axios from 'axios';
 import dotenv from 'dotenv';
 
 // Ensure environment variables are loaded
 dotenv.config();
 
-// Configure nodemailer with environment variables
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: process.env.EMAIL_SECURE === 'true',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+// Make.com webhook URL for sending emails
+const MAKE_WEBHOOK_URL = process.env.MAKE_EMAIL_WEBHOOK_URL || 'https://hook.eu2.make.com/pdlivjtccwyrtr0j8u1ovpxz184lqnki';
 
 /**
  * Generate the client portal URL
@@ -182,79 +174,104 @@ body {
 }
 
 /**
- * Send welcome email with payment and portal information
+ * Send welcome email data to Make.com webhook for email sending
  * @param {Object} client - Client object with all data
  * @param {Object} invoiceData - Optional invoice data with filePath
- * @returns {Promise} Email sending result
+ * @returns {Promise} Webhook call result
  */
 export async function sendWelcomePortalEmail(client, invoiceData = null) {
-  // Generate the email content
-  const htmlContent = generateWelcomeEmailContent(client, invoiceData);
-  
-  // Erstelle E-Mail-Optionen
-  const mailOptions = {
-    from: process.env.EMAIL_FROM || '"Rechtsanwaltskanzlei Scuric" <kontakt@schuldnerberatung-anwalt.de>',
-    to: client.email,
-    subject: `Ihr Mandantenportal und Zahlungsinformationen - ${client.caseNumber || 'Neue Mandatschaft'}`,
-    html: htmlContent
-  };
-  
-  // Wenn eine Rechnung vorhanden ist, füge sie als Anhang hinzu
-  if (invoiceData && invoiceData.filePath) {
-    try {
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      
-      // Absoluten Dateipfad erstellen
-      const rootDir = process.cwd();
-      const filePath = invoiceData.filePath.startsWith('/')
-        ? invoiceData.filePath
-        : path.join(rootDir, invoiceData.filePath.replace(/^\/+/, ''));
-      
-      // Prüfe, ob die Datei existiert
-      await fs.access(filePath);
-      
-      // Dateityp bestimmen (aus Dateiname oder manuell gesetzt)
-      const fileExtension = path.extname(filePath).toLowerCase();
-      let contentType = 'application/pdf'; // Standard
-      
-      if (fileExtension === '.pdf') {
-        contentType = 'application/pdf';
-      } else if (['.jpg', '.jpeg'].includes(fileExtension)) {
-        contentType = 'image/jpeg';
-      } else if (fileExtension === '.png') {
-        contentType = 'image/png';
-      } else if (['.doc', '.docx'].includes(fileExtension)) {
-        contentType = 'application/msword';
-      }
-      
-      // Datei einlesen und als Anhang hinzufügen
-      const fileContent = await fs.readFile(filePath);
-      
-      // Anhang hinzufügen
-      mailOptions.attachments = [
-        {
-          filename: invoiceData.fileName || path.basename(filePath),
-          content: fileContent,
-          contentType: contentType
-        }
-      ];
-      
-      console.log(`Rechnung als Anhang hinzugefügt: ${filePath}`);
-    } catch (fileError) {
-      console.error('Fehler beim Hinzufügen der Rechnung als Anhang:', fileError);
-      // Fehler beim Hinzufügen des Anhangs unterdrücken und E-Mail trotzdem senden
-    }
-  }
-
   try {
-    const result = await transporter.sendMail(mailOptions);
+    // Get PDF base64 if we have an invoice file
+    let invoiceBase64 = null;
+    let fileName = null;
+    let fileType = null;
+
+    if (invoiceData && invoiceData.filePath) {
+      try {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        
+        // Create absolute file path
+        const rootDir = process.cwd();
+        const filePath = invoiceData.filePath.startsWith('/')
+          ? invoiceData.filePath
+          : path.join(rootDir, invoiceData.filePath.replace(/^\/+/, ''));
+        
+        // Check if file exists
+        await fs.access(filePath);
+        
+        // Determine file type
+        const fileExtension = path.extname(filePath).toLowerCase();
+        fileType = 'application/pdf'; // Default
+        
+        if (fileExtension === '.pdf') {
+          fileType = 'application/pdf';
+        } else if (['.jpg', '.jpeg'].includes(fileExtension)) {
+          fileType = 'image/jpeg';
+        } else if (fileExtension === '.png') {
+          fileType = 'image/png';
+        } else if (['.doc', '.docx'].includes(fileExtension)) {
+          fileType = 'application/msword';
+        }
+        
+        // Read file and convert to base64
+        const fileContent = await fs.readFile(filePath);
+        invoiceBase64 = fileContent.toString('base64');
+        fileName = invoiceData.fileName || path.basename(filePath);
+        
+        console.log(`Invoice file prepared for Make.com: ${filePath}`);
+      } catch (fileError) {
+        console.error('Error preparing invoice file:', fileError);
+      }
+    }
+
+    // Prepare client data for Make.com
+    const clientData = {
+      id: client._id,
+      name: client.name || '',
+      email: client.email || '',
+      phone: client.phone || '',
+      honorar: client.honorar || '',
+      raten: client.raten || 3,
+      ratenStart: client.ratenStart || '01.01.2025',
+      caseNumber: client.caseNumber || 'Wird in Kürze vergeben'
+    };
+
+    // Prepare invoice data for Make.com
+    const invoiceDetails = invoiceData ? {
+      invoiceNumber: invoiceData.invoiceNumber || '',
+      date: invoiceData.date || new Date().toLocaleDateString('de-DE'),
+      amount: invoiceData.amount || client.honorar || '',
+      dueDate: invoiceData.dueDate || ''
+    } : null;
+
+    // Create portal URL for the client
+    const portalUrl = generateClientPortalUrl(client);
+
+    // Create data payload for Make.com
+    const makeData = {
+      client: clientData,
+      portalUrl: portalUrl,
+      invoice: invoiceDetails,
+      attachment: invoiceBase64 ? {
+        fileName: fileName,
+        fileType: fileType,
+        base64Content: invoiceBase64
+      } : null
+    };
+
+    // Send data to Make.com webhook
+    const response = await axios.post(MAKE_WEBHOOK_URL, makeData);
+    
+    console.log('Email data sent to Make.com webhook:', response.status);
+    
     return {
       success: true,
-      messageId: result.messageId
+      makeResponse: response.data,
+      sentTo: client.email
     };
   } catch (error) {
-    console.error('Error sending welcome email:', error);
+    console.error('Error sending data to Make.com webhook:', error);
     return {
       success: false,
       error: error.message

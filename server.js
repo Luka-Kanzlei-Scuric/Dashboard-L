@@ -248,7 +248,7 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Email routes
+// Email routes - Send welcome email data to Make.com
 app.post('/api/clients/:id/email/welcome', async (req, res) => {
   try {
     const client = await Client.findById(req.params.id);
@@ -257,18 +257,19 @@ app.post('/api/clients/:id/email/welcome', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Client not found' });
     }
     
-    // Extrahiere Rechnungsdaten aus dem Request-Body, falls vorhanden
+    // Extract invoice data from request body if available
     const invoiceData = req.body.invoiceData || null;
     
-    // Import emailService dynamically (since we're using ES modules)
+    // Import emailService dynamically
     const { sendWelcomePortalEmail } = await import('./src/services/emailService.js');
     
-    // Übergebe die Rechnungsdaten an die Email-Funktion
+    // Call updated email function that sends data to Make.com
     const result = await sendWelcomePortalEmail(client, invoiceData);
     
     if (result.success) {
       // Update client to mark email as sent
       client.emailSent = true;
+      client.lastEmailSent = new Date();
       await client.save();
       
       // Queue this change for Make.com to sync to ClickUp
@@ -276,18 +277,19 @@ app.post('/api/clients/:id/email/welcome', async (req, res) => {
       
       res.status(200).json({
         success: true,
-        message: 'Welcome email sent successfully',
-        messageId: result.messageId
+        message: 'Email data sent to Make.com successfully',
+        sentTo: result.sentTo,
+        makeData: result.makeResponse
       });
     } else {
       res.status(500).json({ 
         success: false, 
-        message: 'Failed to send welcome email', 
+        message: 'Failed to send email data to Make.com', 
         error: result.error 
       });
     }
   } catch (error) {
-    console.error('Error sending welcome email:', error);
+    console.error('Error sending email data to Make.com:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -317,7 +319,7 @@ app.get('/api/clients/:id/portal-url', async (req, res) => {
   }
 });
 
-// Generate email preview
+// Generate email preview and prepare Make.com data
 app.post('/api/clients/:id/generate-email-preview', async (req, res) => {
   try {
     const client = await Client.findById(req.params.id);
@@ -326,18 +328,45 @@ app.post('/api/clients/:id/generate-email-preview', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Client not found' });
     }
     
-    // Extrahiere Rechnungsdaten aus dem Request-Body, falls vorhanden
+    // Extract invoice data from request body if available
     const invoiceData = req.body.invoiceData || null;
     
     // Import emailService dynamically
-    const { generateWelcomeEmailContent } = await import('./src/services/emailService.js');
+    const { generateWelcomeEmailContent, generateClientPortalUrl } = await import('./src/services/emailService.js');
     
-    // Generiere HTML-Inhalt der Email
+    // Generate HTML content of the email for preview
     const html = generateWelcomeEmailContent(client, invoiceData);
+    
+    // Also prepare the data structure that will be sent to Make.com
+    // This helps frontend understand what data will be sent
+    const portalUrl = generateClientPortalUrl(client);
+    
+    const makeData = {
+      client: {
+        id: client._id,
+        name: client.name || '',
+        email: client.email || '',
+        phone: client.phone || '',
+        honorar: client.honorar || '',
+        raten: client.raten || 3,
+        ratenStart: client.ratenStart || '01.01.2025',
+        caseNumber: client.caseNumber || 'Wird in Kürze vergeben'
+      },
+      portalUrl: portalUrl,
+      invoice: invoiceData ? {
+        invoiceNumber: invoiceData.invoiceNumber || '',
+        date: invoiceData.date || new Date().toLocaleDateString('de-DE'),
+        amount: invoiceData.amount || client.honorar || '',
+        dueDate: invoiceData.dueDate || ''
+      } : null,
+      // No attachment data here since we don't want to send the full base64 in the preview
+      hasAttachment: !!(invoiceData && invoiceData.filePath)
+    };
     
     res.status(200).json({
       success: true,
-      html
+      html,
+      makeData
     });
   } catch (error) {
     console.error('Error generating email preview:', error);
