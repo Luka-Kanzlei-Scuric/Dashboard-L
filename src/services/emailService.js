@@ -260,7 +260,23 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
         fileName: fileName,
         fileType: fileType,
         base64Content: invoiceBase64
-      } : null
+      } : null,
+      // Include raw client data for easier debugging
+      rawClient: {
+        _id: client._id,
+        name: client.name,
+        email: client.email,
+        phone: client.phone,
+        honorar: client.honorar,
+        raten: client.raten,
+        ratenStart: client.ratenStart,
+        caseNumber: client.caseNumber,
+        // Include any other potentially useful fields
+        currentPhase: client.currentPhase,
+        emailSent: client.emailSent
+      },
+      // Add timestamp for debugging
+      timestamp: new Date().toISOString()
     };
 
     // Log make data for debugging (without the attachment base64 content)
@@ -334,12 +350,16 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
     if (invoiceBase64) {
       console.log('Attempting last resort method - sending without attachment...');
       try {
-        // Simplified payload without attachment
+        // Still include all required client data, just omit the attachment
         const clientData = {
           id: client._id,
           name: client.name || '',
           email: client.email || '',
-          phone: client.phone || ''
+          phone: client.phone || '',
+          honorar: client.honorar || '',
+          raten: client.raten || 3,
+          ratenStart: client.ratenStart || '01.01.2025',
+          caseNumber: client.caseNumber || 'Wird in Kürze vergeben'
         };
         
         const simplePayload = {
@@ -347,10 +367,24 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
           portalUrl: generateClientPortalUrl(client),
           invoice: invoiceData ? {
             invoiceNumber: invoiceData.invoiceNumber || '',
-            date: invoiceData.date || new Date().toLocaleDateString('de-DE')
+            date: invoiceData.date || new Date().toLocaleDateString('de-DE'),
+            amount: invoiceData.amount || client.honorar || '',
+            dueDate: invoiceData.dueDate || ''
           } : null,
           // Flag that no attachment is included but was intended
-          attachmentOmitted: true 
+          attachmentOmitted: true,
+          // Include raw client data for easier debugging
+          rawClient: {
+            _id: client._id,
+            name: client.name,
+            email: client.email,
+            phone: client.phone,
+            honorar: client.honorar,
+            raten: client.raten,
+            ratenStart: client.ratenStart,
+            caseNumber: client.caseNumber
+          },
+          timestamp: new Date().toISOString()
         };
         
         const response = await axios.post(MAKE_WEBHOOK_URL, simplePayload, {

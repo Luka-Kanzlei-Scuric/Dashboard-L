@@ -267,15 +267,27 @@ app.get('/api/test-make-webhook', async (req, res) => {
     // Define the webhook URL
     const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/pdlivjtccwyrtr0j8u1ovpxz184lqnki';
     
-    // Send a simple test payload
+    // Send a comprehensive test payload with all required fields
     const testPayload = {
       test: true,
       timestamp: new Date().toISOString(),
       message: 'This is a test message from the dashboard backend',
       client: {
         id: 'test-client-id',
-        name: 'Test Client',
-        email: 'test@example.com'
+        name: 'Test Mandant',
+        email: 'test@example.com',
+        phone: '+49 123 4567890',
+        honorar: '1111',
+        raten: 3,
+        ratenStart: '01.01.2025',
+        caseNumber: 'TEST-2025'
+      },
+      portalUrl: 'https://portal.scuric.de/portal/test-client-id',
+      invoice: {
+        invoiceNumber: 'INV-TEST-2025',
+        date: new Date().toLocaleDateString('de-DE'),
+        amount: '1111',
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
       }
     };
     

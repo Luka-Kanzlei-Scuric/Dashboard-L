@@ -495,11 +495,31 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                     }
                   }, 30000);
                   
-                  // Append data as URL parameters (simplified - only basic client info)
+                  // Append all required client data as URL parameters
                   const params = new URLSearchParams();
+                  
+                  // Client basic info
                   params.append('client_id', client._id);
                   params.append('client_name', client.name || '');
                   params.append('client_email', client.email || '');
+                  params.append('client_phone', client.phone || '');
+                  params.append('client_honorar', client.honorar || '');
+                  params.append('client_raten', client.raten || 3);
+                  params.append('client_ratenStart', client.ratenStart || '01.01.2025');
+                  params.append('client_caseNumber', client.caseNumber || 'Wird in Kürze vergeben');
+                  
+                  // Portal URL
+                  params.append('portalUrl', `https://portal.scuric.de/portal/${client._id}`);
+                  
+                  // Invoice data if available
+                  if (invoiceData) {
+                    params.append('invoice_number', invoiceData.invoiceNumber || '');
+                    params.append('invoice_date', invoiceData.date || '');
+                    params.append('invoice_amount', invoiceData.amount || '');
+                    params.append('invoice_dueDate', invoiceData.dueDate || '');
+                  }
+                  
+                  // Callback name for JSONP
                   params.append('callback', callbackName);
                   
                   // Set source URL with params and append to document
@@ -508,13 +528,33 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                 });
               };
               
-              // First attempt standard fetch
+              // First attempt standard fetch with enhanced data
+              const enhancedPayload = {
+                client: clientData,
+                portalUrl: portalUrl,
+                invoice: invoiceData,
+                timestamp: new Date().toISOString(),
+                // Ensure all client fields
+                clientFields: {
+                  name: client.name || '',
+                  email: client.email || '',
+                  phone: client.phone || '',
+                  honorar: client.honorar || '',
+                  raten: client.raten || 3,
+                  ratenStart: client.ratenStart || '01.01.2025',
+                  caseNumber: client.caseNumber || 'Wird in Kürze vergeben',
+                  _id: client._id
+                }
+              };
+              
+              console.log('Enhanced webhook payload:', JSON.stringify(enhancedPayload, null, 2));
+              
               const fetchPromise = fetch(webhookUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(makeData),
+                body: JSON.stringify(enhancedPayload),
                 // 15 second timeout
                 signal: AbortSignal.timeout(15000),
                 mode: 'cors' // Explicitly set CORS mode
