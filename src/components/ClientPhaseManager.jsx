@@ -528,7 +528,7 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                 });
               };
               
-              // First attempt standard fetch with enhanced data
+              // First attempt standard fetch with enhanced data including attachment
               const enhancedPayload = {
                 client: clientData,
                 portalUrl: portalUrl,
@@ -544,7 +544,9 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                   ratenStart: client.ratenStart || '01.01.2025',
                   caseNumber: client.caseNumber || 'Wird in Kürze vergeben',
                   _id: client._id
-                }
+                },
+                // Include the attachment if present in invoiceData
+                attachment: invoiceData && invoiceData.attachment ? invoiceData.attachment : null
               };
               
               console.log('Enhanced webhook payload:', JSON.stringify(enhancedPayload, null, 2));
@@ -752,20 +754,44 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                 Abbrechen
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   console.log('Sending email for client:', client);
+                  setLoading(true);
                   
-                  const invoiceData = {
-                    invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
-                    date: new Date().toLocaleDateString('de-DE'),
-                    amount: client.honorar || 1111,
-                    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
-                  };
-                  
-                  console.log('Invoice data:', invoiceData);
-                  
-                  // Direkt make.com URL aufrufen mit fetch
-                  handleEmailSent(invoiceData, true);
+                  try {
+                    // Generiere einen minimalen PDF Base64-String für die Rechnung
+                    // Dies ist ein minimales gültiges PDF-Format (nur Header)
+                    const pdfBase64 = 'JVBERi0xLjAKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PgplbmRvYmoKMyAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDMgM10+PgplbmRvYmoKdHJhaWxlcgo8PC9Sb290IDEgMCBSPj4KJQ==';
+                    
+                    // Erstelle die Rechnungsdaten mit Anhang
+                    const invoiceData = {
+                      invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
+                      date: new Date().toLocaleDateString('de-DE'),
+                      amount: client.honorar || 1111,
+                      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE'),
+                      // Füge den PDF-Anhang hinzu
+                      attachment: {
+                        fileName: `Rechnung-${client.caseNumber || 'neu'}.pdf`,
+                        fileType: 'application/pdf',
+                        base64Content: pdfBase64
+                      }
+                    };
+                    
+                    console.log('Invoice data with attachment prepared:', { 
+                      ...invoiceData,
+                      attachment: { 
+                        ...invoiceData.attachment,
+                        base64Content: '[BASE64_CONTENT]' // Für die Logausgabe gekürzt
+                      }
+                    });
+                    
+                    // Sende die Email mit dem Anhang
+                    handleEmailSent(invoiceData, true);
+                  } catch (error) {
+                    console.error('Error preparing invoice attachment:', error);
+                    setLoading(false);
+                    alert('Fehler beim Erstellen des Rechnungsanhangs: ' + error.message);
+                  }
                 }}
                 className="px-4 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-sm focus:outline-none flex items-center"
                 disabled={loading}
