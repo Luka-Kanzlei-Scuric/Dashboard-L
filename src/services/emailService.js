@@ -261,9 +261,13 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
     };
 
     // Send data to Make.com webhook
+    console.log('Sending data to Make.com webhook:', MAKE_WEBHOOK_URL);
+    console.log('Data payload:', JSON.stringify(makeData, null, 2));
+    
     const response = await axios.post(MAKE_WEBHOOK_URL, makeData);
     
     console.log('Email data sent to Make.com webhook:', response.status);
+    console.log('Make.com response:', response.data);
     
     return {
       success: true,

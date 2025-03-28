@@ -172,8 +172,8 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
       };
       
-      // Direkte Server-API-URL verwenden
-      const apiBaseUrl = 'http://localhost:5000/api';
+      // Aktuelle API-URL verwenden
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
       
       // Make API request to generate email preview
       const emailPreviewResponse = await fetch(`${apiBaseUrl}/clients/${client._id}/generate-email-preview`, {
@@ -265,21 +265,51 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
   }, [phase2Step]);
   
   // Handle email sent
-  const handleEmailSent = (invoiceData, includesDocumentRequest = false) => {
-    setShowEmailSuccess(true);
-    setShowEmailPreview(false);
+  const handleEmailSent = async (invoiceData, includesDocumentRequest = false) => {
+    setLoading(true);
     
-    // Move to the next phase after email is sent
-    if (currentPhase === 1) {
-      handleNextPhase();
-    } else if (currentPhase === 2 && includesDocumentRequest) {
-      handleNextPhase();
+    try {
+      console.log('Sending invoice email with data:', invoiceData);
+      
+      // Get API base URL for the direct call to send the email
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://dashboard-l-backend.onrender.com/api';
+      
+      // Direct API call to send the email
+      const response = await fetch(`${apiBaseUrl}/clients/${client._id}/email/welcome`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ invoiceData }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Email senden fehlgeschlagen');
+      }
+      
+      const responseData = await response.json();
+      console.log('Email sent successfully:', responseData);
+      
+      setShowEmailSuccess(true);
+      setShowEmailPreview(false);
+      
+      // Move to the next phase after email is sent
+      if (currentPhase === 1) {
+        handleNextPhase();
+      } else if (currentPhase === 2 && includesDocumentRequest) {
+        handleNextPhase();
+      }
+      
+      // Hide success message after 5 seconds
+      setTimeout(() => {
+        setShowEmailSuccess(false);
+      }, 5000);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      alert(`Fehler beim Senden der Email: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
-    
-    // Hide success message after 5 seconds
-    setTimeout(() => {
-      setShowEmailSuccess(false);
-    }, 5000);
   };
   
   // Handle document request
@@ -400,12 +430,18 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
               </button>
               <button
                 onClick={() => {
+                  console.log('Sending email for client:', client);
+                  
                   const invoiceData = {
                     invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
                     date: new Date().toLocaleDateString('de-DE'),
                     amount: client.honorar || 1111,
                     dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
                   };
+                  
+                  console.log('Invoice data:', invoiceData);
+                  
+                  // Direkt make.com URL aufrufen mit fetch
                   handleEmailSent(invoiceData, true);
                 }}
                 className="px-4 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-sm focus:outline-none flex items-center"
