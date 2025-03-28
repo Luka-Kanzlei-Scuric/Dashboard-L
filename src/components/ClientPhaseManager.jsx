@@ -309,66 +309,123 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     setShowAllPhases(!showAllPhases);
   };
   
-  // Email Preview Modal Component
+  // Email Preview Modal Component - Apple-Design
   const renderEmailPreviewModal = () => {
     if (!showEmailPreview || !emailPreviewContent) return null;
     
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-        <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full h-full max-h-[90vh] flex flex-col">
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-800">Email-Vorschau (Vollständige HTML-Version)</h2>
+      <div className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center p-4 overflow-y-auto backdrop-blur-sm">
+        <div className="bg-white bg-opacity-95 rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col overflow-hidden" style={{border: '1px solid rgba(0,0,0,0.1)'}}>
+          {/* Apple-style header with traffic lights */}
+          <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gradient-to-b from-gray-50 to-white">
+            <div className="flex space-x-2 ml-2">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            </div>
+            <h2 className="text-sm font-medium text-gray-700">Email an {client.name}</h2>
             <button 
               onClick={() => setShowEmailPreview(false)}
-              className="p-1 rounded-full hover:bg-gray-100"
+              className="p-1 rounded-full hover:bg-gray-100 focus:outline-none"
               aria-label="Schließen"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
           
-          <div className="flex-1 overflow-auto p-1 bg-gray-100">
-            <div className="bg-white rounded border shadow-sm">
+          {/* Safari-style toolbar */}
+          <div className="bg-gray-50 p-2 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex space-x-2">
+              <button className="p-1 rounded text-gray-500 hover:bg-gray-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button className="p-1 rounded text-gray-500 hover:bg-gray-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 mx-4">
+              <div className="w-full h-7 bg-white rounded-md border border-gray-200 flex items-center px-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-gray-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-xs text-gray-500 truncate">mandantenportal.scuric.de</span>
+              </div>
+            </div>
+            <div>
+              <button className="p-1 rounded text-gray-500 hover:bg-gray-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-auto p-0 bg-white">
+            <div className="bg-white h-full">
               <iframe 
                 srcDoc={emailPreviewContent}
                 title="Email Vorschau" 
-                className="w-full h-full min-h-[60vh]"
+                className="w-full h-full min-h-[400px] max-h-[50vh]"
                 sandbox="allow-same-origin"
+                style={{border: 'none'}}
               />
             </div>
           </div>
           
-          <div className="p-4 border-t border-gray-200 flex justify-end space-x-3">
-            <button
-              onClick={() => setShowEmailPreview(false)}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
-            >
-              Abbrechen
-            </button>
-            <button
-              onClick={() => {
-                const invoiceData = {
-                  invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
-                  date: new Date().toLocaleDateString('de-DE'),
-                  amount: client.honorar || 1111,
-                  dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
-                };
-                handleEmailSent(invoiceData, true);
-              }}
-              className="px-4 py-2 text-white bg-green-600 hover:bg-green-700 rounded"
-              disabled={loading}
-            >
-              {loading ? (
-                <span className="flex items-center">
-                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
-                  Wird gesendet...
-                </span>
-              ) : (
-                'Email jetzt senden'
-              )}
-            </button>
+          <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-xs text-gray-600">Diese Email wird an <span className="font-medium">{client.email}</span> gesendet.</p>
+                <p className="text-xs text-gray-400">Die Rechnung wird automatisch angehängt.</p>
+              </div>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowEmailPreview(false)}
+                className="px-3 py-1.5 text-xs text-gray-700 bg-white border border-gray-300 rounded-full shadow-sm hover:bg-gray-50 focus:outline-none"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={() => {
+                  const invoiceData = {
+                    invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
+                    date: new Date().toLocaleDateString('de-DE'),
+                    amount: client.honorar || 1111,
+                    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
+                  };
+                  handleEmailSent(invoiceData, true);
+                }}
+                className="px-4 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-sm focus:outline-none flex items-center"
+                disabled={loading}
+              >
+                {loading ? (
+                  <span className="flex items-center">
+                    <ArrowPathIcon className="h-3 w-3 mr-1.5 animate-spin" />
+                    Wird gesendet...
+                  </span>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                    </svg>
+                    Email jetzt senden
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
