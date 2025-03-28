@@ -521,6 +521,9 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                     // Füge die Rechnungs-URL hinzu, wenn vorhanden
                     if (invoiceData.invoiceURL) {
                       params.append('invoice_url', invoiceData.invoiceURL);
+                      params.append('invoice_fileName', invoiceData.fileName || '');
+                      params.append('invoice_fileSize', invoiceData.fileSize || '');
+                      params.append('invoice_mimeType', invoiceData.mimeType || 'application/pdf');
                     }
                   }
                   
@@ -550,8 +553,14 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                   caseNumber: client.caseNumber || 'Wird in Kürze vergeben',
                   _id: client._id
                 },
-                // Include the invoice URL if present in invoiceData
-                invoiceURL: invoiceData && invoiceData.invoiceURL ? invoiceData.invoiceURL : null
+                // Include the PDF invoice URL and metadata if present
+                invoiceURL: invoiceData && invoiceData.invoiceURL ? invoiceData.invoiceURL : null,
+                // Include file metadata if available
+                invoiceFile: invoiceData ? {
+                  fileName: invoiceData.fileName || '',
+                  fileSize: invoiceData.fileSize || '',
+                  mimeType: invoiceData.mimeType || 'application/pdf'
+                } : null
               };
               
               console.log('Enhanced webhook payload:', JSON.stringify(enhancedPayload, null, 2));
@@ -764,32 +773,43 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                   setLoading(true);
                   
                   try {
-                    // Generiere eine eindeutige Rechnungsnummer
-                    const invoiceNumber = client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`;
+                    // Prüfe ob wir die aktuelle Rechnung des Mandanten haben
+                    if (!client.currentInvoice) {
+                      throw new Error('Keine Rechnung hochgeladen. Bitte laden Sie zuerst eine Rechnung hoch.');
+                    }
                     
-                    // Erstelle eine sichere URL für die Rechnung
-                    // Format: /rechnung/[client-id]/[rechnungsnummer]/[sicherheitstoken]
-                    const securityToken = btoa(`${client._id}-${new Date().getTime()}`).replace(/[=+\/]/g, '');
-                    const invoiceURL = `https://portal.scuric.de/rechnung/${client._id}/${invoiceNumber}/${securityToken}`;
+                    // API-Basis-URL für öffentliche Dateien
+                    const apiBaseUrl = 'https://dashboard-l-backend.onrender.com';
+                    
+                    // Erstelle die öffentliche URL zur PDF-Datei
+                    // Das Format sollte mit dem Backend-Server übereinstimmen
+                    // Typischerweise: /uploads/clients/{clientId}/{filename}
+                    const pdfUrl = `${apiBaseUrl}/uploads/clients/${client._id}/${client.currentInvoice.filename}`;
+                    
+                    console.log('PDF URL for invoice:', pdfUrl);
                     
                     // Erstelle die Rechnungsdaten mit URL
                     const invoiceData = {
-                      invoiceNumber: invoiceNumber,
+                      invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
                       date: new Date().toLocaleDateString('de-DE'),
                       amount: client.honorar || 1111,
                       dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE'),
-                      // Statt eines Anhangs, eine URL zur Online-Rechnung hinzufügen
-                      invoiceURL: invoiceURL
+                      // URL zur tatsächlichen PDF-Datei
+                      invoiceURL: pdfUrl,
+                      // Metadaten zur Datei
+                      fileName: client.currentInvoice.originalFilename,
+                      fileSize: client.currentInvoice.size,
+                      mimeType: client.currentInvoice.mimetype
                     };
                     
-                    console.log('Invoice data with URL prepared:', invoiceData);
+                    console.log('Invoice data with real PDF URL prepared:', invoiceData);
                     
-                    // Sende die Email mit der Rechnungs-URL
+                    // Sende die Email mit der PDF-URL
                     handleEmailSent(invoiceData, true);
                   } catch (error) {
-                    console.error('Error preparing invoice URL:', error);
+                    console.error('Error preparing invoice PDF URL:', error);
                     setLoading(false);
-                    alert('Fehler beim Erstellen der Rechnungs-URL: ' + error.message);
+                    alert(error.message);
                   }
                 }}
                 className="px-4 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-sm focus:outline-none flex items-center"

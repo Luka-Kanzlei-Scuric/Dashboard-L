@@ -251,18 +251,29 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
     // Create portal URL for the client
     const portalUrl = generateClientPortalUrl(client);
 
-    // Erstelle URL für Rechnungsansicht, falls nicht bereits vorhanden
+    // Verwende die tatsächliche hochgeladene PDF-URL, falls vorhanden
     let invoiceURL = null;
-    if (invoiceDetails && !invoiceData?.invoiceURL) {
-      // Sicherheitstoken generieren
+    let invoiceFileInfo = null;
+    
+    if (invoiceData?.invoiceURL) {
+      // Verwende direkt die hochgeladene PDF-URL
+      invoiceURL = invoiceData.invoiceURL;
+      
+      // Erfasse Dateiinformationen falls vorhanden
+      if (invoiceData.fileName || invoiceData.fileSize || invoiceData.mimeType) {
+        invoiceFileInfo = {
+          fileName: invoiceData.fileName || 'Rechnung.pdf',
+          fileSize: invoiceData.fileSize || '',
+          mimeType: invoiceData.mimeType || 'application/pdf'
+        };
+      }
+    } else if (invoiceDetails) {
+      // Fallback: Generiere eine sichere URL, falls keine hochgeladene PDF vorhanden ist
       const securityToken = Buffer.from(`${client._id}-${new Date().getTime()}`).toString('base64')
         .replace(/[=+/]/g, '');
       
       // URL erstellen
       invoiceURL = `https://portal.scuric.de/rechnung/${client._id}/${invoiceDetails.invoiceNumber}/${securityToken}`;
-    } else if (invoiceData?.invoiceURL) {
-      // Vorhandene URL verwenden wenn verfügbar
-      invoiceURL = invoiceData.invoiceURL;
     }
     
     // Create data payload for Make.com
@@ -270,7 +281,7 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
       client: clientData,
       portalUrl: portalUrl,
       invoice: invoiceDetails,
-      // Füge Anhang nur hinzu, wenn explizit gewünscht und vorhanden
+      // Füge Anhang nur hinzu, wenn explizit gewünscht und vorhanden UND keine URL gesetzt ist
       attachment: invoiceBase64 && !invoiceURL ? {
         fileName: fileName,
         fileType: fileType,
@@ -278,6 +289,8 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
       } : null,
       // Füge Rechnungs-URL hinzu
       invoiceURL: invoiceURL,
+      // Füge Dateiinformationen hinzu, falls vorhanden
+      invoiceFile: invoiceFileInfo,
       // Include raw client data for easier debugging
       rawClient: {
         _id: client._id,
@@ -387,17 +400,27 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
           dueDate: invoiceData.dueDate || ''
         } : null;
         
-        // Erstelle eine sichere Rechnungs-URL
+        // Verwende tatsächliche PDF-URL falls vorhanden
         let invoiceURL = null;
-        if (invoiceDetails) {
-          // Nutze die vorhandene URL oder erstelle eine neue
-          if (invoiceData.invoiceURL) {
-            invoiceURL = invoiceData.invoiceURL;
-          } else {
-            const securityToken = Buffer.from(`${client._id}-${new Date().getTime()}`).toString('base64')
-              .replace(/[=+/]/g, '');
-            invoiceURL = `https://portal.scuric.de/rechnung/${client._id}/${invoiceDetails.invoiceNumber}/${securityToken}`;
+        let invoiceFileInfo = null;
+        
+        if (invoiceData?.invoiceURL) {
+          // Verwende die vorhandene URL
+          invoiceURL = invoiceData.invoiceURL;
+          
+          // Einbeziehen von Dateiinformationen falls vorhanden
+          if (invoiceData.fileName || invoiceData.fileSize || invoiceData.mimeType) {
+            invoiceFileInfo = {
+              fileName: invoiceData.fileName || 'Rechnung.pdf',
+              fileSize: invoiceData.fileSize || '',
+              mimeType: invoiceData.mimeType || 'application/pdf'
+            };
           }
+        } else if (invoiceDetails) {
+          // Fallback: Generiere eine sichere URL
+          const securityToken = Buffer.from(`${client._id}-${new Date().getTime()}`).toString('base64')
+            .replace(/[=+/]/g, '');
+          invoiceURL = `https://portal.scuric.de/rechnung/${client._id}/${invoiceDetails.invoiceNumber}/${securityToken}`;
         }
         
         const simplePayload = {
@@ -406,6 +429,8 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
           invoice: invoiceDetails,
           // Füge die Rechnungs-URL hinzu
           invoiceURL: invoiceURL,
+          // Füge Dateiinformationen hinzu, falls vorhanden
+          invoiceFile: invoiceFileInfo,
           // Flag that no attachment is included but was intended
           attachmentOmitted: true,
           // Include raw client data for easier debugging

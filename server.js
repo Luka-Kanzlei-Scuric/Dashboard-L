@@ -289,8 +289,14 @@ app.get('/api/test-make-webhook', async (req, res) => {
         amount: '1111',
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
       },
-      // Add invoice URL - will be used instead of attachment
-      invoiceURL: 'https://portal.scuric.de/rechnung/test-client-id/INV-TEST-2025/security-token'
+      // Add real PDF URL - will be used to link to the actual invoice
+      invoiceURL: 'https://dashboard-l-backend.onrender.com/uploads/clients/test-client-id/invoice-test.pdf',
+      // Include file metadata
+      invoiceFile: {
+        fileName: 'Rechnung-TEST-2025.pdf',
+        fileSize: '125000',
+        mimeType: 'application/pdf'
+      }
     };
     
     // Send the request
