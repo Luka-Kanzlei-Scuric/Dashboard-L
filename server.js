@@ -267,7 +267,7 @@ app.get('/api/test-make-webhook', async (req, res) => {
     // Define the webhook URL
     const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/pdlivjtccwyrtr0j8u1ovpxz184lqnki';
     
-    // Send a comprehensive test payload with all required fields
+    // Send a comprehensive test payload with all required fields including invoice URL
     const testPayload = {
       test: true,
       timestamp: new Date().toISOString(),
@@ -288,7 +288,9 @@ app.get('/api/test-make-webhook', async (req, res) => {
         date: new Date().toLocaleDateString('de-DE'),
         amount: '1111',
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE')
-      }
+      },
+      // Add invoice URL - will be used instead of attachment
+      invoiceURL: 'https://portal.scuric.de/rechnung/test-client-id/INV-TEST-2025/security-token'
     };
     
     // Send the request

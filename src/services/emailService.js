@@ -251,16 +251,33 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
     // Create portal URL for the client
     const portalUrl = generateClientPortalUrl(client);
 
+    // Erstelle URL für Rechnungsansicht, falls nicht bereits vorhanden
+    let invoiceURL = null;
+    if (invoiceDetails && !invoiceData?.invoiceURL) {
+      // Sicherheitstoken generieren
+      const securityToken = Buffer.from(`${client._id}-${new Date().getTime()}`).toString('base64')
+        .replace(/[=+/]/g, '');
+      
+      // URL erstellen
+      invoiceURL = `https://portal.scuric.de/rechnung/${client._id}/${invoiceDetails.invoiceNumber}/${securityToken}`;
+    } else if (invoiceData?.invoiceURL) {
+      // Vorhandene URL verwenden wenn verfügbar
+      invoiceURL = invoiceData.invoiceURL;
+    }
+    
     // Create data payload for Make.com
     const makeData = {
       client: clientData,
       portalUrl: portalUrl,
       invoice: invoiceDetails,
-      attachment: invoiceBase64 ? {
+      // Füge Anhang nur hinzu, wenn explizit gewünscht und vorhanden
+      attachment: invoiceBase64 && !invoiceURL ? {
         fileName: fileName,
         fileType: fileType,
         base64Content: invoiceBase64
       } : null,
+      // Füge Rechnungs-URL hinzu
+      invoiceURL: invoiceURL,
       // Include raw client data for easier debugging
       rawClient: {
         _id: client._id,
@@ -362,15 +379,33 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
           caseNumber: client.caseNumber || 'Wird in Kürze vergeben'
         };
         
+        // Generiere eine Rechnungs-URL als Alternative zum Anhang
+        const invoiceDetails = invoiceData ? {
+          invoiceNumber: invoiceData.invoiceNumber || '',
+          date: invoiceData.date || new Date().toLocaleDateString('de-DE'),
+          amount: invoiceData.amount || client.honorar || '',
+          dueDate: invoiceData.dueDate || ''
+        } : null;
+        
+        // Erstelle eine sichere Rechnungs-URL
+        let invoiceURL = null;
+        if (invoiceDetails) {
+          // Nutze die vorhandene URL oder erstelle eine neue
+          if (invoiceData.invoiceURL) {
+            invoiceURL = invoiceData.invoiceURL;
+          } else {
+            const securityToken = Buffer.from(`${client._id}-${new Date().getTime()}`).toString('base64')
+              .replace(/[=+/]/g, '');
+            invoiceURL = `https://portal.scuric.de/rechnung/${client._id}/${invoiceDetails.invoiceNumber}/${securityToken}`;
+          }
+        }
+        
         const simplePayload = {
           client: clientData,
           portalUrl: generateClientPortalUrl(client),
-          invoice: invoiceData ? {
-            invoiceNumber: invoiceData.invoiceNumber || '',
-            date: invoiceData.date || new Date().toLocaleDateString('de-DE'),
-            amount: invoiceData.amount || client.honorar || '',
-            dueDate: invoiceData.dueDate || ''
-          } : null,
+          invoice: invoiceDetails,
+          // Füge die Rechnungs-URL hinzu
+          invoiceURL: invoiceURL,
           // Flag that no attachment is included but was intended
           attachmentOmitted: true,
           // Include raw client data for easier debugging

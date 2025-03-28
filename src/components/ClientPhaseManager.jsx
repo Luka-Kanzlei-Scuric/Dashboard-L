@@ -517,6 +517,11 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                     params.append('invoice_date', invoiceData.date || '');
                     params.append('invoice_amount', invoiceData.amount || '');
                     params.append('invoice_dueDate', invoiceData.dueDate || '');
+                    
+                    // Füge die Rechnungs-URL hinzu, wenn vorhanden
+                    if (invoiceData.invoiceURL) {
+                      params.append('invoice_url', invoiceData.invoiceURL);
+                    }
                   }
                   
                   // Callback name for JSONP
@@ -528,7 +533,7 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                 });
               };
               
-              // First attempt standard fetch with enhanced data including attachment
+              // First attempt standard fetch with enhanced data including invoice URL
               const enhancedPayload = {
                 client: clientData,
                 portalUrl: portalUrl,
@@ -545,8 +550,8 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                   caseNumber: client.caseNumber || 'Wird in Kürze vergeben',
                   _id: client._id
                 },
-                // Include the attachment if present in invoiceData
-                attachment: invoiceData && invoiceData.attachment ? invoiceData.attachment : null
+                // Include the invoice URL if present in invoiceData
+                invoiceURL: invoiceData && invoiceData.invoiceURL ? invoiceData.invoiceURL : null
               };
               
               console.log('Enhanced webhook payload:', JSON.stringify(enhancedPayload, null, 2));
@@ -759,38 +764,32 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                   setLoading(true);
                   
                   try {
-                    // Generiere einen minimalen PDF Base64-String für die Rechnung
-                    // Dies ist ein minimales gültiges PDF-Format (nur Header)
-                    const pdfBase64 = 'JVBERi0xLjAKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PgplbmRvYmoKMyAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDMgM10+PgplbmRvYmoKdHJhaWxlcgo8PC9Sb290IDEgMCBSPj4KJQ==';
+                    // Generiere eine eindeutige Rechnungsnummer
+                    const invoiceNumber = client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`;
                     
-                    // Erstelle die Rechnungsdaten mit Anhang
+                    // Erstelle eine sichere URL für die Rechnung
+                    // Format: /rechnung/[client-id]/[rechnungsnummer]/[sicherheitstoken]
+                    const securityToken = btoa(`${client._id}-${new Date().getTime()}`).replace(/[=+\/]/g, '');
+                    const invoiceURL = `https://portal.scuric.de/rechnung/${client._id}/${invoiceNumber}/${securityToken}`;
+                    
+                    // Erstelle die Rechnungsdaten mit URL
                     const invoiceData = {
-                      invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
+                      invoiceNumber: invoiceNumber,
                       date: new Date().toLocaleDateString('de-DE'),
                       amount: client.honorar || 1111,
                       dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE'),
-                      // Füge den PDF-Anhang hinzu
-                      attachment: {
-                        fileName: `Rechnung-${client.caseNumber || 'neu'}.pdf`,
-                        fileType: 'application/pdf',
-                        base64Content: pdfBase64
-                      }
+                      // Statt eines Anhangs, eine URL zur Online-Rechnung hinzufügen
+                      invoiceURL: invoiceURL
                     };
                     
-                    console.log('Invoice data with attachment prepared:', { 
-                      ...invoiceData,
-                      attachment: { 
-                        ...invoiceData.attachment,
-                        base64Content: '[BASE64_CONTENT]' // Für die Logausgabe gekürzt
-                      }
-                    });
+                    console.log('Invoice data with URL prepared:', invoiceData);
                     
-                    // Sende die Email mit dem Anhang
+                    // Sende die Email mit der Rechnungs-URL
                     handleEmailSent(invoiceData, true);
                   } catch (error) {
-                    console.error('Error preparing invoice attachment:', error);
+                    console.error('Error preparing invoice URL:', error);
                     setLoading(false);
-                    alert('Fehler beim Erstellen des Rechnungsanhangs: ' + error.message);
+                    alert('Fehler beim Erstellen der Rechnungs-URL: ' + error.message);
                   }
                 }}
                 className="px-4 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-sm focus:outline-none flex items-center"
