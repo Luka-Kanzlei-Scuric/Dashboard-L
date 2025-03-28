@@ -9,9 +9,19 @@ import Client from './src/models/Client.js';
 dotenv.config();
 const app = express();
 
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+// Middleware with enhanced CORS configuration
+app.use(cors({
+  origin: ['https://dashboard.scuric.de', 'https://portal.scuric.de', 'http://localhost:3000', 'http://localhost:5173'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400 // 24 hours
+}));
+
+// Also handle OPTIONS requests for CORS preflight
+app.options('*', cors());
+
+app.use(express.json({ limit: '50mb' })); // Increased limit for larger attachments
 
 // Connect to MongoDB
 connectDB();
@@ -246,6 +256,55 @@ app.get('/api/webhook/dashboard-to-clickup', (req, res) => {
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Test make.com webhook endpoint
+app.get('/api/test-make-webhook', async (req, res) => {
+  try {
+    // Import axios if needed
+    const axios = (await import('axios')).default;
+    
+    // Define the webhook URL
+    const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/pdlivjtccwyrtr0j8u1ovpxz184lqnki';
+    
+    // Send a simple test payload
+    const testPayload = {
+      test: true,
+      timestamp: new Date().toISOString(),
+      message: 'This is a test message from the dashboard backend',
+      client: {
+        id: 'test-client-id',
+        name: 'Test Client',
+        email: 'test@example.com'
+      }
+    };
+    
+    // Send the request
+    console.log('Sending test request to make.com webhook:', MAKE_WEBHOOK_URL);
+    const response = await axios.post(MAKE_WEBHOOK_URL, testPayload, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000
+    });
+    
+    console.log('Make.com webhook test response:', response.status, response.data);
+    
+    // Return success to client
+    res.status(200).json({
+      success: true,
+      message: 'Test message successfully sent to make.com webhook',
+      webhookResponse: response.data
+    });
+  } catch (error) {
+    console.error('Error testing make.com webhook:', error);
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error testing make.com webhook',
+      error: error.message
+    });
+  }
 });
 
 // Email routes - Send welcome email data to Make.com

@@ -382,73 +382,211 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
         hasAttachment: false
       };
       
-      console.log('Preparing data for make.com webhook:', makeData);
+      console.log('Client ID for email sending:', client._id);
+      console.log('Preparing data for make.com webhook:', JSON.stringify(makeData, null, 2));
       
-      // Try both API methods for redundancy
+      // Track whether any method was successful
+      let isSuccessful = false;
+      let errorMessage = '';
       
-      // Method 1: Through our backend
+      // Method 1: Through our backend API (preferred method)
       try {
-        const apiBaseUrl = 'https://dashboard-l-backend.onrender.com/api';
-        const response = await fetch(`${apiBaseUrl}/clients/${client._id}/email/welcome`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ invoiceData }),
-        });
+        console.log('Trying backend API method...');
+        // Use different API URLs for development/production
+        const apiUrls = [
+          'https://dashboard-l-backend.onrender.com/api', // Production
+          'http://localhost:5000/api',                    // Local development
+          '/api'                                          // Relative path
+        ];
         
-        if (response.ok) {
-          const responseData = await response.json();
-          console.log('Email sent successfully through backend:', responseData);
-        } else {
-          console.warn('Backend email sending failed, trying direct webhook...');
-          throw new Error('Backend route failed');
+        // Try each API URL in sequence
+        for (const apiBaseUrl of apiUrls) {
+          try {
+            console.log(`Attempting with API base URL: ${apiBaseUrl}`);
+            
+            const response = await fetch(`${apiBaseUrl}/clients/${client._id}/email/welcome`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ invoiceData }),
+              // 10 second timeout per attempt
+              signal: AbortSignal.timeout(10000)
+            });
+            
+            if (response.ok) {
+              const responseData = await response.json();
+              console.log('Email sent successfully through backend:', responseData);
+              isSuccessful = true;
+              break; // Exit the loop since we succeeded
+            } else {
+              console.warn(`Backend email sending failed with status ${response.status} at ${apiBaseUrl}`);
+              // Continue to the next URL
+            }
+          } catch (urlError) {
+            console.warn(`Error with API URL ${apiBaseUrl}:`, urlError);
+            // Continue to the next URL
+          }
+        }
+        
+        if (!isSuccessful) {
+          throw new Error('All backend API endpoints failed');
         }
       } catch (backendError) {
-        console.warn('Backend email sending error:', backendError);
+        console.warn('All backend email sending attempts failed:', backendError);
+        errorMessage = backendError.message;
         
         // Method 2: Direct webhook call as fallback
         try {
-          console.log('Trying direct make.com webhook call...');
+          console.log('Trying direct make.com webhook call as fallback...');
           
-          // Direct webhook URL
-          const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/pdlivjtccwyrtr0j8u1ovpxz184lqnki';
+          // Define webhook URLs (with primary URL first)
+          const webhookUrls = [
+            'https://hook.eu2.make.com/pdlivjtccwyrtr0j8u1ovpxz184lqnki', // Primary
+            'https://hook.eu1.make.com/pdlivjtccwyrtr0j8u1ovpxz184lqnki', // Fallback URL if the primary region is having issues
+          ];
           
-          const webhookResponse = await fetch(MAKE_WEBHOOK_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(makeData),
-          });
+          // Flag to track whether any webhook call succeeded
+          let webhookSuccess = false;
           
-          if (!webhookResponse.ok) {
-            throw new Error('Direct webhook call failed');
+          // Try each webhook URL
+          for (const webhookUrl of webhookUrls) {
+            try {
+              console.log(`Attempting webhook at: ${webhookUrl}`);
+              
+              // Set up JSONP approach as fallback for CORS issues
+              const useJsonp = () => {
+                return new Promise((resolve, reject) => {
+                  // Create a unique callback name
+                  const callbackName = `makeWebhookCallback_${Date.now()}`;
+                  
+                  // Create script element
+                  const script = document.createElement('script');
+                  
+                  // Set global callback
+                  window[callbackName] = (response) => {
+                    // Clean up
+                    document.body.removeChild(script);
+                    delete window[callbackName];
+                    
+                    // Resolve with response
+                    resolve(response);
+                  };
+                  
+                  // Handle errors
+                  script.onerror = (error) => {
+                    // Clean up
+                    document.body.removeChild(script);
+                    delete window[callbackName];
+                    
+                    // Reject with error
+                    reject(new Error('JSONP request failed'));
+                  };
+                  
+                  // Set timeout
+                  const timeoutId = setTimeout(() => {
+                    if (window[callbackName]) {
+                      // Clean up
+                      document.body.removeChild(script);
+                      delete window[callbackName];
+                      
+                      // Reject with timeout error
+                      reject(new Error('JSONP request timed out'));
+                    }
+                  }, 30000);
+                  
+                  // Append data as URL parameters (simplified - only basic client info)
+                  const params = new URLSearchParams();
+                  params.append('client_id', client._id);
+                  params.append('client_name', client.name || '');
+                  params.append('client_email', client.email || '');
+                  params.append('callback', callbackName);
+                  
+                  // Set source URL with params and append to document
+                  script.src = `${webhookUrl}?${params.toString()}`;
+                  document.body.appendChild(script);
+                });
+              };
+              
+              // First attempt standard fetch
+              const fetchPromise = fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(makeData),
+                // 15 second timeout
+                signal: AbortSignal.timeout(15000),
+                mode: 'cors' // Explicitly set CORS mode
+              });
+              
+              // Race fetch against a timeout
+              const webhookResponse = await fetchPromise;
+              
+              if (!webhookResponse.ok) {
+                console.warn(`Webhook call status not OK: ${webhookResponse.status}`);
+                throw new Error(`Webhook returned status ${webhookResponse.status}`);
+              }
+              
+              let webhookData;
+              try {
+                webhookData = await webhookResponse.json();
+              } catch (e) {
+                // If we can't parse JSON, assume success with empty response
+                webhookData = {};
+              }
+              
+              console.log('Email sent successfully via direct webhook:', webhookData);
+              webhookSuccess = true;
+              break; // Exit loop on success
+            } catch (specificWebhookError) {
+              console.warn(`Error with webhook URL ${webhookUrl}:`, specificWebhookError);
+              
+              // If fetch fails, try JSONP as last resort
+              if (webhookUrl === webhookUrls[webhookUrls.length - 1]) {
+                try {
+                  console.log('Attempting JSONP as final fallback method...');
+                  const jsonpResult = await useJsonp();
+                  console.log('JSONP webhook call succeeded:', jsonpResult);
+                  webhookSuccess = true;
+                } catch (jsonpError) {
+                  console.error('JSONP fallback also failed:', jsonpError);
+                }
+              }
+            }
           }
           
-          const webhookData = await webhookResponse.json();
-          console.log('Email sent successfully via direct webhook:', webhookData);
+          if (!webhookSuccess) {
+            throw new Error('All direct webhook calls failed');
+          } else {
+            isSuccessful = true;
+          }
         } catch (webhookError) {
-          console.error('Direct webhook also failed:', webhookError);
-          throw new Error('Alle Versuche, die Email zu senden, sind fehlgeschlagen');
+          console.error('Direct webhook approach failed:', webhookError);
+          errorMessage = `${errorMessage}. ${webhookError.message}`;
         }
       }
       
-      // If we get here, at least one method succeeded
-      setShowEmailSuccess(true);
-      setShowEmailPreview(false);
-      
-      // Move to the next phase after email is sent
-      if (currentPhase === 1) {
-        handleNextPhase();
-      } else if (currentPhase === 2 && includesDocumentRequest) {
-        handleNextPhase();
+      if (isSuccessful) {
+        // At least one method succeeded
+        setShowEmailSuccess(true);
+        setShowEmailPreview(false);
+        
+        // Move to the next phase after email is sent
+        if (currentPhase === 1) {
+          handleNextPhase();
+        } else if (currentPhase === 2 && includesDocumentRequest) {
+          handleNextPhase();
+        }
+        
+        // Hide success message after 5 seconds
+        setTimeout(() => {
+          setShowEmailSuccess(false);
+        }, 5000);
+      } else {
+        // All methods failed
+        throw new Error(`Alle Versuche, die Email zu senden, sind fehlgeschlagen: ${errorMessage}`);
       }
-      
-      // Hide success message after 5 seconds
-      setTimeout(() => {
-        setShowEmailSuccess(false);
-      }, 5000);
     } catch (error) {
       console.error('Error sending email:', error);
       alert(`Fehler beim Senden der Email: ${error.message}`);

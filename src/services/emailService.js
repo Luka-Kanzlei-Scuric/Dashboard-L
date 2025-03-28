@@ -186,6 +186,9 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
     let fileName = null;
     let fileType = null;
 
+    // Log Client ID for debugging
+    console.log('Client ID for webhook call:', client._id);
+
     if (invoiceData && invoiceData.filePath) {
       try {
         const fs = await import('fs/promises');
@@ -260,22 +263,115 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
       } : null
     };
 
-    // Send data to Make.com webhook
-    console.log('Sending data to Make.com webhook:', MAKE_WEBHOOK_URL);
-    console.log('Data payload:', JSON.stringify(makeData, null, 2));
+    // Log make data for debugging (without the attachment base64 content)
+    const logData = {...makeData};
+    if (logData.attachment && logData.attachment.base64Content) {
+      logData.attachment.base64Content = '[BASE64_CONTENT]';
+    }
+    console.log('Webhook URL:', MAKE_WEBHOOK_URL);
+    console.log('Data payload (sanitized):', JSON.stringify(logData, null, 2));
     
-    const response = await axios.post(MAKE_WEBHOOK_URL, makeData);
-    
-    console.log('Email data sent to Make.com webhook:', response.status);
-    console.log('Make.com response:', response.data);
-    
-    return {
-      success: true,
-      makeResponse: response.data,
-      sentTo: client.email
-    };
+    // Custom error handling for different scenarios
+    try {
+      // Try to send data with axios 
+      const response = await axios.post(MAKE_WEBHOOK_URL, makeData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 20000 // 20 second timeout
+      });
+      
+      console.log('Email data sent to Make.com webhook:', response.status);
+      console.log('Make.com response:', response.data);
+      
+      return {
+        success: true,
+        makeResponse: response.data,
+        sentTo: client.email
+      };
+    } catch (axiosError) {
+      console.error('Axios webhook call failed:', axiosError.message);
+      
+      // Try with fetch as a fallback (works in browser and Node.js environments)
+      console.log('Trying with fetch API as fallback...');
+      try {
+        // Use global fetch or import it if needed
+        const fetchModule = typeof fetch === 'undefined' ? await import('node-fetch') : null;
+        const fetchFunction = fetchModule ? fetchModule.default : fetch;
+        
+        const fetchResponse = await fetchFunction(MAKE_WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(makeData)
+        });
+        
+        if (!fetchResponse.ok) {
+          throw new Error(`HTTP error with fetch! Status: ${fetchResponse.status}`);
+        }
+        
+        const responseData = await fetchResponse.json();
+        console.log('Fetch webhook call succeeded:', responseData);
+        
+        return {
+          success: true,
+          makeResponse: responseData,
+          sentTo: client.email,
+          method: 'fetch'
+        };
+      } catch (fetchError) {
+        console.error('Fetch webhook call also failed:', fetchError.message);
+        throw new Error(`Failed to send email data using both axios and fetch: ${fetchError.message}`);
+      }
+    }
   } catch (error) {
     console.error('Error sending data to Make.com webhook:', error);
+    
+    // Try last resort method - send without attachments if appropriate
+    if (invoiceBase64) {
+      console.log('Attempting last resort method - sending without attachment...');
+      try {
+        // Simplified payload without attachment
+        const clientData = {
+          id: client._id,
+          name: client.name || '',
+          email: client.email || '',
+          phone: client.phone || ''
+        };
+        
+        const simplePayload = {
+          client: clientData,
+          portalUrl: generateClientPortalUrl(client),
+          invoice: invoiceData ? {
+            invoiceNumber: invoiceData.invoiceNumber || '',
+            date: invoiceData.date || new Date().toLocaleDateString('de-DE')
+          } : null,
+          // Flag that no attachment is included but was intended
+          attachmentOmitted: true 
+        };
+        
+        const response = await axios.post(MAKE_WEBHOOK_URL, simplePayload, {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log('Last resort email succeeded:', response.status);
+        return {
+          success: true,
+          makeResponse: response.data,
+          sentTo: client.email,
+          attachmentOmitted: true,
+          warning: 'Email sent without attachment due to technical limitations'
+        };
+      } catch (lastResortError) {
+        console.error('Last resort method also failed:', lastResortError);
+      }
+    }
+    
     return {
       success: false,
       error: error.message
