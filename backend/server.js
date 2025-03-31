@@ -411,6 +411,60 @@ app.get('/api/health', cors(corsOptions), (req, res) => {
 
 // Client Portal API Endpoints
 
+// Verify client access by case number
+app.post('/api/clients/verify-access', async (req, res) => {
+  try {
+    const { clientId, caseNumber } = req.body;
+    
+    if (!clientId || !caseNumber) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Client ID and case number are required' 
+      });
+    }
+    
+    // Find the client by ID
+    const client = await Client.findById(clientId);
+    
+    if (!client) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Client not found' 
+      });
+    }
+    
+    // Check if the case number matches
+    const isVerified = client.caseNumber && client.caseNumber.trim() === caseNumber.trim();
+    
+    if (isVerified) {
+      // Log the successful access
+      if (!client.portal) {
+        client.portal = { 
+          active: true,
+          accessCount: 1,
+          lastAccess: new Date()
+        };
+      } else {
+        client.portal.accessCount = (client.portal.accessCount || 0) + 1;
+        client.portal.lastAccess = new Date();
+      }
+      await client.save();
+    }
+    
+    // Return verification result
+    res.status(200).json({
+      verified: isVerified,
+      message: isVerified ? 'Access granted' : 'Invalid case number'
+    });
+  } catch (error) {
+    console.error('Error verifying client access:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+});
+
 // Get client portal data
 app.get('/api/clients/:id/portal', async (req, res) => {
   try {

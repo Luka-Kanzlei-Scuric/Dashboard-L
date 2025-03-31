@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import CreditorUploadComponent from '../components/CreditorUploadComponent';
 import ClientDataComponent from '../components/ClientDataComponent';
 import ClientProgressTracker from '../components/ClientProgressTracker';
@@ -14,9 +14,19 @@ import api from '../../config/api';
  */
 const ClientPortalPage = () => {
   const { clientId } = useParams();
+  const navigate = useNavigate();
   const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Check authentication on load
+  useEffect(() => {
+    const isAuthenticated = localStorage.getItem('portal_auth_' + clientId) === 'true';
+    if (!isAuthenticated) {
+      // Redirect to auth page if not authenticated
+      navigate(`/portal/${clientId}`);
+    }
+  }, [clientId, navigate]);
   
   // Sample progress phases
   const progressPhases = [
@@ -137,9 +147,20 @@ const ClientPortalPage = () => {
               className="h-auto w-auto max-h-full max-w-[100px] object-contain" 
             />
           </div>
-          <h1 className="text-xl font-bold text-[#9c1a1b]">
-            Kundenportal
-          </h1>
+          <div className="flex items-center space-x-3">
+            <h1 className="text-xl font-bold text-[#9c1a1b]">
+              Kundenportal
+            </h1>
+            <button 
+              onClick={() => {
+                localStorage.removeItem('portal_auth_' + clientId);
+                navigate(`/portal/${clientId}`);
+              }}
+              className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-2 rounded-full transition-colors"
+            >
+              Abmelden
+            </button>
+          </div>
         </div>
       </header>
       

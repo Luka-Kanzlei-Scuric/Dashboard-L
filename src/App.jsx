@@ -7,6 +7,7 @@ import ClientDetailPage from './pages/ClientDetailPage';
 import NotFoundPage from './pages/NotFoundPage';
 import DocumentUploadPage from './pages/upload/DocumentUploadPage';
 import ClientPortalPage from './clientportal/pages/ClientPortalPage';
+import ClientPortalAuth from './clientportal/pages/ClientPortalAuth';
 
 function App() {
   return (
@@ -22,8 +23,9 @@ function App() {
         {/* Öffentliche Routes ohne Layout */}
         <Route path="/upload/:token" element={<DocumentUploadPage />} />
         
-        {/* Kundenportal Routes */}
-        <Route path="/portal/:clientId" element={<ClientPortalPage />} />
+        {/* Kundenportal Routes - Auth und Ansicht getrennt */}
+        <Route path="/portal/:clientId" element={<ClientPortalAuth />} />
+        <Route path="/portal/view/:clientId" element={<ClientPortalPage />} />
       </Routes>
     </ClientProvider>
   );
