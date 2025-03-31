@@ -1,5 +1,8 @@
 import axios from 'axios';
 
+// Base URL for API requests
+export const API_BASE_URL = '/api';
+
 // Available backend URLs to try if the primary one fails
 let BACKEND_URLS = [
   import.meta.env.VITE_API_URL,

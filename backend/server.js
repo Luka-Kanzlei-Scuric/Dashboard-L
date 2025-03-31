@@ -7,6 +7,8 @@ import connectDB from './src/config/db.js';
 import Client from './src/models/Client.js';
 import emailService from './src/services/emailService.js';
 import fileService from './src/services/fileService.js';
+import authRoutes from './src/routes/authRoutes.js';
+import { createInitialAdmin } from './src/controllers/authController.js';
 
 // Load env variables
 dotenv.config();
@@ -21,6 +23,9 @@ const app = express();
   try {
     await connectDB();
     console.log('MongoDB connected successfully');
+    
+    // Create initial admin user if none exists
+    await createInitialAdmin();
   } catch (err) {
     console.error('MongoDB connection error:', err);
     console.log('Retrying in 5 seconds...');
@@ -91,6 +96,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(fileService.uploadsBaseDir));
+
+// Auth routes
+app.use('/api/auth', authRoutes);
 
 // Queue for changes that need to be sent to ClickUp via Make.com
 const changeQueue = [];
