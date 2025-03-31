@@ -410,6 +410,7 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     try {
       // Client-Daten für den Webhook vorbereiten
       const webhookData = {
+        clientId: client._id, // Explizit die Client-ID im Root-Level hinzufügen
         client: {
           id: client._id,
           name: client.name || '',
