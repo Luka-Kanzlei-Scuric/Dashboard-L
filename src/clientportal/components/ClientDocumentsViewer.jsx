@@ -216,18 +216,18 @@ const ClientDocumentsViewer = ({ client }) => {
                 <div className="flex items-start">
                   {getDocumentIcon(document.mimetype)}
                   
-                  <div className="ml-3 flex-grow">
-                    <div className="flex justify-between">
-                      <h4 className="text-sm font-medium text-gray-900 truncate max-w-sm">
+                  <div className="ml-3 flex-grow min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
+                      <h4 className="text-sm font-medium text-gray-900 truncate max-w-[220px] sm:max-w-sm">
                         {document.originalFilename}
                       </h4>
                       
-                      <div className="flex space-x-2">
+                      <div className="flex mt-2 sm:mt-0 space-x-4">
                         <button 
                           onClick={() => togglePreview(document.id)}
                           className="text-[#9c1a1b] hover:text-[#8a1718] text-xs flex items-center"
                         >
-                          {activePreview === document.id ? 'Vorschau schließen' : 'Vorschau'}
+                          {activePreview === document.id ? 'Schließen' : 'Vorschau'}
                         </button>
                         
                         <a 
@@ -238,7 +238,7 @@ const ClientDocumentsViewer = ({ client }) => {
                           rel="noopener noreferrer"
                         >
                           <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
-                          Download
+                          <span className="block">Download</span>
                         </a>
                       </div>
                     </div>
