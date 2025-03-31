@@ -62,6 +62,8 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
   const [selectedUploadType, setSelectedUploadType] = useState(null);
   const [emailPreviewContent, setEmailPreviewContent] = useState(null);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [showCaseNumberModal, setShowCaseNumberModal] = useState(false);
+  const [caseNumberInput, setCaseNumberInput] = useState('');
   const [loading, setLoading] = useState(false);
   
   const { updateClient, markDocumentsUploaded, markPaymentReceived } = useClients();
@@ -78,6 +80,11 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
         setCurrentPhase(2); // Email sent phase
       } else {
         setCurrentPhase(1); // Initial phase
+      }
+      
+      // Initialize case number input with client's case number if available
+      if (client.caseNumber) {
+        setCaseNumberInput(client.caseNumber);
       }
     }
   }, [client]);
@@ -350,6 +357,79 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     }
   }, [phase2Step]);
   
+  // Funktion, um Email vorzubereiten und zu senden
+  const prepareAndSendEmail = async () => {
+    setLoading(true);
+    
+    try {
+      // Prüfe ob wir die aktuelle Rechnung des Mandanten haben
+      if (!client.currentInvoice) {
+        throw new Error('Keine Rechnung hochgeladen. Bitte laden Sie zuerst eine Rechnung hoch.');
+      }
+      
+      // API-Basis-URL für öffentliche Dateien
+      const apiBaseUrl = 'https://dashboard-l-backend.onrender.com';
+      
+      // Erstelle die öffentliche URL zur PDF-Datei
+      // Das Format sollte mit dem Backend-Server übereinstimmen
+      // Typischerweise: /uploads/clients/{clientId}/{filename}
+      const pdfUrl = `${apiBaseUrl}/uploads/clients/${client._id}/${client.currentInvoice.filename}`;
+      
+      console.log('PDF URL for invoice:', pdfUrl);
+      
+      // Erstelle die Rechnungsdaten mit URL
+      const invoiceData = {
+        invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
+        date: new Date().toLocaleDateString('de-DE'),
+        amount: client.honorar || 1111,
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE'),
+        // URL zur tatsächlichen PDF-Datei
+        invoiceURL: pdfUrl,
+        // Metadaten zur Datei
+        fileName: client.currentInvoice.originalFilename,
+        fileSize: client.currentInvoice.size,
+        mimeType: client.currentInvoice.mimetype
+      };
+      
+      console.log('Invoice data with real PDF URL prepared:', invoiceData);
+      
+      // Sende die Email mit der PDF-URL
+      await handleEmailSent(invoiceData, true);
+    } catch (error) {
+      console.error('Error preparing invoice PDF URL:', error);
+      setLoading(false);
+      alert(error.message);
+    }
+  };
+  
+  // Funktion zum Aktualisieren des Aktenzeichens und Fortfahren mit dem Email-Versand
+  const handleCaseNumberUpdate = async () => {
+    if (!caseNumberInput.trim()) {
+      alert('Bitte geben Sie ein gültiges Aktenzeichen ein.');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      // Aktenzeichen speichern
+      await updateClient(client._id, { caseNumber: caseNumberInput.trim() });
+      
+      // Lokalen Client aktualisieren
+      client.caseNumber = caseNumberInput.trim();
+      
+      // Modal schließen
+      setShowCaseNumberModal(false);
+      
+      // Email versenden
+      await prepareAndSendEmail();
+    } catch (error) {
+      console.error('Error updating case number:', error);
+      setLoading(false);
+      alert(`Fehler beim Speichern des Aktenzeichens: ${error.message}`);
+    }
+  };
+
   // Handle email sent
   const handleEmailSent = async (invoiceData, includesDocumentRequest = false) => {
     setLoading(true);
@@ -678,6 +758,95 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     setShowAllPhases(!showAllPhases);
   };
   
+  // Apple-Style Aktenzeichen Modal Component
+  const renderCaseNumberModal = () => {
+    if (!showCaseNumberModal) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center p-4 overflow-y-auto backdrop-blur-sm">
+        <div className="bg-white bg-opacity-95 rounded-xl shadow-2xl max-w-md w-full flex flex-col overflow-hidden animate-scaleIn" 
+          style={{border: '1px solid rgba(0,0,0,0.1)'}}>
+          {/* Apple-style header with traffic lights */}
+          <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gradient-to-b from-gray-50 to-white">
+            <div className="flex space-x-2 ml-2">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            </div>
+            <h2 className="text-sm font-medium text-gray-700">Aktenzeichen benötigt</h2>
+            <button 
+              onClick={() => setShowCaseNumberModal(false)}
+              className="p-1 rounded-full hover:bg-gray-100 focus:outline-none"
+              aria-label="Schließen"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          {/* Content */}
+          <div className="p-6">
+            <div className="mb-6 text-center">
+              <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Aktenzeichen erforderlich</h3>
+              <p className="text-gray-600 text-sm">
+                Um die Email an den Mandanten zu senden, ist ein Aktenzeichen erforderlich. 
+                Bitte geben Sie ein Aktenzeichen ein, um fortzufahren.
+              </p>
+            </div>
+            
+            <div className="mb-6">
+              <label htmlFor="caseNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                Aktenzeichen
+              </label>
+              <input
+                type="text"
+                id="caseNumber"
+                value={caseNumberInput}
+                onChange={(e) => setCaseNumberInput(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                placeholder="z.B. 2023-123-AB"
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowCaseNumberModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                disabled={loading}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleCaseNumberUpdate}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center"
+                disabled={loading || !caseNumberInput.trim()}
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Wird gespeichert...
+                  </>
+                ) : (
+                  'Speichern & fortfahren'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
   // Email Preview Modal Component - Apple-Design
   const renderEmailPreviewModal = () => {
     if (!showEmailPreview || !emailPreviewContent) return null;
@@ -770,47 +939,16 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
               <button
                 onClick={async () => {
                   console.log('Sending email for client:', client);
-                  setLoading(true);
                   
-                  try {
-                    // Prüfe ob wir die aktuelle Rechnung des Mandanten haben
-                    if (!client.currentInvoice) {
-                      throw new Error('Keine Rechnung hochgeladen. Bitte laden Sie zuerst eine Rechnung hoch.');
-                    }
-                    
-                    // API-Basis-URL für öffentliche Dateien
-                    const apiBaseUrl = 'https://dashboard-l-backend.onrender.com';
-                    
-                    // Erstelle die öffentliche URL zur PDF-Datei
-                    // Das Format sollte mit dem Backend-Server übereinstimmen
-                    // Typischerweise: /uploads/clients/{clientId}/{filename}
-                    const pdfUrl = `${apiBaseUrl}/uploads/clients/${client._id}/${client.currentInvoice.filename}`;
-                    
-                    console.log('PDF URL for invoice:', pdfUrl);
-                    
-                    // Erstelle die Rechnungsdaten mit URL
-                    const invoiceData = {
-                      invoiceNumber: client.caseNumber || `INV-${new Date().getTime().toString().substr(-6)}`,
-                      date: new Date().toLocaleDateString('de-DE'),
-                      amount: client.honorar || 1111,
-                      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE'),
-                      // URL zur tatsächlichen PDF-Datei
-                      invoiceURL: pdfUrl,
-                      // Metadaten zur Datei
-                      fileName: client.currentInvoice.originalFilename,
-                      fileSize: client.currentInvoice.size,
-                      mimeType: client.currentInvoice.mimetype
-                    };
-                    
-                    console.log('Invoice data with real PDF URL prepared:', invoiceData);
-                    
-                    // Sende die Email mit der PDF-URL
-                    handleEmailSent(invoiceData, true);
-                  } catch (error) {
-                    console.error('Error preparing invoice PDF URL:', error);
-                    setLoading(false);
-                    alert(error.message);
+                  // Prüfe, ob ein Aktenzeichen vorhanden ist
+                  if (!client.caseNumber) {
+                    // Öffne Modal zur Aktenzeichen-Eingabe
+                    setShowCaseNumberModal(true);
+                    return;
                   }
+                  
+                  // Wenn ein Aktenzeichen vorhanden ist, führe den Versand normal fort
+                  await prepareAndSendEmail();
                 }}
                 className="px-4 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-sm focus:outline-none flex items-center"
                 disabled={loading}
@@ -1044,7 +1182,16 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                   </button>
                   
                   <button
-                    onClick={() => handleEmailSent(null, true)}
+                    onClick={() => {
+                      // Prüfe, ob ein Aktenzeichen vorhanden ist
+                      if (!client.caseNumber) {
+                        // Öffne Modal zur Aktenzeichen-Eingabe
+                        setShowCaseNumberModal(true);
+                        return;
+                      }
+                      
+                      handleEmailSent(null, true);
+                    }}
                     className="flex-1 px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
                   >
                     <EnvelopeIcon className="h-5 w-5 mr-2" />
@@ -1314,6 +1461,7 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
       
       {/* Email Preview Modal */}
       {renderEmailPreviewModal()}
+      {renderCaseNumberModal()}
     </div>
   );
 };
