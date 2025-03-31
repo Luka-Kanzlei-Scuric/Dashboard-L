@@ -20,7 +20,10 @@ const LoginPage = () => {
       const success = await login(email, password);
       
       if (success) {
+        console.log("Login successful, navigating to dashboard");
         navigate('/');
+        // Force a page reload to ensure routes are updated correctly
+        window.location.href = '/';
       } else {
         setErrorMessage(error || 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.');
       }

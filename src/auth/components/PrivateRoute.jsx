@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 const PrivateRoute = () => {
   const { isAuthenticated, loading } = useAuth();
+  const token = localStorage.getItem('auth_token');
 
   // Show loading spinner while checking authentication
   if (loading) {
@@ -14,12 +15,20 @@ const PrivateRoute = () => {
     );
   }
 
+  // If no token exists, redirect to login immediately
+  if (!token) {
+    console.log("No auth token found, redirecting to login");
+    return <Navigate to="/login" replace />;
+  }
+
   // If not authenticated, redirect to login
   if (!isAuthenticated) {
+    console.log("Not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;
   }
 
   // Render child routes if authenticated
+  console.log("User authenticated, rendering protected route");
   return <Outlet />;
 };
 

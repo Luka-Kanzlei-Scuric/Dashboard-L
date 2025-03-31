@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
         axios.defaults.headers.common['x-auth-token'] = token;
         
         // Get current user data
-        const res = await axios.get(`${API_BASE_URL}/api/auth/me`);
+        const res = await axios.get(`${API_BASE_URL}/auth/me`);
         
         setUser(res.data);
         setLoading(false);
@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      const res = await axios.post(`${API_BASE_URL}/api/auth/login`, {
+      const res = await axios.post(`${API_BASE_URL}/auth/login`, {
         email,
         password
       });
@@ -85,7 +85,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      const res = await axios.post(`${API_BASE_URL}/api/auth/register`, userData);
+      const res = await axios.post(`${API_BASE_URL}/auth/register`, userData);
       
       setLoading(false);
       return res.data;
@@ -126,7 +126,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      const res = await axios.put(`${API_BASE_URL}/api/auth/profile`, profileData);
+      const res = await axios.put(`${API_BASE_URL}/auth/profile`, profileData);
       
       const { token, user: updatedUser } = res.data;
       
@@ -154,7 +154,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      const res = await axios.put(`${API_BASE_URL}/api/auth/change-password`, passwordData);
+      const res = await axios.put(`${API_BASE_URL}/auth/change-password`, passwordData);
       
       setLoading(false);
       return { success: true, message: res.data.message };
