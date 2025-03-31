@@ -402,6 +402,51 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     }
   };
   
+  // Funktion zum Senden des Status-Updates an make.com über Webhook
+  const sendStatusWebhook = async (client, status) => {
+    // Webhook URL für Make.com
+    const MAKE_STATUS_WEBHOOK_URL = 'https://hook.eu2.make.com/ceti2mis1cybiqn9chxqfeagqhfc7jyk';
+    
+    try {
+      // Client-Daten für den Webhook vorbereiten
+      const webhookData = {
+        client: {
+          id: client._id,
+          name: client.name || '',
+          email: client.email || '',
+          phone: client.phone || '',
+          caseNumber: client.caseNumber || '',
+        },
+        status: status,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('Sending status update to make.com webhook:', webhookData);
+      
+      // Webhook-Anfrage senden
+      const response = await fetch(MAKE_STATUS_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(webhookData),
+        // 10 Sekunden Timeout
+        signal: AbortSignal.timeout(10000)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Webhook returned status ${response.status}`);
+      }
+      
+      console.log('Status webhook sent successfully.');
+      return true;
+    } catch (error) {
+      console.error('Error sending status webhook:', error);
+      // Fehler beim Webhook-Versand sollten den Hauptablauf nicht unterbrechen
+      return false;
+    }
+  };
+  
   // Funktion zum Aktualisieren des Aktenzeichens und Fortfahren mit dem Email-Versand
   const handleCaseNumberUpdate = async () => {
     if (!caseNumberInput.trim()) {
@@ -707,6 +752,27 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
         // At least one method succeeded
         setShowEmailSuccess(true);
         setShowEmailPreview(false);
+        
+        // Update client label to "gläubigeranfrage & re"
+        try {
+          const newLabel = "gläubigeranfrage & re";
+          
+          // Update in database
+          await updateClient(client._id, { label: newLabel });
+          
+          // Update local client object
+          if (client) {
+            client.label = newLabel;
+          }
+          
+          console.log("Client label updated to:", newLabel);
+          
+          // Send webhook to make.com about status change
+          await sendStatusWebhook(client, newLabel);
+        } catch (labelError) {
+          console.error("Error updating client label:", labelError);
+          // Continue with the flow despite label update error
+        }
         
         // Move to the next phase after email is sent
         if (currentPhase === 1) {
