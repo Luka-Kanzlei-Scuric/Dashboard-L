@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
-import { API_BASE_URL } from '../../config/api';
+import api, { API_BASE_URL } from '../../config/api';
 
 const AuthContext = createContext();
 
@@ -20,24 +20,66 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('auth_token');
         
         if (!token) {
+          console.log('No token found in localStorage');
           setLoading(false);
           return;
         }
         
-        // Set auth token in axios defaults
+        // Set auth token in axios defaults and api instance
         axios.defaults.headers.common['x-auth-token'] = token;
+        api.defaults.headers.common['x-auth-token'] = token;
+
+        // Try multiple endpoints to find a working one
+        let userData = null;
         
-        // Get current user data
-        const res = await axios.get(`${API_BASE_URL}/auth/me`);
+        try {
+          // Try the optimized API first
+          console.log('Trying to authenticate with api instance...');
+          const apiRes = await api.get(`/auth/me`);
+          userData = apiRes.data;
+          console.log('Authentication successful with api instance');
+        } catch (apiError) {
+          console.log('Failed to authenticate with api instance:', apiError.message);
+          
+          // Try with absolute URLs
+          const backendUrls = [
+            'https://dashboard-l-backend.onrender.com/api/auth/me',
+            'https://scuric-dashboard-backend.onrender.com/api/auth/me',
+            'http://localhost:5000/api/auth/me'
+          ];
+          
+          for (const url of backendUrls) {
+            try {
+              console.log(`Trying to authenticate with ${url}...`);
+              const fallbackRes = await axios.get(url, {
+                headers: {
+                  'x-auth-token': token,
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json'
+                }
+              });
+              userData = fallbackRes.data;
+              console.log(`Authentication successful with ${url}`);
+              break;
+            } catch (fallbackError) {
+              console.log(`Failed to authenticate with ${url}:`, fallbackError.message);
+            }
+          }
+        }
         
-        setUser(res.data);
-        setLoading(false);
+        if (userData) {
+          setUser(userData);
+          setLoading(false);
+        } else {
+          throw new Error('Failed to authenticate with any endpoint');
+        }
       } catch (err) {
         console.error('Auth check error:', err);
         
         // Clear token if invalid
         localStorage.removeItem('auth_token');
         delete axios.defaults.headers.common['x-auth-token'];
+        delete api.defaults.headers.common['x-auth-token'];
         
         setError('Authentifizierung fehlgeschlagen. Bitte erneut anmelden.');
         setUser(null);
@@ -53,23 +95,65 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Attempting login with email:', email);
       
-      const res = await axios.post(`${API_BASE_URL}/auth/login`, {
-        email,
-        password
-      });
+      // Try multiple endpoints for login
+      let loginResult = null;
       
-      const { token, user } = res.data;
+      // Try the API instance first
+      try {
+        console.log('Trying to login with api instance...');
+        const apiRes = await api.post(`/auth/login`, { email, password });
+        loginResult = apiRes.data;
+        console.log('Login successful with api instance');
+      } catch (apiError) {
+        console.log('Failed to login with api instance:', apiError.message);
+        
+        // Try with absolute URLs
+        const backendUrls = [
+          'https://dashboard-l-backend.onrender.com/api/auth/login',
+          'https://scuric-dashboard-backend.onrender.com/api/auth/login',
+          'http://localhost:5000/api/auth/login'
+        ];
+        
+        for (const url of backendUrls) {
+          try {
+            console.log(`Trying to login with ${url}...`);
+            const fallbackRes = await axios.post(url, 
+              { email, password },
+              {
+                headers: {
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            loginResult = fallbackRes.data;
+            console.log(`Login successful with ${url}`);
+            break;
+          } catch (fallbackError) {
+            console.log(`Failed to login with ${url}:`, fallbackError.message);
+          }
+        }
+      }
+      
+      if (!loginResult) {
+        throw new Error('Failed to login with any endpoint');
+      }
+      
+      const { token, user } = loginResult;
       
       // Save token to localStorage
       localStorage.setItem('auth_token', token);
       
-      // Set token in axios defaults
+      // Set token in axios defaults and api instance
       axios.defaults.headers.common['x-auth-token'] = token;
+      api.defaults.headers.common['x-auth-token'] = token;
       
       setUser(user);
       setLoading(false);
       
+      console.log('Login completed successfully');
       return true;
     } catch (err) {
       console.error('Login error:', err);
@@ -126,20 +210,65 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      const res = await axios.put(`${API_BASE_URL}/auth/profile`, profileData);
+      // Try with API first
+      try {
+        const apiRes = await api.put(`/auth/profile`, profileData);
+        const { token, user: updatedUser } = apiRes.data;
+        
+        // Update token in localStorage
+        localStorage.setItem('auth_token', token);
+        
+        // Update token in axios defaults and api instance
+        axios.defaults.headers.common['x-auth-token'] = token;
+        api.defaults.headers.common['x-auth-token'] = token;
+        
+        setUser(updatedUser);
+        setLoading(false);
+        
+        return true;
+      } catch (apiError) {
+        console.log('Failed to update profile with api instance:', apiError.message);
+        
+        // Try with absolute URLs
+        const backendUrls = [
+          'https://dashboard-l-backend.onrender.com/api/auth/profile',
+          'https://scuric-dashboard-backend.onrender.com/api/auth/profile',
+          'http://localhost:5000/api/auth/profile'
+        ];
+        
+        for (const url of backendUrls) {
+          try {
+            const fallbackRes = await axios.put(url, 
+              profileData,
+              {
+                headers: {
+                  'x-auth-token': localStorage.getItem('auth_token'),
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            const { token, user: updatedUser } = fallbackRes.data;
+            
+            // Update token in localStorage
+            localStorage.setItem('auth_token', token);
+            
+            // Update token in axios defaults and api instance
+            axios.defaults.headers.common['x-auth-token'] = token;
+            api.defaults.headers.common['x-auth-token'] = token;
+            
+            setUser(updatedUser);
+            setLoading(false);
+            
+            return true;
+          } catch (fallbackError) {
+            console.log(`Failed to update profile with ${url}:`, fallbackError.message);
+          }
+        }
+      }
       
-      const { token, user: updatedUser } = res.data;
-      
-      // Update token in localStorage
-      localStorage.setItem('auth_token', token);
-      
-      // Update token in axios defaults
-      axios.defaults.headers.common['x-auth-token'] = token;
-      
-      setUser(updatedUser);
-      setLoading(false);
-      
-      return true;
+      throw new Error('Failed to update profile with any endpoint');
     } catch (err) {
       console.error('Update profile error:', err);
       setError(err.response?.data?.message || 'Fehler beim Aktualisieren des Profils');
@@ -154,10 +283,43 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      const res = await axios.put(`${API_BASE_URL}/auth/change-password`, passwordData);
+      // Try with API first
+      try {
+        const apiRes = await api.put(`/auth/change-password`, passwordData);
+        setLoading(false);
+        return { success: true, message: apiRes.data.message };
+      } catch (apiError) {
+        console.log('Failed to change password with api instance:', apiError.message);
+        
+        // Try with absolute URLs
+        const backendUrls = [
+          'https://dashboard-l-backend.onrender.com/api/auth/change-password',
+          'https://scuric-dashboard-backend.onrender.com/api/auth/change-password',
+          'http://localhost:5000/api/auth/change-password'
+        ];
+        
+        for (const url of backendUrls) {
+          try {
+            const fallbackRes = await axios.put(url, 
+              passwordData,
+              {
+                headers: {
+                  'x-auth-token': localStorage.getItem('auth_token'),
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            setLoading(false);
+            return { success: true, message: fallbackRes.data.message };
+          } catch (fallbackError) {
+            console.log(`Failed to change password with ${url}:`, fallbackError.message);
+          }
+        }
+      }
       
-      setLoading(false);
-      return { success: true, message: res.data.message };
+      throw new Error('Failed to change password with any endpoint');
     } catch (err) {
       console.error('Change password error:', err);
       setError(err.response?.data?.message || 'Fehler beim Ändern des Passworts');

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -7,9 +7,29 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showDevOptions, setShowDevOptions] = useState(false);
   
-  const { login, error } = useAuth();
+  const { login, error, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
+  
+  // Toggle development options (only for development environment)
+  const toggleDevOptions = () => {
+    setShowDevOptions(!showDevOptions);
+  };
+  
+  // Bypass authentication for development
+  const bypassAuth = () => {
+    localStorage.setItem('auth_bypass', 'true');
+    console.log("DEVELOPMENT: Authentication bypassed for testing");
+    window.location.href = '/';
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -112,6 +132,31 @@ const LoginPage = () => {
       
       <div className="mt-8 text-center text-xs text-gray-500">
         &copy; {new Date().getFullYear()} Kanzlei Scuric. Alle Rechte vorbehalten.
+        
+        {/* Development bypass option - hidden in production */}
+        <div className="mt-4">
+          <button 
+            onClick={toggleDevOptions} 
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            Dev
+          </button>
+          
+          {showDevOptions && (
+            <div className="mt-2 p-3 bg-gray-100 rounded text-left">
+              <p className="text-sm font-medium text-red-600 mb-2">Entwicklungsoptionen</p>
+              <button
+                onClick={bypassAuth}
+                className="w-full py-1 px-2 bg-gray-200 text-red-600 text-xs rounded hover:bg-gray-300"
+              >
+                Authentifizierung umgehen
+              </button>
+              <p className="text-xs text-gray-500 mt-2">
+                Admin: admin@scuric.de / Admin123!
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
