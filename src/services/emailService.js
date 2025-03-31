@@ -13,7 +13,7 @@ const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/pdlivjtccwyrtr0j8u1ovpxz184l
  * @returns {string} Full URL to client portal
  */
 export function generateClientPortalUrl(client) {
-  const baseUrl = process.env.CLIENT_PORTAL_BASE_URL || 'https://portal.scuric.de';
+  const baseUrl = process.env.CLIENT_PORTAL_BASE_URL || 'https://dashboard-l.onrender.com';
   return `${baseUrl}/portal/${client._id}`;
 }
 
@@ -40,7 +40,7 @@ export function generateWelcomeEmailContent(client, invoiceData = null) {
       <p>Rechnungsdatum: ${invoiceData.date || new Date().toLocaleDateString('de-DE')}</p>
       <p>Betrag: ${invoiceData.amount || client.honorar || 1111}€</p>
       <p>Zahlbar bis: ${invoiceData.dueDate || ''}</p>
-      <p>Die Rechnung ist dieser E-Mail als Anhang beigefügt.</p>
+      <p>Die Rechnung finden Sie in Ihrem persönlichen Mandantenportal.</p>
     </div>
     `;
   }
@@ -273,7 +273,7 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
         .replace(/[=+/]/g, '');
       
       // URL erstellen
-      invoiceURL = `https://portal.scuric.de/rechnung/${client._id}/${invoiceDetails.invoiceNumber}/${securityToken}`;
+      invoiceURL = `https://dashboard-l.onrender.com/portal/${client._id}`;
     }
     
     // Create data payload for Make.com
@@ -420,7 +420,7 @@ export async function sendWelcomePortalEmail(client, invoiceData = null) {
           // Fallback: Generiere eine sichere URL
           const securityToken = Buffer.from(`${client._id}-${new Date().getTime()}`).toString('base64')
             .replace(/[=+/]/g, '');
-          invoiceURL = `https://portal.scuric.de/rechnung/${client._id}/${invoiceDetails.invoiceNumber}/${securityToken}`;
+          invoiceURL = `https://dashboard-l.onrender.com/portal/${client._id}`;
         }
         
         const simplePayload = {

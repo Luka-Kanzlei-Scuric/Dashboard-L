@@ -172,7 +172,7 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     };
     
     // Generate HTML preview immediately without waiting for server
-    const baseUrl = 'https://portal.scuric.de';
+    const baseUrl = 'https://dashboard-l.onrender.com';
     const portalUrl = `${baseUrl}/portal/${client._id}`;
     
     // Generate a nice HTML email preview
@@ -287,7 +287,7 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     <p>Rechnungsdatum: ${invoiceData.date}</p>
     <p>Betrag: ${invoiceData.amount || client.honorar || 1111}€</p>
     <p>Zahlbar bis: ${invoiceData.dueDate}</p>
-    <p>Die Rechnung ist dieser E-Mail als Anhang beigefügt.</p>
+    <p>Die Rechnung finden Sie in Ihrem persönlichen Mandantenportal.</p>
   </div>
 
   <div class="media-section">
@@ -370,7 +370,7 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
       };
       
       // Create portal URL
-      const baseUrl = 'https://portal.scuric.de';
+      const baseUrl = 'https://dashboard-l.onrender.com';
       const portalUrl = `${baseUrl}/portal/${client._id}`;
       
       // Prepare data payload for direct webhook
@@ -509,7 +509,7 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
                   params.append('client_caseNumber', client.caseNumber || 'Wird in Kürze vergeben');
                   
                   // Portal URL
-                  params.append('portalUrl', `https://portal.scuric.de/portal/${client._id}`);
+                  params.append('portalUrl', `https://dashboard-l.onrender.com/portal/${client._id}`);
                   
                   // Invoice data if available
                   if (invoiceData) {

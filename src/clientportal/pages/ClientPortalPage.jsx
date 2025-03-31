@@ -4,6 +4,7 @@ import CreditorUploadComponent from '../components/CreditorUploadComponent';
 import ClientDataComponent from '../components/ClientDataComponent';
 import ClientProgressTracker from '../components/ClientProgressTracker';
 import ClientDocumentsViewer from '../components/ClientDocumentsViewer';
+import ClientInvoicesViewer from '../components/ClientInvoicesViewer';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import api from '../../config/api';
 
@@ -152,6 +153,9 @@ const ClientPortalPage = () => {
         
         {/* Client data */}
         <ClientDataComponent client={client} />
+        
+        {/* Invoice viewer */}
+        <ClientInvoicesViewer client={client} />
         
         {/* Previously uploaded documents viewer */}
         <ClientDocumentsViewer client={client} />
