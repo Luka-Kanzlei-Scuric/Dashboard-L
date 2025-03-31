@@ -411,12 +411,15 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
       // Client-Daten für den Webhook vorbereiten
       const webhookData = {
         clientId: client._id, // Explizit die Client-ID im Root-Level hinzufügen
+        clickupId: client.clickupId || '', // Die ClickUp-ID, die unter dem Namen des Mandanten angezeigt wird
+        clickupIdShort: client.clickupId ? client.clickupId.slice(-6) : '', // Die letzten 6 Zeichen der ClickUp-ID (wie auf der UI angezeigt)
         client: {
           id: client._id,
           name: client.name || '',
           email: client.email || '',
           phone: client.phone || '',
           caseNumber: client.caseNumber || '',
+          clickupId: client.clickupId || '', // Auch im Client-Objekt hinzufügen
         },
         status: status,
         timestamp: new Date().toISOString()
