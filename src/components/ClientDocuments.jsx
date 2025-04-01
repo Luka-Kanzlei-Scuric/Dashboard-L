@@ -8,7 +8,8 @@ import {
   ExclamationCircleIcon,
   PaperClipIcon,
   CheckIcon,
-  Square2StackIcon
+  Square2StackIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 /**
@@ -215,20 +216,20 @@ const ClientDocuments = ({ client, allowDelete = true }) => {
   const getDocumentIcon = (mimetype) => {
     if (mimetype.startsWith('image/')) {
       return (
-        <div className="rounded-full bg-purple-100 p-2">
-          <DocumentMagnifyingGlassIcon className="h-4 w-4 text-purple-700" />
+        <div className="rounded-full bg-purple-50 p-2 shadow-sm border border-purple-100">
+          <DocumentMagnifyingGlassIcon className="h-4 w-4 text-purple-600" />
         </div>
       );
     } else if (mimetype === 'application/pdf') {
       return (
-        <div className="rounded-full bg-red-100 p-2">
-          <DocumentTextIcon className="h-4 w-4 text-red-700" />
+        <div className="rounded-full bg-red-50 p-2 shadow-sm border border-red-100">
+          <DocumentTextIcon className="h-4 w-4 text-red-600" />
         </div>
       );
     } else {
       return (
-        <div className="rounded-full bg-blue-100 p-2">
-          <PaperClipIcon className="h-4 w-4 text-blue-700" />
+        <div className="rounded-full bg-blue-50 p-2 shadow-sm border border-blue-100">
+          <PaperClipIcon className="h-4 w-4 text-blue-600" />
         </div>
       );
     }
@@ -247,32 +248,51 @@ const ClientDocuments = ({ client, allowDelete = true }) => {
   const getPreviewComponent = (document) => {
     if (document.mimetype.startsWith('image/')) {
       return (
-        <img 
-          src={document.url} 
-          alt={document.originalFilename}
-          className="max-w-full max-h-96 object-contain rounded-lg shadow-sm" 
-        />
+        <div className="relative">
+          <img 
+            src={document.url} 
+            alt={document.originalFilename}
+            className="max-w-full max-h-96 object-contain rounded-xl shadow-sm border border-gray-100" 
+          />
+          <div className="absolute bottom-4 right-4 bg-white bg-opacity-90 rounded-full shadow-sm px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-100">
+            <span className="flex items-center">
+              <DocumentMagnifyingGlassIcon className="h-3.5 w-3.5 mr-1 text-purple-600" />
+              Bild-Vorschau
+            </span>
+          </div>
+        </div>
       );
     } else if (document.mimetype === 'application/pdf') {
       return (
-        <iframe 
-          src={`${document.url}#view=FitH`}
-          className="w-full h-96 border-0 rounded-lg shadow-sm" 
-          title={document.originalFilename}
-        />
+        <div className="relative">
+          <iframe 
+            src={`${document.url}#view=FitH`}
+            className="w-full h-96 border-0 rounded-xl shadow-sm" 
+            title={document.originalFilename}
+          />
+          <div className="absolute top-4 right-4 bg-white bg-opacity-90 rounded-full shadow-sm px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-100">
+            <span className="flex items-center">
+              <DocumentTextIcon className="h-3.5 w-3.5 mr-1 text-red-600" />
+              PDF-Dokument
+            </span>
+          </div>
+        </div>
       );
     } else {
       return (
-        <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-lg">
-          <ExclamationCircleIcon className="h-12 w-12 text-gray-400 mb-4" />
-          <p className="text-gray-600">Vorschau nicht verfügbar.</p>
+        <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-xl border border-gray-100">
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 border border-blue-100">
+            <ExclamationCircleIcon className="h-8 w-8 text-blue-500" />
+          </div>
+          <p className="text-gray-600 font-medium">Vorschau nicht verfügbar</p>
+          <p className="text-gray-500 text-sm mb-6">Das Format dieses Dokuments unterstützt keine Vorschau.</p>
           <a 
             href={document.url} 
             download 
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+            className="px-4 py-2 bg-gradient-to-b from-blue-500 to-blue-600 text-white rounded-full shadow-sm hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center"
           >
             <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-            Herunterladen
+            Dokument herunterladen
           </a>
         </div>
       );
@@ -281,22 +301,30 @@ const ClientDocuments = ({ client, allowDelete = true }) => {
   
   if (loading) {
     return (
-      <div className="p-4 text-center">
-        <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-        <p className="text-gray-600">Dokumente werden geladen...</p>
+      <div className="p-8 text-center">
+        <div className="relative mx-auto w-16 h-16">
+          <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
+          <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+        </div>
+        <p className="mt-4 text-gray-600 font-medium">Dokumente werden geladen</p>
+        <p className="text-gray-500 text-sm">Bitte warten Sie einen Moment...</p>
       </div>
     );
   }
   
   if (error) {
     return (
-      <div className="p-4 text-center text-red-600">
-        <ExclamationCircleIcon className="h-8 w-8 mx-auto mb-2" />
-        <p>{error || 'Fehler beim Laden der Dokumente'}</p>
+      <div className="p-8 text-center bg-white rounded-xl shadow-sm border border-red-100">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
+          <ExclamationCircleIcon className="h-8 w-8 text-red-500" />
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Fehler beim Laden</h3>
+        <p className="text-red-600 mb-4">{error || 'Fehler beim Laden der Dokumente'}</p>
         <button 
           onClick={fetchDocuments}
-          className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-6 py-2 bg-gradient-to-b from-blue-500 to-blue-600 text-white rounded-full shadow-sm hover:from-blue-600 hover:to-blue-700 transition-all duration-200 focus:ring-2 focus:ring-blue-300 flex items-center mx-auto"
         >
+          <ArrowPathIcon className="h-4 w-4 mr-2" />
           Erneut versuchen
         </button>
       </div>
@@ -305,10 +333,12 @@ const ClientDocuments = ({ client, allowDelete = true }) => {
   
   if (documents.length === 0) {
     return (
-      <div className="p-6 text-center bg-gray-50 rounded-xl">
-        <DocumentTextIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+      <div className="p-8 text-center bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
+          <DocumentTextIcon className="h-8 w-8 text-gray-400" />
+        </div>
         <h3 className="text-lg font-medium text-gray-900 mb-2">Keine Dokumente vorhanden</h3>
-        <p className="text-gray-600">
+        <p className="text-gray-500 max-w-md mx-auto">
           Für diesen Mandanten wurden noch keine Dokumente hochgeladen.
         </p>
       </div>
@@ -317,28 +347,37 @@ const ClientDocuments = ({ client, allowDelete = true }) => {
   
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-medium text-gray-900 flex items-center">
           <DocumentTextIcon className="h-5 w-5 text-gray-500 mr-2" />
           Dokumente ({documents.length})
         </h3>
         
         {allowDelete && documents.length > 0 && (
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 items-center">
+            {selectMode && (
+              <div className="mr-1 text-sm text-gray-500">
+                {selectedDocuments.length} ausgewählt
+              </div>
+            )}
+            
             {selectMode && selectedDocuments.length > 0 && (
               <button
                 onClick={handleDeleteSelectedDocuments}
-                className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center"
+                className="group relative px-4 py-2 text-sm font-medium rounded-full bg-gradient-to-b from-red-500 to-red-600 text-white shadow-sm hover:from-red-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-red-300 transition-all duration-200 flex items-center"
               >
                 <TrashIcon className="h-4 w-4 mr-1.5" />
-                {selectedDocuments.length} löschen
+                Löschen
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-xs font-semibold text-red-800">
+                  {selectedDocuments.length}
+                </span>
               </button>
             )}
             
             {selectMode && (
               <button
                 onClick={selectAllDocuments}
-                className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors flex items-center"
+                className="px-4 py-2 text-sm font-medium rounded-full bg-gray-50 text-gray-600 border border-gray-200 shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all duration-200 flex items-center"
               >
                 {selectedDocuments.length === documents.length ? (
                   <>
@@ -348,7 +387,7 @@ const ClientDocuments = ({ client, allowDelete = true }) => {
                 ) : (
                   <>
                     <CheckIcon className="h-4 w-4 mr-1.5" />
-                    Alle auswählen
+                    Alle
                   </>
                 )}
               </button>
@@ -356,36 +395,43 @@ const ClientDocuments = ({ client, allowDelete = true }) => {
             
             <button
               onClick={toggleSelectMode}
-              className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center ${
+              className={`px-4 py-2 text-sm font-medium rounded-full shadow-sm transition-all duration-200 flex items-center ${
                 selectMode
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-300'
+                  : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 focus:ring-2 focus:ring-gray-200'
               }`}
             >
               <Square2StackIcon className="h-4 w-4 mr-1.5" />
-              {selectMode ? 'Fertig' : 'Mehrere auswählen'}
+              {selectMode ? 'Fertig' : 'Auswählen'}
             </button>
           </div>
         )}
       </div>
       
-      <div className="bg-white rounded-xl shadow-sm">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <ul className="divide-y divide-gray-200">
           {documents.map(document => (
-            <li key={document.id} className={`p-4 ${selectMode ? 'hover:bg-gray-50' : ''}`}>
+            <li key={document.id} className={`p-4 transition-all duration-200 ${
+              selectMode 
+                ? selectedDocuments.includes(document.id)
+                  ? 'bg-blue-50/30'
+                  : 'hover:bg-gray-50/80' 
+                : ''
+            }`}>
               <div className="flex items-start">
                 {selectMode ? (
                   <button
                     onClick={() => toggleDocumentSelection(document.id)}
-                    className="flex-shrink-0 mr-2 mt-1"
+                    className="flex-shrink-0 mr-3 mt-1"
+                    aria-label={selectedDocuments.includes(document.id) ? "Deselect document" : "Select document"}
                   >
-                    <div className={`w-5 h-5 rounded flex items-center justify-center border ${
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 ${
                       selectedDocuments.includes(document.id)
-                        ? 'bg-blue-600 border-blue-600 text-white'
-                        : 'border-gray-300 bg-white'
+                        ? 'bg-blue-600 border-0 text-white shadow-md scale-110'
+                        : 'border border-gray-300 bg-white'
                     }`}>
                       {selectedDocuments.includes(document.id) && (
-                        <CheckIcon className="h-3.5 w-3.5" />
+                        <CheckIcon className="h-3 w-3 animate-scaleIn" />
                       )}
                     </div>
                   </button>
@@ -404,26 +450,36 @@ const ClientDocuments = ({ client, allowDelete = true }) => {
                         <>
                           <button 
                             onClick={() => togglePreview(document.id)}
-                            className="text-blue-600 hover:text-blue-800 text-xs flex items-center"
+                            className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium flex items-center hover:bg-blue-100 transition-colors shadow-sm border border-blue-100"
                           >
-                            {activePreview === document.id ? 'Vorschau schließen' : 'Vorschau'}
+                            {activePreview === document.id ? (
+                              <>
+                                <XMarkIcon className="h-3.5 w-3.5 mr-1" />
+                                Schließen
+                              </>
+                            ) : (
+                              <>
+                                <DocumentMagnifyingGlassIcon className="h-3.5 w-3.5 mr-1" />
+                                Vorschau
+                              </>
+                            )}
                           </button>
                           
                           <a 
                             href={document.url} 
                             download 
-                            className="text-green-600 hover:text-green-800 text-xs flex items-center"
+                            className="px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium flex items-center hover:bg-green-100 transition-colors shadow-sm border border-green-100"
                           >
-                            <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
+                            <ArrowDownTrayIcon className="h-3.5 w-3.5 mr-1" />
                             Download
                           </a>
                           
                           {allowDelete && (
                             <button 
                               onClick={() => handleDeleteDocument(document.id)}
-                              className="text-red-600 hover:text-red-800 text-xs flex items-center"
+                              className="px-2.5 py-1 bg-red-50 text-red-700 rounded-full text-xs font-medium flex items-center hover:bg-red-100 transition-colors shadow-sm border border-red-100"
                             >
-                              <TrashIcon className="h-4 w-4 mr-1" />
+                              <TrashIcon className="h-3.5 w-3.5 mr-1" />
                               Löschen
                             </button>
                           )}
