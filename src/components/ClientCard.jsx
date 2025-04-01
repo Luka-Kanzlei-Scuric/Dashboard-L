@@ -81,9 +81,13 @@ const ClientCard = ({ client }) => {
                 ? 'bg-green-100 text-green-800' 
                 : status === 'Wartend' 
                 ? 'bg-yellow-100 text-yellow-800' 
+                : client && client.label && client.label.toLowerCase().includes("gläubigeranfrage")
+                ? 'bg-blue-100 text-blue-800'
                 : 'bg-red-100 text-red-800'
             }`}>
-              {status}
+              {client && client.label && client.label.toLowerCase().includes("gläubigeranfrage") 
+                ? 'Gläubigeranfrage & RE' 
+                : status}
             </span>
           </div>
         </div>

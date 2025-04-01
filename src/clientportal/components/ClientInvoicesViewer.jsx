@@ -254,7 +254,9 @@ const ClientInvoicesViewer = ({ client }) => {
                     
                     <div className="mt-1 text-xs text-gray-500 flex justify-between">
                       <div>
-                        <span className="px-2 py-1 bg-gray-100 rounded-full">Rechnung</span>
+                        <span className={`px-2 py-1 ${client.label && client.label.toLowerCase().includes("gläubigeranfrage") ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'} rounded-full`}>
+                          {client.label && client.label.toLowerCase().includes("gläubigeranfrage") ? 'Gläubigeranfrage & RE' : 'Rechnung offen'}
+                        </span>
                         <span className="ml-2">{formatFileSize(invoice.size)}</span>
                       </div>
                       <span>
