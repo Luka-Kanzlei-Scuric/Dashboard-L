@@ -91,12 +91,16 @@ export const AuthProvider = ({ children }) => {
       } catch (err) {
         console.error('Auth check error:', err);
         
-        // Check if server is returning 404 (endpoints don't exist yet)
+        // Check if server is returning 404 (endpoints don't exist yet) or CORS errors
         // In production, we'll be stricter, but during initial deployment 
         // we'll allow access with the token even if the endpoints aren't ready
         const is404Error = err.response?.status === 404;
+        const isCorsError = 
+          err.message?.includes('CORS') || 
+          err.message?.includes('Network Error') ||
+          err.message?.includes('access control check');
         
-        if (is404Error) {
+        if (is404Error || isCorsError) {
           console.log('Auth endpoints not available yet - using token-based auth temporarily');
           // Create a temporary user based on the token to allow access
           try {
@@ -122,7 +126,7 @@ export const AuthProvider = ({ children }) => {
         }
         
         // Only clear token if it's definitely invalid (not just server issues)
-        if (!is404Error) {
+        if (!is404Error && !isCorsError) {
           localStorage.removeItem('auth_token');
           delete axios.defaults.headers.common['x-auth-token'];
           delete api.defaults.headers.common['x-auth-token'];

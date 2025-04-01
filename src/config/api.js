@@ -127,6 +127,11 @@ const triedBackends = new Map(); // URL -> retry count
 let isConnecting = false;
 let connectionAttempts = 0;
 
+// Check if site is in development/maintenance mode
+const isMaintenanceMode = () => {
+  return localStorage.getItem('auth_bypass') === 'true';
+};
+
 // Attempt to find a working backend on startup
 // This runs once when the module is imported
 const findWorkingBackend = async () => {
@@ -199,6 +204,15 @@ api.interceptors.response.use(
   async error => {
     // Get the failed request
     const originalRequest = error.config;
+    
+    // If we're in maintenance mode, don't retry too aggressively
+    if (isMaintenanceMode()) {
+      console.log('Request failed in maintenance mode - reducing retries');
+      // Still return the error but don't retry as aggressively
+      if (originalRequest._retryCount >= 1) {
+        return Promise.reject(error);
+      }
+    }
     
     const isCorsError = error.message?.includes('Origin') || 
                          error.message?.includes('access control checks') ||

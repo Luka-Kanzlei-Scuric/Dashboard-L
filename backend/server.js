@@ -61,7 +61,8 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
   preflightContinue: false,
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 204,
+  allowedHeaders: ['Content-Type', 'Authorization', 'Content-Length', 'X-Requested-With', 'Accept', 'Cache-Control', 'Pragma', 'x-auth-token', 'X-Random']
 };
 
 // Debug CORS settings
@@ -76,8 +77,9 @@ app.use((req, res, next) => {
     // Add CORS headers
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, Accept, Cache-Control, Pragma, X-Random');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, Accept, Cache-Control, Pragma, X-Random, x-auth-token');
     res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400'); // 24 hours to reduce preflight requests
     
     // Handle preflight response
     console.log(`Handled preflight request from ${req.headers.origin} for ${req.path}`);

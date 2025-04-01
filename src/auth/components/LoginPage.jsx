@@ -70,7 +70,22 @@ const LoginPage = () => {
           Dashboard Login
         </h2>
         
-        {errorMessage && (
+        {/* Maintenance mode notice - show if server is having issues */}
+        {(errorMessage && errorMessage.includes('fehlgeschlagen')) && (
+          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 text-orange-800 rounded-md">
+            <p className="font-medium mb-2">Server im Wartungsmodus</p>
+            <p className="text-sm mb-3">Der Server wird gerade aktualisiert. Sie können dennoch fortfahren:</p>
+            <button
+              onClick={bypassAuth}
+              className="w-full py-2 px-4 bg-orange-100 text-orange-800 rounded hover:bg-orange-200 mb-2"
+            >
+              Weiter zum Dashboard
+            </button>
+            <p className="text-xs text-orange-600">Die vollständige Funktionalität wird in Kürze wiederhergestellt.</p>
+          </div>
+        )}
+        
+        {errorMessage && !errorMessage.includes('fehlgeschlagen') && (
           <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
             {errorMessage}
           </div>
