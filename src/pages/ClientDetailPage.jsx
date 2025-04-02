@@ -1213,9 +1213,13 @@ const ClientDetailPage = () => {
               ? 'bg-green-100 text-green-800' 
               : client.status === 'Wartend' 
               ? 'bg-amber-100 text-amber-800' 
-              : 'bg-blue-100 text-blue-800'
+              : client.label && client.label.toLowerCase().includes("gläubigeranfrage")
+              ? 'bg-blue-100 text-blue-800'
+              : 'bg-red-100 text-red-800'
           }`}>
-            {client.status}
+            {client.label && client.label.toLowerCase().includes("gläubigeranfrage") 
+             ? 'Gläubigeranfrage & RE' 
+             : client.status}
           </span>
           
           {/* Kompakte Prozessverfolgung neben dem Namen */}

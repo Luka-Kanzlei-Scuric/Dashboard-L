@@ -10,7 +10,8 @@ const SAMPLE_DATA = [
     phone: '+49 123 456789',
     clickupId: 'sample123456',
     status: 'Onboarding',
-    lastUpdated: new Date().toISOString()
+    lastUpdated: new Date().toISOString(),
+    label: 'gläubigeranfrage & re'  // Beispiel für einen Mandanten mit Gläubigeranfrage-Status
   },
   {
     _id: 'sample2',
@@ -19,6 +20,15 @@ const SAMPLE_DATA = [
     phone: '+49 123 987654',
     clickupId: 'sample654321',
     status: 'Aktiv',
+    lastUpdated: new Date().toISOString()
+  },
+  {
+    _id: 'sample3',
+    name: 'Stefan Müller',
+    email: 'stefan@example.com',
+    phone: '+49 123 555444',
+    clickupId: 'sample789012',
+    status: 'Onboarding',
     lastUpdated: new Date().toISOString()
   }
 ];
