@@ -158,11 +158,37 @@ export const ClientProvider = ({ children }) => {
       // Try to get from local state first for better UX
       const localClient = clients.find(client => client._id === id);
       if (localClient) {
+        // Synchronisiere die Labels basierend auf der Phase des Clients
+        if (localClient.currentPhase) {
+          if (localClient.currentPhase >= 3 && (!localClient.label || !localClient.label.toLowerCase().includes("gläubigeranfrage"))) {
+            // Wenn der Client in Phase 3 oder höher ist, aber nicht das richtige Label hat
+            console.log(`Synchronisiere Label für Client in Phase ${localClient.currentPhase}`);
+            localClient.label = "gläubigeranfrage & re";
+          } else if (localClient.currentPhase === 2 && (!localClient.label || localClient.label.toLowerCase().includes("gläubigeranfrage"))) {
+            // Wenn der Client in Phase 2 ist, aber nicht das richtige Label hat
+            console.log(`Synchronisiere Label für Client in Phase ${localClient.currentPhase}`);
+            localClient.label = "rechnung offen";
+          }
+        }
         return localClient;
       }
       
       // Otherwise fetch from API
       const { data } = await api.get(`/clients/${id}`);
+      
+      // Synchronisiere die Labels basierend auf der Phase des Clients
+      if (data && data.currentPhase) {
+        if (data.currentPhase >= 3 && (!data.label || !data.label.toLowerCase().includes("gläubigeranfrage"))) {
+          // Wenn der Client in Phase 3 oder höher ist, aber nicht das richtige Label hat
+          console.log(`Synchronisiere Label für Client in Phase ${data.currentPhase}`);
+          data.label = "gläubigeranfrage & re";
+        } else if (data.currentPhase === 2 && (!data.label || data.label.toLowerCase().includes("gläubigeranfrage"))) {
+          // Wenn der Client in Phase 2 ist, aber nicht das richtige Label hat
+          console.log(`Synchronisiere Label für Client in Phase ${data.currentPhase}`);
+          data.label = "rechnung offen";
+        }
+      }
+      
       return data;
     } catch (err) {
       console.error('Error getting client:', err);
