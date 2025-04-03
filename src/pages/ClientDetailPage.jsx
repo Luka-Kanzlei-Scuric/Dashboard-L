@@ -897,9 +897,6 @@ const ClientDetailPage = () => {
     }
   }, [lastDataUpdate, loadClient]);
   
-  // Debug-State für die Entwicklung
-  const [debugMode, setDebugMode] = useState(false);
-  
   // Verwende useRef für den Timer, um direkte State-Updates zu vermeiden
   const timerRef = useRef(null);
   
@@ -953,20 +950,6 @@ const ClientDetailPage = () => {
     // und kümmert sich ausschließlich um das Laden der Client-Daten
   }, [lastDataUpdate]);
   
-  // Debug-Hilfsfunktion: Ein testweise Abruf der Testdaten
-  const forceTestDataFetch = async () => {
-    try {
-      setLoading(true);
-      const testData = await fetchFormData(TEST_CLIENT_ID);
-      console.log('Test data fetch successful:', testData);
-      alert(`Testdaten für ID ${TEST_CLIENT_ID} erfolgreich abgerufen. Überprüfe die Konsole für Details.`);
-    } catch (error) {
-      console.error('Error fetching test data:', error);
-      alert('Fehler beim Abrufen der Testdaten. Siehe Konsole für Details.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Verwende die bereits am Anfang der Komponente definierten State-Variablen
   // (emailSending, showEmailSuccess)

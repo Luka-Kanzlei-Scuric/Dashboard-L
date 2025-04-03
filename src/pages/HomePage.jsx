@@ -68,14 +68,6 @@ const HomePage = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <h1 className="text-2xl font-semibold text-primary">Dashboard</h1>
-          {usingSampleData && (
-            <div className="ml-3 flex items-center">
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                <InformationCircleIcon className="w-4 h-4 mr-1" />
-                Demo-Modus
-              </span>
-            </div>
-          )}
         </div>
         <button 
           disabled
@@ -87,32 +79,6 @@ const HomePage = () => {
         </button>
       </div>
       
-      {usingSampleData && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-800 text-sm flex items-center">
-          <ExclamationTriangleIcon className="h-5 w-5 mr-2 text-amber-600 flex-shrink-0" />
-          <div>
-            <p className="font-medium">Das Dashboard verwendet aktuell Beispieldaten.</p>
-            <p className="mt-1">Es konnte keine Verbindung zum Backend-Server hergestellt werden. Die Anzeige wird automatisch aktualisiert, sobald die Verbindung wiederhergestellt ist.</p>
-          </div>
-          <button 
-            onClick={handleRetry}
-            disabled={retryInProgress || loading}
-            className="ml-4 flex-shrink-0 inline-flex items-center px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-amber-800 text-sm font-medium hover:bg-amber-100 transition-colors"
-          >
-            {retryInProgress || loading ? (
-              <>
-                <ArrowPathIcon className="h-4 w-4 mr-1.5 animate-spin" />
-                Verbinde...
-              </>
-            ) : (
-              <>
-                <ArrowPathIcon className="h-4 w-4 mr-1.5" />
-                Verbindung prüfen
-              </>
-            )}
-          </button>
-        </div>
-      )}
 
       {error && !usingSampleData && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-800 text-sm flex items-center">
