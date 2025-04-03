@@ -77,18 +77,11 @@ const ClientCard = ({ client }) => {
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
               client && client.label && client.label.toLowerCase().includes("gläubigeranfrage")
                 ? 'bg-blue-100 text-blue-800'
-                : status === 'Onboarding' 
-                ? 'bg-blue-100 text-blue-800' 
-                : status === 'Aktiv' 
-                ? 'bg-green-100 text-green-800' 
-                : status === 'Wartend' 
-                ? 'bg-yellow-100 text-yellow-800' 
                 : 'bg-red-100 text-red-800'
             }`}>
-              {client && client.label && (
-                client.label.toLowerCase().includes("gläubigeranfrage") 
+              {client && client.label && client.label.toLowerCase().includes("gläubigeranfrage") 
                 ? 'Gläubigeranfrage & RE' 
-                : status)}
+                : 'Rechnung offen'}
             </span>
           </div>
         </div>

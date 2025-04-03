@@ -1209,17 +1209,13 @@ const ClientDetailPage = () => {
           </button>
           <h1 className="text-2xl font-medium text-gray-900">{client.name}</h1>
           <span className={`ml-4 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-            client.status === 'Aktiv' 
-              ? 'bg-green-100 text-green-800' 
-              : client.status === 'Wartend' 
-              ? 'bg-amber-100 text-amber-800' 
-              : client.label && client.label.toLowerCase().includes("gläubigeranfrage")
+            client.label && client.label.toLowerCase().includes("gläubigeranfrage")
               ? 'bg-blue-100 text-blue-800'
               : 'bg-red-100 text-red-800'
           }`}>
             {client.label && client.label.toLowerCase().includes("gläubigeranfrage") 
              ? 'Gläubigeranfrage & RE' 
-             : client.status}
+             : 'Rechnung offen'}
           </span>
           
           {/* Kompakte Prozessverfolgung neben dem Namen */}
