@@ -1505,21 +1505,8 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     <div className="space-y-6">
       {/* Phase progress tracker */}
       <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200">
-        <div className="flex justify-between items-center mb-6">
+        <div className="mb-6">
           <h3 className="text-lg font-medium text-gray-900">Prozessverfolgung</h3>
-          
-          {/* Toggle for development/debugging */}
-          <div className="flex items-center">
-            <button
-              onClick={handleToggleAllPhases}
-              className="text-xs flex items-center text-gray-500 hover:text-gray-700"
-            >
-              <span className={`w-8 h-4 rounded-full mr-2 flex items-center ${showAllPhases ? 'bg-blue-500 justify-end' : 'bg-gray-300 justify-start'}`}>
-                <span className="w-3 h-3 rounded-full bg-white mx-0.5"></span>
-              </span>
-              {showAllPhases ? "Entwicklermodus" : "Standard-Ansicht"}
-            </button>
-          </div>
         </div>
         
         <ProgressTracker 
