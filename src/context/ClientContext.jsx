@@ -48,6 +48,33 @@ export const ClientProvider = ({ children }) => {
     setError(null);
   };
 
+  // Hilfsfunktion zur Synchronisierung der Labels mit den Phasen
+  const synchronizeLabelsWithPhases = (clientsList) => {
+    if (!Array.isArray(clientsList)) return clientsList;
+    
+    return clientsList.map(client => {
+      if (!client) return client;
+      
+      // Kopiere den Client, um die Originalreferenz nicht zu verändern
+      const updatedClient = { ...client };
+      
+      // Synchronisiere Label basierend auf der Phase
+      if (updatedClient.currentPhase) {
+        if (updatedClient.currentPhase >= 3 && (!updatedClient.label || !updatedClient.label.toLowerCase().includes("gläubigeranfrage"))) {
+          // Wenn Phase 3 oder höher, setze "gläubigeranfrage & re" (blau)
+          console.log(`Synchronisiere Dashboard-Label für Client ${updatedClient.name} in Phase ${updatedClient.currentPhase}`);
+          updatedClient.label = "gläubigeranfrage & re";
+        } else if (updatedClient.currentPhase === 2 && (!updatedClient.label || updatedClient.label.toLowerCase().includes("gläubigeranfrage"))) {
+          // Wenn Phase 2, setze "rechnung offen" (rot)
+          console.log(`Synchronisiere Dashboard-Label für Client ${updatedClient.name} in Phase ${updatedClient.currentPhase}`);
+          updatedClient.label = "rechnung offen";
+        }
+      }
+      
+      return updatedClient;
+    });
+  };
+
   // Fetch all clients with retry logic
   const fetchClients = useCallback(async (forceRefresh = false, backgroundRefresh = false) => {
     // Don't fetch if we're already loading, unless forced
@@ -100,7 +127,10 @@ export const ClientProvider = ({ children }) => {
           await new Promise(resolve => setTimeout(resolve, minLoadingTime - timeElapsed));
         }
         
-        setClients(data);
+        // Synchronisiere Labels vor dem Speichern der Daten
+        const synchronizedData = synchronizeLabelsWithPhases(data);
+        
+        setClients(synchronizedData);
         setUsingSampleData(false);
         setLastSuccessfulFetch(new Date());
         setRetryCount(0); // Reset retry counter on success
@@ -139,7 +169,9 @@ export const ClientProvider = ({ children }) => {
       // After 2 failed attempts, use sample data
       if (retryCount >= 1 && clients.length === 0) {
         console.log('Using sample data after multiple failed attempts');
-        setClients(SAMPLE_DATA);
+        // Synchronisiere Labels für die Sample-Daten
+        const synchronizedSampleData = synchronizeLabelsWithPhases(SAMPLE_DATA);
+        setClients(synchronizedSampleData);
         setUsingSampleData(true);
       }
     } finally {
