@@ -74,10 +74,15 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
       // Check client.currentPhase first (from database)
       if (client.currentPhase) {
         setCurrentPhase(client.currentPhase);
+        
+        // Stellen sicher, dass das Label mit der Phase übereinstimmt
+        updateLabelBasedOnPhase(client.currentPhase);
       } else if (client.status === 'Aktiv' && client.emailSent) {
         setCurrentPhase(3); // Documents uploaded & payment started
+        updateLabelBasedOnPhase(3);
       } else if (client.emailSent) {
         setCurrentPhase(2); // Email sent phase
+        updateLabelBasedOnPhase(2);
       } else {
         setCurrentPhase(1); // Initial phase
       }
@@ -89,6 +94,38 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
     }
   }, [client]);
   
+  // Funktion zum Aktualisieren des Labels basierend auf der Phase
+  const updateLabelBasedOnPhase = async (phaseNumber) => {
+    if (!client || !client._id) return;
+    
+    let newLabel = client.label || ''; // Behalte das aktuelle Label als Standard bei
+    
+    // Setze das Label basierend auf der Phase
+    if (phaseNumber === 2) {
+      newLabel = "rechnung offen";
+    } else if (phaseNumber === 3) {
+      newLabel = "gläubigeranfrage & re";
+    }
+    
+    // Aktualisiere das Label im Backend nur, wenn es sich geändert hat
+    if (newLabel !== client.label) {
+      try {
+        // Aktualisiere im Backend
+        await updateClient(client._id, { label: newLabel });
+        
+        // Aktualisiere lokalen Client
+        client.label = newLabel;
+        
+        console.log(`Client label updated to: ${newLabel} based on phase ${phaseNumber}`);
+        
+        // Optional: Webhook-Benachrichtigung senden
+        await sendStatusWebhook(client, newLabel);
+      } catch (error) {
+        console.error("Error updating client label based on phase:", error);
+      }
+    }
+  };
+
   // Handle client moving to next phase
   const handleNextPhase = async () => {
     if (currentPhase < phases.length) {
@@ -106,6 +143,9 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
           
           // Only update the UI state after database update is successful
           setCurrentPhase(newPhase);
+          
+          // Aktualisiere Label basierend auf der neuen Phase
+          await updateLabelBasedOnPhase(newPhase);
           
           if (onPhaseChange) {
             onPhaseChange(newPhase);
@@ -139,6 +179,9 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
               setPhase2Step(1);
               setSelectedUploadType('invoice');
             }
+            
+            // Aktualisiere Label basierend auf der neuen Phase
+            updateLabelBasedOnPhase(targetPhase);
             
             // Callback to parent component
             if (onPhaseChange) {
