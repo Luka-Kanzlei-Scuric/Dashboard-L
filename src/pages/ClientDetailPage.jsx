@@ -1288,25 +1288,6 @@ const ClientDetailPage = () => {
                 </svg>
               </div>
             </div>
-            
-            {/* Debug-Button für Entwicklung - kann für Produktion auskommentiert werden */}
-            {debugMode && (
-              <button
-                onClick={forceTestDataFetch}
-                className="ml-4 px-2 py-1 text-xs bg-amber-100 text-amber-800 rounded hover:bg-amber-200 transition-colors"
-              >
-                Test-Daten laden
-              </button>
-            )}
-            
-            {/* Debug-Modus Toggle */}
-            <button 
-              onClick={() => setDebugMode(!debugMode)} 
-              className="ml-3 p-1 text-xs text-gray-400 hover:text-gray-600"
-              title="Debug-Modus umschalten"
-            >
-              {debugMode ? '🔍' : '⚙️'}
-            </button>
           </div>
         </div>
       </div>
