@@ -11,14 +11,21 @@ const ClientPortalAuth = () => {
   const { clientId } = useParams();
   const navigate = useNavigate();
   const [caseNumber, setCaseNumber] = useState('');
+  const [clientName, setClientName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Validate both fields
     if (!caseNumber.trim()) {
       setError('Bitte geben Sie Ihr Aktenzeichen ein.');
+      return;
+    }
+    
+    if (!clientName.trim()) {
+      setError('Bitte geben Sie Ihren Namen ein.');
       return;
     }
 
@@ -26,10 +33,11 @@ const ClientPortalAuth = () => {
     setError(null);
 
     try {
-      // Verify the case number against the client ID
+      // Verify the case number and name against the client ID
       const response = await api.post('/clients/verify-access', {
         clientId,
-        caseNumber: caseNumber.trim()
+        caseNumber: caseNumber.trim(),
+        clientName: clientName.trim()
       });
 
       if (response.data.verified) {
@@ -71,7 +79,7 @@ const ClientPortalAuth = () => {
           </h1>
           
           <p className="text-gray-600 text-center mb-6">
-            Bitte geben Sie Ihr persönliches Aktenzeichen ein, um auf Ihr Mandantenportal zuzugreifen.
+            Bitte geben Sie Ihren Namen und Ihr persönliches Aktenzeichen ein, um auf Ihr Mandantenportal zuzugreifen.
           </p>
           
           {error && (
@@ -81,19 +89,37 @@ const ClientPortalAuth = () => {
           )}
           
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="caseNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                Aktenzeichen
-              </label>
-              <input
-                type="text"
-                id="caseNumber"
-                value={caseNumber}
-                onChange={(e) => setCaseNumber(e.target.value)}
-                placeholder="z.B. TS-12345"
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-[#9c1a1b] focus:ring-2 focus:ring-[#9c1a1b]/20 focus:outline-none transition-colors"
-                disabled={loading}
-              />
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="clientName" className="block text-sm font-medium text-gray-700 mb-1">
+                  Ihr Name
+                </label>
+                <input
+                  type="text"
+                  id="clientName"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="Vor- und Nachname"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-[#9c1a1b] focus:ring-2 focus:ring-[#9c1a1b]/20 focus:outline-none transition-colors"
+                  disabled={loading}
+                  autoComplete="name"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="caseNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                  Aktenzeichen
+                </label>
+                <input
+                  type="text"
+                  id="caseNumber"
+                  value={caseNumber}
+                  onChange={(e) => setCaseNumber(e.target.value)}
+                  placeholder="z.B. TS-12345"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-[#9c1a1b] focus:ring-2 focus:ring-[#9c1a1b]/20 focus:outline-none transition-colors"
+                  disabled={loading}
+                />
+              </div>
             </div>
             
             <button
