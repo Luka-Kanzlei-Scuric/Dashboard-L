@@ -75,14 +75,12 @@ const ClientPhaseManager = ({ client, onPhaseChange }) => {
       if (client.currentPhase) {
         setCurrentPhase(client.currentPhase);
         
-        // Stellen sicher, dass das Label mit der Phase übereinstimmt
-        updateLabelBasedOnPhase(client.currentPhase);
+        // KEINE automatische Label-Aktualisierung hier, da dies zu Endlosschleifen führt
+        // Die Labels werden nur aktualisiert, wenn der Benutzer aktiv die Phase ändert
       } else if (client.status === 'Aktiv' && client.emailSent) {
         setCurrentPhase(3); // Documents uploaded & payment started
-        updateLabelBasedOnPhase(3);
       } else if (client.emailSent) {
         setCurrentPhase(2); // Email sent phase
-        updateLabelBasedOnPhase(2);
       } else {
         setCurrentPhase(1); // Initial phase
       }
