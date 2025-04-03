@@ -26,7 +26,7 @@ function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
               <Route path="client/:id" element={<ClientDetailPage />} />
-              <Route path="settings" element={<SettingsPage />} />
+              {/* Einstellungen-Route entfernt */}
               <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Route>

@@ -76,15 +76,6 @@ const TopBar = ({ sidebarOpen, setSidebarOpen }) => {
                 <div className="text-xs text-gray-500">{user?.email}</div>
               </div>
               
-              <Link
-                to="/settings"
-                onClick={() => setDropdownOpen(false)}
-                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-              >
-                <Cog6ToothIcon className="mr-2 h-4 w-4" />
-                Einstellungen
-              </Link>
-              
               <div className="border-t border-gray-100"></div>
               
               <button

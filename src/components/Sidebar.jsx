@@ -63,14 +63,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         />
       </nav>
 
-      {/* Footer */}
+      {/* Footer - kein Inhalt mehr */}
       <div className="p-3 border-t border-neutral-light">
-        <NavItem 
-          to="/settings" 
-          icon={<Cog6ToothIcon className="w-6 h-6" />} 
-          title="Einstellungen" 
-          sidebarOpen={sidebarOpen} 
-        />
       </div>
     </div>
   );
