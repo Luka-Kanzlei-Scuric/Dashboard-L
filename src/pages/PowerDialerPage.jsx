@@ -8,7 +8,8 @@ import {
   InformationCircleIcon,
   UserIcon,
   DocumentTextIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  ChevronDownIcon
 } from '@heroicons/react/24/outline';
 
 const PowerDialerPage = () => {
@@ -19,6 +20,7 @@ const PowerDialerPage = () => {
   const [callAnswered, setCallAnswered] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [formLoaded, setFormLoaded] = useState(false);
+  const [showDialerControls, setShowDialerControls] = useState(false);
   
   // Beispiel-Daten für aktuellen Kontakt
   const [currentContact, setCurrentContact] = useState({
@@ -84,25 +86,156 @@ const PowerDialerPage = () => {
     };
   }, [sessionInterval]);
   
+  // Klick-Handler für das Dokument (schließt Dropdown beim Klick außerhalb)
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      const controlsElement = document.getElementById('dialer-controls');
+      const toggleElement = document.getElementById('dialer-toggle');
+      
+      if (showDialerControls && 
+          controlsElement && 
+          !controlsElement.contains(event.target) && 
+          toggleElement && 
+          !toggleElement.contains(event.target)) {
+        setShowDialerControls(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showDialerControls]);
+  
   return (
     <div className="h-full w-full bg-[#f5f5f7] overflow-hidden">
-      {/* Header mit abgerundeten Ecken */}
-      <div className="bg-white px-8 py-6 border-b border-gray-100 rounded-b-2xl shadow-sm">
-        <div className="max-w-screen-xl mx-auto">
-          <h1 className="text-2xl font-light text-gray-800">Power-Dialer</h1>
-          <p className="text-gray-500 font-light">Verkaufsteam-Dashboard</p>
+      {/* Header mit PowerDialer-Steuerung */}
+      <div className="bg-white px-8 py-5 border-b border-gray-100 shadow-sm sticky top-0 z-20">
+        <div className="max-w-screen-xl mx-auto flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-light text-gray-800">Power-Dialer</h1>
+            <p className="text-gray-500 font-light">Verkaufsteam-Dashboard</p>
+          </div>
+          
+          {/* PowerDialer-Steuerung in der Header-Leiste */}
+          <div className="relative">
+            <button 
+              id="dialer-toggle"
+              onClick={() => setShowDialerControls(!showDialerControls)}
+              className={`flex items-center rounded-full py-2 pl-3 pr-4 transition-all duration-300 border ${
+                dialerActive 
+                  ? 'bg-green-50 border-green-100 text-green-600 hover:bg-green-100' 
+                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-full mr-2 flex items-center justify-center ${
+                dialerActive ? 'bg-green-100' : 'bg-gray-100'
+              }`}>
+                <PhoneIcon className={`w-4 h-4 ${dialerActive ? 'text-green-500' : 'text-gray-500'}`} />
+              </div>
+              <div className="flex flex-col items-start">
+                {dialerActive ? (
+                  <>
+                    <span className="text-xs font-light">PowerDialer aktiv</span>
+                    <span className="text-xs font-medium">{formatTime(sessionTime)}</span>
+                  </>
+                ) : (
+                  <span className="text-sm font-light">PowerDialer starten</span>
+                )}
+              </div>
+              <ChevronDownIcon className="w-4 h-4 ml-2" />
+            </button>
+            
+            {/* Dropdown für PowerDialer Steuerung */}
+            {showDialerControls && (
+              <div 
+                id="dialer-controls"
+                className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-lg border border-gray-100 w-80 overflow-hidden z-20"
+              >
+                <div className="p-4 border-b border-gray-100">
+                  <h3 className="text-sm font-medium text-gray-800 mb-2 flex items-center">
+                    <PhoneIcon className="w-4 h-4 mr-2 text-gray-400" />
+                    PowerDialer-Steuerung
+                  </h3>
+                  
+                  {dialerActive && (
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-2">
+                          <ClockIcon className="w-3 h-3 text-gray-500" />
+                        </div>
+                        <span className="text-sm font-light font-mono">{formatTime(sessionTime)}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className={`w-2 h-2 rounded-full mr-1.5 ${
+                          callAnswered ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'
+                        }`}></div>
+                        <span className="text-xs font-light">
+                          {callAnswered ? 'Telefonat läuft' : 'Warte auf Anruf'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between items-center">
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500 font-light">
+                        {dialerActive 
+                          ? "PowerDialer ist aktiv. Heute wurden 15 Anrufe getätigt." 
+                          : "PowerDialer starten, um Kontakte anzurufen und Gespräche zu dokumentieren."
+                        }
+                      </p>
+                    </div>
+                    
+                    <button
+                      onClick={toggleDialer}
+                      className={`ml-4 flex items-center justify-center rounded-full transition-all duration-300 px-3 py-1.5 ${
+                        dialerActive 
+                          ? 'bg-red-50 text-red-500 hover:bg-red-100' 
+                          : 'bg-green-50 text-green-600 hover:bg-green-100'
+                      }`}
+                    >
+                      {dialerActive ? (
+                        <>
+                          <PauseIcon className="w-3 h-3 mr-1.5" />
+                          <span className="text-xs font-light">Stoppen</span>
+                        </>
+                      ) : (
+                        <>
+                          <PlayIcon className="w-3 h-3 mr-1.5" />
+                          <span className="text-xs font-light">Starten</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+                
+                {dialerActive && !callAnswered && (
+                  <div className="p-4 bg-gray-50">
+                    <button
+                      onClick={simulateAnsweredCall}
+                      className="w-full flex items-center justify-center bg-white rounded-lg shadow-sm text-gray-600 hover:bg-gray-50 py-2 border border-gray-200"
+                    >
+                      <CheckCircleIcon className="w-4 h-4 mr-2 text-gray-500" />
+                      <span className="text-sm font-light">Anruf angenommen</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
       {/* Haupt-Dashboard */}
       <div className="max-w-screen-xl mx-auto pt-6 px-6">
-        <div className="flex gap-6 h-[calc(100vh-160px)]">
-          {/* Linker Bereich - PowerDialer Steuerung (20%) */}
+        <div className="flex gap-6 h-[calc(100vh-140px)]">
+          {/* Linker Bereich - PowerDialer Info (20%) */}
           <div className="w-1/5 flex flex-col">
             <div className="bg-white rounded-2xl shadow-sm p-6 mb-5 flex-1">
               <h2 className="text-base font-light text-gray-800 mb-5 flex items-center border-b pb-3">
-                <PhoneIcon className="w-4 h-4 mr-2 text-gray-400" />
-                PowerDialer-Steuerung
+                <InformationCircleIcon className="w-4 h-4 mr-2 text-gray-400" />
+                PowerDialer-Info
               </h2>
               
               {!dialerActive ? (
@@ -125,15 +258,14 @@ const PowerDialerPage = () => {
                     </div>
                   </div>
                   
-                  <button
-                    onClick={toggleDialer}
-                    className="mt-auto transition-all duration-300 bg-white rounded-full border border-gray-200 py-3 px-6 flex items-center justify-center text-gray-700 hover:bg-gray-50 shadow-sm hover:shadow group"
-                  >
-                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-3 group-hover:bg-gray-200 transition-colors">
-                      <PlayIcon className="w-3 h-3 text-gray-500 ml-0.5" />
+                  <div className="mt-auto flex items-center justify-center">
+                    <div className="text-center bg-gray-50 rounded-2xl p-4 w-full">
+                      <p className="text-xs text-gray-500 mb-3">Starten Sie den PowerDialer in der Titelleiste, um Anrufe zu tätigen.</p>
+                      <div className="flex items-center justify-center">
+                        <PhoneIcon className="w-6 h-6 text-gray-300" />
+                      </div>
                     </div>
-                    <span className="font-light">PowerDialer starten</span>
-                  </button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col h-full">
@@ -156,24 +288,6 @@ const PowerDialerPage = () => {
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center justify-between text-sm">
-                      <button 
-                        onClick={simulateAnsweredCall}
-                        disabled={callAnswered}
-                        className={`text-xs px-3 py-1.5 rounded-full flex items-center transition-all ${
-                          callAnswered 
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        <CheckCircleIcon className="w-3 h-3 mr-1.5" />
-                        Anruf angenommen
-                      </button>
-                      <span className="text-xs font-light text-gray-500">
-                        {callAnswered ? 'Telefonat läuft...' : 'Warte auf Anruf...'}
-                      </span>
-                    </div>
                   </div>
                   
                   <div className="flex-1 flex flex-col justify-center items-center">
@@ -190,15 +304,17 @@ const PowerDialerPage = () => {
                     <p className="text-xs text-gray-500 font-light">PowerDialer ist aktiv</p>
                   </div>
                   
-                  <button
-                    onClick={toggleDialer}
-                    className="mt-auto transition-all duration-300 bg-white rounded-full border border-gray-200 py-3 px-6 flex items-center justify-center text-red-500 hover:bg-red-50 shadow-sm hover:shadow group"
-                  >
-                    <div className="w-6 h-6 rounded-full bg-red-50 flex items-center justify-center mr-3 group-hover:bg-red-100 transition-colors">
-                      <PauseIcon className="w-3 h-3 text-red-500" />
-                    </div>
-                    <span className="font-light">PowerDialer stoppen</span>
-                  </button>
+                  {!callAnswered && (
+                    <button 
+                      onClick={simulateAnsweredCall}
+                      className="mt-auto transition-all duration-300 bg-white rounded-full border border-gray-200 py-3 px-6 flex items-center justify-center text-gray-700 hover:bg-gray-50 shadow-sm hover:shadow group"
+                    >
+                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-3 group-hover:bg-gray-200 transition-colors">
+                        <CheckCircleIcon className="w-3 h-3 text-gray-500" />
+                      </div>
+                      <span className="font-light">Anruf angenommen</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
