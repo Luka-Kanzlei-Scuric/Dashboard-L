@@ -110,11 +110,11 @@ const PowerDialerPage = () => {
   return (
     <div className="h-full w-full bg-[#f5f5f7] overflow-hidden">
       {/* Header mit PowerDialer-Steuerung */}
-      <div className="bg-white px-8 py-5 border-b border-gray-100 shadow-sm sticky top-0 z-20">
+      <div className="bg-white px-4 sm:px-6 md:px-8 py-4 md:py-5 border-b border-gray-100 shadow-sm sticky top-0 z-20">
         <div className="max-w-screen-xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-light text-gray-800">Power-Dialer</h1>
-            <p className="text-gray-500 font-light">Verkaufsteam-Dashboard</p>
+            <h1 className="text-xl md:text-2xl font-light text-gray-800">Power-Dialer</h1>
+            <p className="text-xs md:text-sm text-gray-500 font-light">Verkaufsteam-Dashboard</p>
           </div>
           
           {/* PowerDialer-Steuerung in der Header-Leiste */}
@@ -122,35 +122,35 @@ const PowerDialerPage = () => {
             <button 
               id="dialer-toggle"
               onClick={() => setShowDialerControls(!showDialerControls)}
-              className={`flex items-center rounded-full py-2 pl-3 pr-4 transition-all duration-300 border ${
+              className={`flex items-center rounded-full py-1.5 md:py-2 pl-2 md:pl-3 pr-3 md:pr-4 transition-all duration-300 border ${
                 dialerActive 
                   ? 'bg-green-50 border-green-100 text-green-600 hover:bg-green-100' 
                   : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <div className={`w-8 h-8 rounded-full mr-2 flex items-center justify-center ${
+              <div className={`w-6 h-6 md:w-8 md:h-8 rounded-full mr-1.5 md:mr-2 flex items-center justify-center ${
                 dialerActive ? 'bg-green-100' : 'bg-gray-100'
               }`}>
-                <PhoneIcon className={`w-4 h-4 ${dialerActive ? 'text-green-500' : 'text-gray-500'}`} />
+                <PhoneIcon className={`w-3 h-3 md:w-4 md:h-4 ${dialerActive ? 'text-green-500' : 'text-gray-500'}`} />
               </div>
-              <div className="flex flex-col items-start">
+              <div className="hidden sm:flex flex-col items-start">
                 {dialerActive ? (
                   <>
                     <span className="text-xs font-light">PowerDialer aktiv</span>
                     <span className="text-xs font-medium">{formatTime(sessionTime)}</span>
                   </>
                 ) : (
-                  <span className="text-sm font-light">PowerDialer starten</span>
+                  <span className="text-xs md:text-sm font-light">PowerDialer starten</span>
                 )}
               </div>
-              <ChevronDownIcon className="w-4 h-4 ml-2" />
+              <ChevronDownIcon className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
             </button>
             
             {/* Dropdown für PowerDialer Steuerung */}
             {showDialerControls && (
               <div 
                 id="dialer-controls"
-                className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-lg border border-gray-100 w-80 overflow-hidden z-20"
+                className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-lg border border-gray-100 w-64 sm:w-72 md:w-80 overflow-hidden z-20"
               >
                 <div className="p-4 border-b border-gray-100">
                   <h3 className="text-sm font-medium text-gray-800 mb-2 flex items-center">
@@ -228,20 +228,20 @@ const PowerDialerPage = () => {
       </div>
       
       {/* Haupt-Dashboard */}
-      <div className="max-w-screen-xl mx-auto pt-6 px-6">
-        <div className="flex gap-6 h-[calc(100vh-140px)]">
+      <div className="max-w-screen-xl mx-auto pt-4 md:pt-6 px-4 md:px-6">
+        <div className="flex flex-col lg:flex-row gap-4 md:gap-6 h-[calc(100vh-120px)] overflow-y-auto lg:overflow-visible">
           {/* Linker Bereich - PowerDialer Info (20%) */}
-          <div className="w-1/5 flex flex-col">
-            <div className="bg-white rounded-2xl shadow-sm p-6 mb-5 flex-1">
-              <h2 className="text-base font-light text-gray-800 mb-5 flex items-center border-b pb-3">
+          <div className="w-full lg:w-1/5 flex flex-col">
+            <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 mb-4 md:mb-5 flex-1">
+              <h2 className="text-base font-light text-gray-800 mb-4 md:mb-5 flex items-center border-b pb-3">
                 <InformationCircleIcon className="w-4 h-4 mr-2 text-gray-400" />
                 PowerDialer-Info
               </h2>
               
               {!dialerActive ? (
                 <div className="flex-1 flex flex-col h-full">
-                  <div className="bg-[#f5f5f7] rounded-2xl p-5 mb-5">
-                    <p className="text-gray-600 text-sm font-light mb-4 leading-relaxed">
+                  <div className="bg-[#f5f5f7] rounded-xl md:rounded-2xl p-4 md:p-5 mb-4 md:mb-5">
+                    <p className="text-sm font-light text-gray-600 mb-4 leading-relaxed">
                       Der PowerDialer ermöglicht es Ihnen, Kontakte effizient zu verwalten und Gespräche zu dokumentieren.
                     </p>
                     <div className="flex items-center text-sm text-gray-500 mb-3">
@@ -259,7 +259,7 @@ const PowerDialerPage = () => {
                   </div>
                   
                   <div className="mt-auto flex items-center justify-center">
-                    <div className="text-center bg-gray-50 rounded-2xl p-4 w-full">
+                    <div className="text-center bg-gray-50 rounded-xl md:rounded-2xl p-4 w-full">
                       <p className="text-xs text-gray-500 mb-3">Starten Sie den PowerDialer in der Titelleiste, um Anrufe zu tätigen.</p>
                       <div className="flex items-center justify-center">
                         <PhoneIcon className="w-6 h-6 text-gray-300" />
@@ -269,7 +269,7 @@ const PowerDialerPage = () => {
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col h-full">
-                  <div className="bg-[#f5f5f7] rounded-2xl p-5 mb-5">
+                  <div className="bg-[#f5f5f7] rounded-xl md:rounded-2xl p-4 md:p-5 mb-4 md:mb-5">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center">
                         <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center mr-3">
@@ -291,14 +291,14 @@ const PowerDialerPage = () => {
                   </div>
                   
                   <div className="flex-1 flex flex-col justify-center items-center">
-                    <div className="w-28 h-28 rounded-full border-4 border-gray-100 flex items-center justify-center relative mb-4">
-                      <div className="w-20 h-20 rounded-full bg-[#f5f5f7] flex items-center justify-center">
-                        <ArrowPathIcon className={`w-8 h-8 text-gray-300 ${
+                    <div className="w-20 h-20 md:w-28 md:h-28 rounded-full border-4 border-gray-100 flex items-center justify-center relative mb-4">
+                      <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-[#f5f5f7] flex items-center justify-center">
+                        <ArrowPathIcon className={`w-6 h-6 md:w-8 md:h-8 text-gray-300 ${
                           dialerActive ? 'animate-spin' : ''
                         }`} />
                       </div>
-                      <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-white shadow-sm flex items-center justify-center border border-gray-100">
-                        <PhoneIcon className="w-3 h-3 text-green-500" />
+                      <div className="absolute -top-1 -right-1 w-5 h-5 md:w-6 md:h-6 rounded-full bg-white shadow-sm flex items-center justify-center border border-gray-100">
+                        <PhoneIcon className="w-2.5 h-2.5 md:w-3 md:h-3 text-green-500" />
                       </div>
                     </div>
                     <p className="text-xs text-gray-500 font-light">PowerDialer ist aktiv</p>
@@ -307,12 +307,12 @@ const PowerDialerPage = () => {
                   {!callAnswered && (
                     <button 
                       onClick={simulateAnsweredCall}
-                      className="mt-auto transition-all duration-300 bg-white rounded-full border border-gray-200 py-3 px-6 flex items-center justify-center text-gray-700 hover:bg-gray-50 shadow-sm hover:shadow group"
+                      className="mt-auto transition-all duration-300 bg-white rounded-full border border-gray-200 py-2 md:py-3 px-4 md:px-6 flex items-center justify-center text-gray-700 hover:bg-gray-50 shadow-sm hover:shadow group"
                     >
-                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-3 group-hover:bg-gray-200 transition-colors">
-                        <CheckCircleIcon className="w-3 h-3 text-gray-500" />
+                      <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-gray-100 flex items-center justify-center mr-2 md:mr-3 group-hover:bg-gray-200 transition-colors">
+                        <CheckCircleIcon className="w-2.5 h-2.5 md:w-3 md:h-3 text-gray-500" />
                       </div>
-                      <span className="font-light">Anruf angenommen</span>
+                      <span className="text-sm font-light">Anruf angenommen</span>
                     </button>
                   )}
                 </div>
@@ -321,9 +321,9 @@ const PowerDialerPage = () => {
           </div>
           
           {/* Mittlerer Bereich - Eingebettetes Formular (60%) */}
-          <div className="w-3/5 flex flex-col">
-            <div className="bg-white rounded-2xl shadow-sm flex-1 overflow-hidden flex flex-col">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="w-full lg:w-3/5 flex flex-col">
+            <div className="bg-white rounded-2xl shadow-sm flex-1 overflow-hidden flex flex-col min-h-[400px] lg:min-h-0">
+              <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2 className="text-base font-light text-gray-800 flex items-center">
                   <DocumentTextIcon className="w-4 h-4 mr-2 text-gray-400" />
                   Formular
@@ -352,8 +352,8 @@ const PowerDialerPage = () => {
                 {(dialerActive && callAnswered && formLoading) && (
                   <div className="absolute inset-0 bg-white flex flex-col items-center justify-center z-10">
                     <div className="flex items-center justify-center mb-4">
-                      <div className="rounded-full h-12 w-12 bg-[#f5f5f7] flex items-center justify-center">
-                        <svg className="animate-spin h-6 w-6 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <div className="rounded-full h-10 w-10 md:h-12 md:w-12 bg-[#f5f5f7] flex items-center justify-center">
+                        <svg className="animate-spin h-5 w-5 md:h-6 md:w-6 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -366,15 +366,15 @@ const PowerDialerPage = () => {
                 
                 {/* Placeholder wenn kein Gespräch */}
                 {(!dialerActive || !callAnswered) && (
-                  <div className="absolute inset-0 bg-[#f5f5f7] flex flex-col items-center justify-center z-10">
-                    <div className="bg-white rounded-2xl shadow-sm p-8 max-w-md w-full text-center">
+                  <div className="absolute inset-0 bg-[#f5f5f7] flex flex-col items-center justify-center z-10 p-4">
+                    <div className="bg-white rounded-xl md:rounded-2xl shadow-sm p-4 md:p-8 max-w-sm md:max-w-md w-full text-center">
                       <div className="flex items-center justify-center mb-4">
-                        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
-                          <DocumentTextIcon className="w-8 h-8 text-gray-300" />
+                        <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                          <DocumentTextIcon className="w-6 h-6 md:w-8 md:h-8 text-gray-300" />
                         </div>
                       </div>
-                      <h3 className="text-lg font-light text-gray-800 mb-2">Formular-Ansicht</h3>
-                      <p className="text-sm font-light text-gray-500 mb-4">
+                      <h3 className="text-base md:text-lg font-light text-gray-800 mb-2">Formular-Ansicht</h3>
+                      <p className="text-xs md:text-sm font-light text-gray-500 mb-4">
                         {dialerActive 
                           ? "Warten auf Gesprächsbeginn. Wenn ein Kontakt den Anruf annimmt, wird hier das entsprechende Formular geladen."
                           : "Starten Sie den PowerDialer, um die Formular-Ansicht zu aktivieren."}
@@ -382,9 +382,9 @@ const PowerDialerPage = () => {
                       {dialerActive && (
                         <button 
                           onClick={simulateAnsweredCall}
-                          className="text-sm px-4 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors inline-flex items-center"
+                          className="text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors inline-flex items-center"
                         >
-                          <CheckCircleIcon className="w-4 h-4 mr-2" />
+                          <CheckCircleIcon className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                           Gesprächsbeginn simulieren
                         </button>
                       )}
@@ -408,9 +408,9 @@ const PowerDialerPage = () => {
           </div>
           
           {/* Rechter Bereich - Kontaktinformationen (20%) */}
-          <div className="w-1/5 flex flex-col">
-            <div className="bg-white rounded-2xl shadow-sm p-6 mb-5 flex-1">
-              <h2 className="text-base font-light text-gray-800 mb-5 flex items-center justify-between border-b pb-3">
+          <div className="w-full lg:w-1/5 flex flex-col">
+            <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 mb-4 md:mb-5 flex-1">
+              <h2 className="text-base font-light text-gray-800 mb-4 md:mb-5 flex items-center justify-between border-b pb-3">
                 <div className="flex items-center">
                   <UserIcon className="w-4 h-4 mr-2 text-gray-400" />
                   <span>Aktueller Kontakt</span>
@@ -421,11 +421,11 @@ const PowerDialerPage = () => {
               </h2>
               
               {(!dialerActive || !callAnswered) ? (
-                <div className="flex-1 flex flex-col justify-center items-center text-center text-gray-400 py-8">
-                  <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center mb-4">
-                    <UserIcon className="w-10 h-10 text-gray-200" />
+                <div className="flex-1 flex flex-col justify-center items-center text-center text-gray-400 py-4 md:py-8">
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gray-50 flex items-center justify-center mb-4">
+                    <UserIcon className="w-8 h-8 md:w-10 md:h-10 text-gray-200" />
                   </div>
-                  <p className="text-sm font-light max-w-[200px]">
+                  <p className="text-xs md:text-sm font-light max-w-[200px]">
                     {!dialerActive 
                       ? "Starten Sie den PowerDialer, um Kontaktdaten zu sehen" 
                       : "Warten auf Gesprächsbeginn..."}
@@ -433,14 +433,14 @@ const PowerDialerPage = () => {
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col">
-                  <div className="text-center mb-6 bg-[#f5f5f7] rounded-2xl p-4 shadow-inner">
-                    <div className="w-16 h-16 mx-auto rounded-full bg-white shadow-sm flex items-center justify-center mb-2">
-                      <span className="text-xl font-light text-gray-400">
+                  <div className="text-center mb-4 md:mb-6 bg-[#f5f5f7] rounded-xl md:rounded-2xl p-3 md:p-4 shadow-inner">
+                    <div className="w-12 h-12 md:w-16 md:h-16 mx-auto rounded-full bg-white shadow-sm flex items-center justify-center mb-2">
+                      <span className="text-lg md:text-xl font-light text-gray-400">
                         {currentContact.name.split(' ').map(name => name[0]).join('')}
                       </span>
                     </div>
-                    <h3 className="text-xl font-light text-gray-800">{currentContact.name}</h3>
-                    <a href={`tel:${currentContact.phone}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 block mb-1 mt-1 text-sm">
+                    <h3 className="text-lg md:text-xl font-light text-gray-800">{currentContact.name}</h3>
+                    <a href={`tel:${currentContact.phone}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 block mb-1 mt-1 text-xs md:text-sm">
                       {currentContact.phone}
                     </a>
                     <a href={`mailto:${currentContact.email}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 text-xs">
@@ -448,7 +448,7 @@ const PowerDialerPage = () => {
                     </a>
                   </div>
                   
-                  <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-5">
+                  <div className="bg-[#f5f5f7] rounded-xl md:rounded-2xl p-3 md:p-4 mb-4 md:mb-5">
                     <div className="flex justify-between text-xs mb-2">
                       <span className="text-gray-500">Bisherige Versuche:</span>
                       <span className="font-normal text-gray-800">{currentContact.previousAttempts}</span>
@@ -459,12 +459,12 @@ const PowerDialerPage = () => {
                     </div>
                   </div>
                   
-                  <div className="border-t border-gray-100 pt-4 flex-1">
+                  <div className="border-t border-gray-100 pt-3 md:pt-4 flex-1">
                     <h4 className="font-normal text-xs mb-2 text-gray-500 flex items-center">
                       <DocumentTextIcon className="w-3 h-3 mr-1.5" />
                       Notizen:
                     </h4>
-                    <div className="bg-[#f5f5f7] p-3 rounded-2xl flex-1 overflow-auto shadow-inner">
+                    <div className="bg-[#f5f5f7] p-3 rounded-xl md:rounded-2xl flex-1 overflow-auto shadow-inner">
                       <p className="text-xs text-gray-600 leading-relaxed">{currentContact.notes}</p>
                     </div>
                   </div>
