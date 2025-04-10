@@ -1,7 +1,8 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  HomeIcon, 
+  BuildingOffice2Icon, 
+  PhoneIcon,
   Cog6ToothIcon,
   ArrowLeftCircleIcon,
   ArrowRightCircleIcon
@@ -56,9 +57,15 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       {/* Nav Links */}
       <nav className="flex-1 px-3 py-4 space-y-1">
         <NavItem 
+          to="/power-dialer" 
+          icon={<PhoneIcon className="w-6 h-6" />} 
+          title="Power-Dialer" 
+          sidebarOpen={sidebarOpen} 
+        />
+        <NavItem 
           to="/" 
-          icon={<HomeIcon className="w-6 h-6" />} 
-          title="Dashboard" 
+          icon={<BuildingOffice2Icon className="w-6 h-6" />} 
+          title="Backoffice" 
           sidebarOpen={sidebarOpen} 
         />
       </nav>

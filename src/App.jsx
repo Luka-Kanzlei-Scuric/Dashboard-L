@@ -11,7 +11,7 @@ import ClientPortalPage from './clientportal/pages/ClientPortalPage';
 import ClientPortalAuth from './clientportal/pages/ClientPortalAuth';
 import LoginPage from './auth/components/LoginPage';
 import PrivateRoute from './auth/components/PrivateRoute';
-import SettingsPage from './pages/settings/SettingsPage';
+import PowerDialerPage from './pages/PowerDialerPage';
 
 function App() {
   return (
@@ -25,8 +25,8 @@ function App() {
           <Route element={<PrivateRoute />}>
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
+              <Route path="power-dialer" element={<PowerDialerPage />} />
               <Route path="client/:id" element={<ClientDetailPage />} />
-              {/* Einstellungen-Route entfernt */}
               <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Route>
