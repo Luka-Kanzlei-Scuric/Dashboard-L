@@ -252,14 +252,15 @@ app.post('/api/aircall/users/:id/calls', async (req, res) => {
       });
     }
     
-    // Get Aircall API key from environment variable
-    const aircallApiKey = process.env.AIRCALL_API_KEY;
+    // Get Aircall API key from environment variable or use hardcoded value for testing
+    const aircallApiKey = process.env.AIRCALL_API_KEY || '169250e46fdaa0ec9b842089e57a475f:da86ddaf732b0001e14daf573829ed3c';
     if (!aircallApiKey) {
       return res.status(500).json({
         success: false,
         message: 'Aircall API key not configured'
       });
     }
+    console.log('Using Aircall API key for calls endpoint:', aircallApiKey.substring(0, 10) + '...');
     
     // Make request to Aircall API
     const response = await axios.post(
@@ -324,14 +325,15 @@ app.post('/api/aircall/users/:id/dial', async (req, res) => {
       });
     }
     
-    // Get Aircall API key from environment variable
-    const aircallApiKey = process.env.AIRCALL_API_KEY;
+    // Get Aircall API key from environment variable or use hardcoded value for testing
+    const aircallApiKey = process.env.AIRCALL_API_KEY || '169250e46fdaa0ec9b842089e57a475f:da86ddaf732b0001e14daf573829ed3c';
     if (!aircallApiKey) {
       return res.status(500).json({
         success: false,
         message: 'Aircall API key not configured'
       });
     }
+    console.log('Using Aircall API key for dial endpoint:', aircallApiKey.substring(0, 10) + '...');
     
     // Make request to Aircall API
     const response = await axios.post(
