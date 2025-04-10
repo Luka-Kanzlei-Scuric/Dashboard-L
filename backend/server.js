@@ -230,6 +230,151 @@ const queueClientChange = (clientData, changeType) => {
 
 // API ROUTES
 
+// Aircall API proxy routes
+app.post('/api/aircall/users/:id/calls', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { number_id, to } = req.body;
+    
+    if (!number_id || !to) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'number_id and to parameters are required' 
+      });
+    }
+    
+    // Validate phone number is in E.164 format
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+    if (!e164Regex.test(to)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number must be in E.164 format (e.g. +18001231234)'
+      });
+    }
+    
+    // Get Aircall API key from environment variable
+    const aircallApiKey = process.env.AIRCALL_API_KEY;
+    if (!aircallApiKey) {
+      return res.status(500).json({
+        success: false,
+        message: 'Aircall API key not configured'
+      });
+    }
+    
+    // Make request to Aircall API
+    const response = await axios.post(
+      `https://api.aircall.io/v1/users/${id}/calls`,
+      { number_id, to },
+      {
+        auth: {
+          username: aircallApiKey.split(':')[0],
+          password: aircallApiKey.split(':')[1]
+        },
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    // Return success response
+    return res.status(204).send();
+  } catch (error) {
+    console.error('Error making Aircall API call:', error);
+    
+    // Return appropriate error based on Aircall API error
+    if (error.response) {
+      if (error.response.status === 400) {
+        return res.status(400).json({
+          success: false,
+          message: 'Number not found or invalid number to dial'
+        });
+      } else if (error.response.status === 405) {
+        return res.status(405).json({
+          success: false,
+          message: 'User not available'
+        });
+      }
+    }
+    
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+app.post('/api/aircall/users/:id/dial', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { to } = req.body;
+    
+    if (!to) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'to parameter is required' 
+      });
+    }
+    
+    // Validate phone number is in E.164 format
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+    if (!e164Regex.test(to)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number must be in E.164 format (e.g. +18001231234)'
+      });
+    }
+    
+    // Get Aircall API key from environment variable
+    const aircallApiKey = process.env.AIRCALL_API_KEY;
+    if (!aircallApiKey) {
+      return res.status(500).json({
+        success: false,
+        message: 'Aircall API key not configured'
+      });
+    }
+    
+    // Make request to Aircall API
+    const response = await axios.post(
+      `https://api.aircall.io/v1/users/${id}/phone/dial`,
+      { to },
+      {
+        auth: {
+          username: aircallApiKey.split(':')[0],
+          password: aircallApiKey.split(':')[1]
+        },
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    // Return success response
+    return res.status(204).send();
+  } catch (error) {
+    console.error('Error making Aircall API dial call:', error);
+    
+    // Return appropriate error based on Aircall API error
+    if (error.response) {
+      if (error.response.status === 400) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid number to dial'
+        });
+      } else if (error.response.status === 405) {
+        return res.status(405).json({
+          success: false,
+          message: 'User not available'
+        });
+      }
+    }
+    
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // Get all clients
 app.get('/api/clients', async (req, res) => {
   try {

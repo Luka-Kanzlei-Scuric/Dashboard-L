@@ -9,8 +9,10 @@ import {
   UserIcon,
   DocumentTextIcon,
   CheckCircleIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
+import aircallService from '../services/aircallService';
 
 const PowerDialerPage = () => {
   // States für den PowerDialer
@@ -22,10 +24,22 @@ const PowerDialerPage = () => {
   const [formLoaded, setFormLoaded] = useState(false);
   const [showDialerControls, setShowDialerControls] = useState(false);
   
+  // States für Aircall
+  const [showManualDialer, setShowManualDialer] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [isCallInProgress, setIsCallInProgress] = useState(false);
+  const [callError, setCallError] = useState(null);
+  
+  // Aircall Konfiguration
+  const aircallConfig = {
+    userId: "1527216", // Deine Aircall-Benutzer-ID
+    numberId: "967647" // Deine Aircall-Nummer-ID für "Dorsten - Lokal"
+  };
+  
   // Beispiel-Daten für aktuellen Kontakt
   const [currentContact, setCurrentContact] = useState({
     name: "Maria Schmidt",
-    phone: "+49 123 4567890",
+    phone: "+49 123 4567890", // Sollte im E.164-Format sein, z.B. "+491234567890"
     email: "maria.schmidt@example.com",
     previousAttempts: 2,
     lastContact: "2025-04-08 14:30",
@@ -77,6 +91,92 @@ const PowerDialerPage = () => {
     ].join(':');
   };
   
+  // Funktion zum Starten eines Anrufs mit Aircall
+  const startCall = async (phoneNumberToCall) => {
+    try {
+      setCallError(null);
+      setIsCallInProgress(true);
+      
+      // Entweder die eingegebene Nummer oder die des aktuellen Kontakts verwenden
+      const number = phoneNumberToCall || phoneNumber;
+      
+      // Validiere, dass die Nummer im E.164-Format ist (mit Ländervorwahl)
+      const e164Regex = /^\+[1-9]\d{1,14}$/;
+      if (!e164Regex.test(number)) {
+        throw new Error('Telefonnummer muss im E.164-Format sein (z.B. +491234567890)');
+      }
+      
+      // Anruf über Aircall API starten
+      await aircallService.startOutboundCall(
+        aircallConfig.userId,
+        aircallConfig.numberId,
+        number
+      );
+      
+      // Anruf erfolgreich gestartet, simuliere Anruf angenommen
+      simulateAnsweredCall();
+      
+      // Wenn manueller Dialer geöffnet war, schließen
+      setShowManualDialer(false);
+      
+      // Telefonnummer im Eingabefeld zurücksetzen
+      setPhoneNumber("");
+    } catch (error) {
+      console.error('Fehler beim Starten des Anrufs:', error);
+      setCallError(error.message || 'Fehler beim Starten des Anrufs');
+      setIsCallInProgress(false);
+    }
+  };
+  
+  // Funktion zum Anrufen des aktuellen Kontakts
+  const callCurrentContact = async () => {
+    try {
+      // Prüfe, ob ein aktueller Kontakt vorhanden ist
+      if (!currentContact || !currentContact.phone) {
+        throw new Error('Keine Telefonnummer für aktuellen Kontakt verfügbar');
+      }
+      
+      // Starte Anruf mit der Telefonnummer des aktuellen Kontakts
+      await startCall(currentContact.phone);
+    } catch (error) {
+      console.error('Fehler beim Anrufen des aktuellen Kontakts:', error);
+      setCallError(error.message || 'Fehler beim Anrufen des aktuellen Kontakts');
+    }
+  };
+  
+  // Funktion zum Formatieren einer Telefonnummer in E.164-Format
+  const formatToE164 = (number) => {
+    // Entferne alle Zeichen außer Ziffern
+    const digitsOnly = number.replace(/\D/g, '');
+    
+    // Wenn die Nummer mit einer führenden 0 beginnt, ersetze sie durch die deutsche Ländervorwahl
+    if (digitsOnly.startsWith('0')) {
+      return '+49' + digitsOnly.substring(1);
+    }
+    
+    // Wenn keine Ländervorwahl vorhanden ist, füge deutsche Vorwahl hinzu
+    if (!number.startsWith('+')) {
+      return '+49' + digitsOnly;
+    }
+    
+    // Wenn die Nummer bereits mit + beginnt, stelle sicher, dass das + erhalten bleibt
+    return '+' + digitsOnly;
+  };
+  
+  // Handler für Änderungen im Telefonnummern-Eingabefeld
+  const handlePhoneNumberChange = (e) => {
+    setPhoneNumber(e.target.value);
+  };
+  
+  // Handler für das Absenden des manuellen Dialer-Formulars
+  const handleDialSubmit = (e) => {
+    e.preventDefault();
+    
+    // Formatiere die Telefonnummer und starte den Anruf
+    const formattedNumber = formatToE164(phoneNumber);
+    startCall(formattedNumber);
+  };
+  
   // Cleanup beim Unmount
   useEffect(() => {
     return () => {
@@ -91,7 +191,9 @@ const PowerDialerPage = () => {
     const handleOutsideClick = (event) => {
       const controlsElement = document.getElementById('dialer-controls');
       const toggleElement = document.getElementById('dialer-toggle');
+      const manualDialerElement = document.getElementById('manual-dialer');
       
+      // Schließe Dialer-Steuerung bei Klick außerhalb
       if (showDialerControls && 
           controlsElement && 
           !controlsElement.contains(event.target) && 
@@ -99,13 +201,20 @@ const PowerDialerPage = () => {
           !toggleElement.contains(event.target)) {
         setShowDialerControls(false);
       }
+      
+      // Schließe den manuellen Dialer bei Klick außerhalb
+      if (showManualDialer &&
+          manualDialerElement &&
+          !manualDialerElement.contains(event.target)) {
+        setShowManualDialer(false);
+      }
     };
     
     document.addEventListener('mousedown', handleOutsideClick);
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
     };
-  }, [showDialerControls]);
+  }, [showDialerControls, showManualDialer]);
   
   return (
     <div className="h-full w-full bg-[#f5f5f7] overflow-hidden">
@@ -212,13 +321,23 @@ const PowerDialerPage = () => {
                 
                 {dialerActive && !callAnswered && (
                   <div className="p-4 bg-gray-50">
-                    <button
-                      onClick={simulateAnsweredCall}
-                      className="w-full flex items-center justify-center bg-white rounded-lg shadow-sm text-gray-600 hover:bg-gray-50 py-2 border border-gray-200"
-                    >
-                      <CheckCircleIcon className="w-4 h-4 mr-2 text-gray-500" />
-                      <span className="text-sm font-light">Anruf angenommen</span>
-                    </button>
+                    <div className="flex flex-col space-y-2">
+                      <button
+                        onClick={simulateAnsweredCall}
+                        className="w-full flex items-center justify-center bg-white rounded-lg shadow-sm text-gray-600 hover:bg-gray-50 py-2 border border-gray-200"
+                      >
+                        <CheckCircleIcon className="w-4 h-4 mr-2 text-gray-500" />
+                        <span className="text-sm font-light">Anruf angenommen</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => setShowManualDialer(true)}
+                        className="w-full flex items-center justify-center bg-white rounded-lg shadow-sm text-gray-600 hover:bg-gray-50 py-2 border border-gray-200"
+                      >
+                        <PhoneIcon className="w-4 h-4 mr-2 text-gray-500" />
+                        <span className="text-sm font-light">Nummer wählen</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -226,6 +345,81 @@ const PowerDialerPage = () => {
           </div>
         </div>
       </div>
+      
+      {/* Manueller Dialer (Modal) */}
+      {showManualDialer && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center px-4">
+          <div 
+            id="manual-dialer" 
+            className="bg-white rounded-2xl shadow-lg max-w-md w-full p-5 md:p-6"
+          >
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-lg font-light text-gray-800">Nummer wählen</h2>
+              <button 
+                onClick={() => setShowManualDialer(false)}
+                className="p-1 rounded-full hover:bg-gray-100"
+              >
+                <XMarkIcon className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            {callError && (
+              <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+                {callError}
+              </div>
+            )}
+            
+            <form onSubmit={handleDialSubmit}>
+              <div className="mb-4">
+                <label htmlFor="phoneNumber" className="block text-sm text-gray-600 mb-1">
+                  Telefonnummer
+                </label>
+                <input
+                  type="text"
+                  id="phoneNumber"
+                  value={phoneNumber}
+                  onChange={handlePhoneNumberChange}
+                  placeholder="+49 123 456789"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                  required
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Bitte im Format +49... eingeben oder die Umwandlung erfolgt automatisch
+                </p>
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowManualDialer(false)}
+                  className="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCallInProgress}
+                  className={`px-4 py-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 flex items-center ${
+                    isCallInProgress ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isCallInProgress ? (
+                    <>
+                      <ArrowPathIcon className="w-4 h-4 mr-2 animate-spin" />
+                      Verbinde...
+                    </>
+                  ) : (
+                    <>
+                      <PhoneIcon className="w-4 h-4 mr-2" />
+                      Anrufen
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       
       {/* Haupt-Dashboard */}
       <div className="max-w-screen-xl mx-auto pt-4 md:pt-6 px-4 md:px-6">
@@ -258,14 +452,6 @@ const PowerDialerPage = () => {
                     </div>
                   </div>
                   
-                  <div className="mt-auto flex items-center justify-center">
-                    <div className="text-center bg-gray-50 rounded-xl md:rounded-2xl p-4 w-full">
-                      <p className="text-xs text-gray-500 mb-3">Starten Sie den PowerDialer in der Titelleiste, um Anrufe zu tätigen.</p>
-                      <div className="flex items-center justify-center">
-                        <PhoneIcon className="w-6 h-6 text-gray-300" />
-                      </div>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col h-full">
@@ -440,12 +626,35 @@ const PowerDialerPage = () => {
                       </span>
                     </div>
                     <h3 className="text-lg md:text-xl font-light text-gray-800">{currentContact.name}</h3>
-                    <a href={`tel:${currentContact.phone}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 block mb-1 mt-1 text-xs md:text-sm">
-                      {currentContact.phone}
-                    </a>
-                    <a href={`mailto:${currentContact.email}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 text-xs">
+                    
+                    <div className="mt-2 mb-2 flex items-center justify-center space-x-2">
+                      <a href={`tel:${currentContact.phone}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 block text-xs md:text-sm">
+                        {currentContact.phone}
+                      </a>
+                      
+                      <button
+                        onClick={callCurrentContact}
+                        disabled={isCallInProgress || !dialerActive}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                          dialerActive 
+                            ? 'bg-green-100 text-green-600 hover:bg-green-200' 
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        }`}
+                        title={dialerActive ? "Kontakt anrufen" : "Aktivieren Sie zuerst den PowerDialer"}
+                      >
+                        <PhoneIcon className="w-3 h-3" />
+                      </button>
+                    </div>
+                    
+                    <a href={`mailto:${currentContact.email}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 text-xs block">
                       {currentContact.email}
                     </a>
+                    
+                    {callError && (
+                      <div className="mt-2 bg-red-50 text-red-600 p-2 rounded-lg text-xs">
+                        {callError}
+                      </div>
+                    )}
                   </div>
                   
                   <div className="bg-[#f5f5f7] rounded-xl md:rounded-2xl p-3 md:p-4 mb-4 md:mb-5">
