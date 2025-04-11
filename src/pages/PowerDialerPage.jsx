@@ -81,12 +81,13 @@ const PowerDialerPage = () => {
   const aircallConfig = {
     userId: "1527216", // Aircall-Benutzer-ID
     numberId: "967647", // Aircall-Nummer-ID
-    useMockMode: true,  // Mock-Modus für Tests - IMMER true lassen für Entwicklung ohne echte Aircall-API
+    // Für Produktion: useMockMode auf false setzen, wenn API-Key konfiguriert ist
+    useMockMode: false,  // Im Produktionsmodus auf false setzen
     debugMode: true,    // Aktiviert ausführliche Logs
     mockCallDuration: 3000, // Anrufdauer im Mock-Modus in ms (auf 3 Sekunden verkürzt für schnelleres Testen)
     webhookUrl: window.location.origin + "/api/aircall-webhook", // Optional: URL für Webhooks in Produktivumgebung
-    // Um KEINE API-Anfragen zu stellen und nur lokale Mocks zu verwenden
-    forceCompleteMock: true
+    // Im Produktionsmodus auf false setzen, um echte API-Aufrufe zu ermöglichen
+    forceCompleteMock: false
   };
   
   // -------------------- Hilfsfunktionen --------------------
