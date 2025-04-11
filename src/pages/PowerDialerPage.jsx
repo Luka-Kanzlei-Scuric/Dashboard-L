@@ -83,7 +83,7 @@ const PowerDialerPage = () => {
     numberId: "967647", // Aircall-Nummer-ID
     useMockMode: true,  // Mock-Modus für Tests MUSS true sein für lokale Entwicklung
     debugMode: true,    // Aktiviert ausführliche Logs
-    mockCallDuration: 5000, // Anrufdauer im Mock-Modus in ms
+    mockCallDuration: 3000, // Anrufdauer im Mock-Modus in ms (auf 3 Sekunden verkürzt für schnelleres Testen)
     webhookUrl: window.location.origin + "/api/aircall-webhook" // Optional: URL für Webhooks in Produktivumgebung
   };
   
@@ -445,13 +445,17 @@ const PowerDialerPage = () => {
       // 3. Nach eingestellter Dauer Anruf beenden
       const callDuration = aircallConfig.mockCallDuration || 5000;
       const endCallTimeout = setTimeout(() => {
-        if (!dialerActive || !isCallInProgress) return;
+        if (!dialerActive || !isCallInProgress) {
+          console.log("[MOCK] Anruf nicht mehr aktiv, überspringe Auto-End");
+          return;
+        }
         
         console.log(`[MOCK] Automatisches Beenden des Anrufs nach ${callDuration/1000} Sekunden`);
         if (timeoutId) clearTimeout(timeoutId);
         
         // WICHTIG: Der direkte Aufruf von endCurrentCall scheint ein Problem zu sein
         // Probieren wir es mit einem expliziten Status-Reset und dann moveToNextContact
+        console.log("[MOCK] Setze UI-Status zurück und beende Anruf");
         setCallAnswered(false);
         setFormLoaded(false);
         setFormLoading(false);
@@ -469,6 +473,11 @@ const PowerDialerPage = () => {
               moveToNextContact();
             }, 1000);
             window._activeTimeouts.push(nextContactTimeout);
+          } else {
+            console.log("[MOCK] Kein Auto-Dialing oder Dialer nicht aktiv:", {
+              autoDialingActive,
+              dialerActive
+            });
           }
         });
       }, callDuration + 3500); // 3.5s klingeln + anrufsdauer
@@ -689,8 +698,18 @@ const PowerDialerPage = () => {
   const startDialingSequence = () => {
     if (!dialerActive) return;
     
+    console.log("Start Dialing Sequence aktiviert - Starte Auto-Dialing");
     setAutoDialingActive(true);
-    dialNextContact();
+    
+    // Immer explizit zum ersten Kontakt zurückkehren wenn wir auto-dialing starten
+    setCurrentContactIndex(0);
+    setCurrentContact(contactList[0]);
+    
+    // Verzögerung hinzufügen, damit der State Update Zeit hat
+    setTimeout(() => {
+      console.log("Starte ersten Anruf in der Auto-Dial Sequenz");
+      dialNextContact();
+    }, 500);
   };
   
   /**
@@ -704,71 +723,91 @@ const PowerDialerPage = () => {
    * Wählt den nächsten Kontakt in der Liste an
    */
   const dialNextContact = async () => {
-    console.log("dialNextContact: Starte Anruf zum nächsten Kontakt");
+    console.log("✅ dialNextContact: Starte Anruf zum nächsten Kontakt");
     
     try {
+      // DEBUG: Zeige aktuellen Zustand
+      console.log("💡 DEBUG Zustand:", {
+        autoDialingActive,
+        dialerActive,
+        currentContactIndex,
+        contactListLength: contactList.length,
+        isCallInProgress
+      });
+      
       // Sicherheitschecks
       if (!dialerActive) {
-        console.log("PowerDialer ist nicht aktiv, kein Anruf wird getätigt");
+        console.log("❌ PowerDialer ist nicht aktiv, kein Anruf wird getätigt");
+        return;
+      }
+      
+      // Prüfe, ob wir am Ende der Liste sind
+      if (currentContactIndex >= contactList.length) {
+        console.log("❌ Ende der Kontaktliste erreicht, beende Auto-Dialing");
+        setAutoDialingActive(false);
         return;
       }
       
       // Verfügbarkeit prüfen
-      console.log("Prüfe Verfügbarkeit des Sales Rep...");
+      console.log("🔍 Prüfe Verfügbarkeit des Sales Rep...");
       const availability = await checkSalesRepAvailability();
       
       if (!availability?.available) {
-        console.log(`Sales Rep ist nicht verfügbar (${availability?.status}). Auto-Dialing wird angehalten.`);
+        console.log(`❌ Sales Rep ist nicht verfügbar (${availability?.status}). Auto-Dialing wird angehalten.`);
         setCallError(`Sales Rep ist nicht verfügbar (${availability?.status}). Auto-Dialing angehalten.`);
         setAutoDialingActive(false);
         return;
       }
       
-      console.log("Sales Rep ist verfügbar, fahre fort...");
+      console.log("✅ Sales Rep ist verfügbar, fahre fort...");
       
       // Laufende Anrufe beenden
       if (isCallInProgress || aircallService.hasActiveCall()) {
-        console.log("Es gibt noch einen aktiven Anruf, beende diesen zuerst");
+        console.log("⚠️ Es gibt noch einen aktiven Anruf, beende diesen zuerst");
         await endCurrentCall();
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
-      // Prüfe, ob wir am Ende der Liste sind
-      if (currentContactIndex >= contactList.length) {
-        console.log("Ende der Kontaktliste erreicht, beende Auto-Dialing");
-        setAutoDialingActive(false);
-        return;
-      }
-      
       // Nächsten Kontakt anrufen
-      console.log(`Kontaktindex: ${currentContactIndex}, Kontaktliste Länge: ${contactList.length}`);
+      console.log(`📞 Kontaktindex: ${currentContactIndex}, Kontaktliste Länge: ${contactList.length}`);
       const contactToCall = contactList[currentContactIndex];
       
       if (!contactToCall) {
-        console.error("Kontakt nicht gefunden! Index scheint ungültig zu sein.");
+        console.error("❌ Kontakt nicht gefunden! Index scheint ungültig zu sein.");
         setCallError("Fehler: Kontakt nicht gefunden");
+        
+        // Beim nächsten versuchen
+        if (autoDialingActive) {
+          moveToNextContact();
+        }
         return;
       }
       
-      console.log(`Bereite Anruf für ${contactToCall.name} vor...`);
+      console.log(`📞 Bereite Anruf für ${contactToCall.name} vor...`);
       setCurrentContact(contactToCall);
+      
+      // WICHTIG: Diese States müssen explizit gesetzt werden, damit der Anruf richtig startet
       setIsCallInProgress(true);
       setCallAnswered(false);
       setFormLoaded(false);
+      setFormLoading(false);
       setCallError(null);
       
-      console.log(`Rufe ${contactToCall.name} unter ${contactToCall.phone} an...`);
+      // Kleine Verzögerung hinzufügen, damit die State-Updates Zeit haben, sich zu verbreiten
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      console.log(`📞 Rufe ${contactToCall.name} unter ${contactToCall.phone} an...`);
       const callResponse = await startCall(contactToCall.phone);
-      console.log("Anruf initiiert:", callResponse?.data?.id);
+      console.log("✅ Anruf initiiert:", callResponse?.data?.id);
       
     } catch (error) {
-      console.error("Fehler beim Anrufen des nächsten Kontakts:", error);
+      console.error("❌ Fehler beim Anrufen des nächsten Kontakts:", error);
       setCallError(error.message || "Unbekannter Fehler beim Anrufen");
       setIsCallInProgress(false);
       
       // Bei Fehler zum nächsten Kontakt gehen, aber nur wenn Auto-Dialing aktiv ist
       if (autoDialingActive && dialerActive) {
-        console.log("Fehler aufgetreten, gehe zum nächsten Kontakt in 3 Sekunden...");
+        console.log("⚠️ Fehler aufgetreten, gehe zum nächsten Kontakt in 3 Sekunden...");
         const errorTimeout = setTimeout(() => {
           moveToNextContact();
         }, 3000);
@@ -784,11 +823,20 @@ const PowerDialerPage = () => {
    * Wechselt zum nächsten Kontakt in der Liste
    */
   const moveToNextContact = () => {
-    console.log("moveToNextContact aufgerufen - Wechsle zum nächsten Kontakt");
+    console.log("🔄 moveToNextContact aufgerufen - Wechsle zum nächsten Kontakt");
+    
+    // Prüfe die aktuellen Zustände
+    console.log("💡 DEBUG moveToNextContact:", {
+      autoDialingActive,
+      dialerActive,
+      currentContactIndex,
+      contactListLength: contactList.length,
+      isCallInProgress
+    });
     
     // Berechne den Index des nächsten Kontakts
     const nextIndex = currentContactIndex + 1;
-    console.log(`Aktueller Kontaktindex: ${currentContactIndex}, Nächster Index: ${nextIndex}, Kontaktliste Länge: ${contactList.length}`);
+    console.log(`🔢 Aktueller Kontaktindex: ${currentContactIndex}, Nächster Index: ${nextIndex}, Kontaktliste Länge: ${contactList.length}`);
     
     // Setze den neuen Index
     setCurrentContactIndex(nextIndex);
@@ -797,16 +845,19 @@ const PowerDialerPage = () => {
     if (nextIndex < contactList.length) {
       // Setze den neuen Kontakt
       const nextContact = contactList[nextIndex];
-      console.log(`Nächster Kontakt: ${nextContact.name} (${nextContact.phone})`);
+      console.log(`👤 Nächster Kontakt: ${nextContact.name} (${nextContact.phone})`);
       setCurrentContact(nextContact);
       
       // Wenn Auto-Dialing aktiv, rufe nach einer kurzen Pause den nächsten Kontakt an
       if (autoDialingActive && dialerActive) {
-        console.log("Auto-Dialing aktiv, rufe nächsten Kontakt in 1.5 Sekunden an");
+        console.log("🔄 Auto-Dialing aktiv, rufe nächsten Kontakt in 1.5 Sekunden an");
+        
+        // Stelle sicher, dass kein Anruf läuft
+        setIsCallInProgress(false);
         
         // Speichere Timeout-ID für mögliche Bereinigung
         const nextCallTimeout = setTimeout(() => {
-          console.log("Starte Anruf zum nächsten Kontakt...");
+          console.log("📞 Starte Anruf zum nächsten Kontakt...");
           dialNextContact();
         }, 1500);
         
@@ -814,11 +865,16 @@ const PowerDialerPage = () => {
         window._activeTimeouts = window._activeTimeouts || [];
         window._activeTimeouts.push(nextCallTimeout);
       } else {
-        console.log("Auto-Dialing nicht aktiv, warte auf manuellen Anruf");
+        console.log("⏸️ Auto-Dialing nicht aktiv, warte auf manuellen Anruf");
       }
     } else {
-      console.log("Ende der Kontaktliste erreicht");
+      console.log("🛑 Ende der Kontaktliste erreicht");
       setAutoDialingActive(false);
+      // Starte optional wieder von vorne
+      setCurrentContactIndex(0);
+      if (contactList.length > 0) {
+        setCurrentContact(contactList[0]);
+      }
     }
   };
   
