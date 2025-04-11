@@ -81,7 +81,9 @@ const PowerDialerPage = () => {
   const aircallConfig = {
     userId: "1527216", // Aircall-Benutzer-ID
     numberId: "967647", // Aircall-Nummer-ID
-    useMockMode: true,  // Mock-Modus für Tests
+    useMockMode: true,  // Mock-Modus für Tests MUSS true sein für lokale Entwicklung
+    debugMode: true,    // Aktiviert ausführliche Logs
+    mockCallDuration: 5000, // Anrufdauer im Mock-Modus in ms
     webhookUrl: window.location.origin + "/api/aircall-webhook" // Optional: URL für Webhooks in Produktivumgebung
   };
   
@@ -142,6 +144,32 @@ const PowerDialerPage = () => {
       // Timer stoppen
       if (sessionInterval) {
         clearInterval(sessionInterval);
+      }
+      
+      // Alle aktiven Intervalle und Timeouts stoppen
+      if (window._activeIntervals) {
+        console.log(`Bereinige ${window._activeIntervals.length} aktive Intervalle`);
+        window._activeIntervals.forEach(interval => {
+          try {
+            clearInterval(interval);
+          } catch (error) {
+            console.error("Fehler beim Bereinigen des Intervals:", error);
+          }
+        });
+        window._activeIntervals = [];
+      }
+      
+      // Alle aktiven Timeouts beenden
+      if (window._activeTimeouts) {
+        console.log(`Bereinige ${window._activeTimeouts.length} aktive Timeouts`);
+        window._activeTimeouts.forEach(timeout => {
+          try {
+            clearTimeout(timeout);
+          } catch (error) {
+            console.error("Fehler beim Bereinigen des Timeouts:", error);
+          }
+        });
+        window._activeTimeouts = [];
       }
       
       // Alle aktiven Anrufe beenden
@@ -361,6 +389,10 @@ const PowerDialerPage = () => {
    * Überwacht Änderungen des Anrufstatus
    */
   const handleCallStatusChanges = (callId, timeoutId) => {
+    if (aircallConfig.debugMode) {
+      console.log("--------- ANRUF STATUS ÜBERWACHUNG GESTARTET ---------");
+    }
+    
     if (!callId) {
       console.error("Keine Call-ID für Status-Überwachung verfügbar");
       setCallError("Fehler beim Tätigen des Anrufs");
@@ -370,9 +402,82 @@ const PowerDialerPage = () => {
     
     console.log(`Starte Status-Überwachung für Anruf ${callId}`);
     
-    // In einer Produktivumgebung würden wir Webhooks verwenden
-    // Im Testmodus verwenden wir die Simulationsfunktion des aircallService
+    // In Mock-Modus immer sofort annehmen (zu Testzwecken)
+    if (aircallConfig.useMockMode) {
+      if (aircallConfig.debugMode) {
+        console.log("[MOCK] Simuliere Anrufverlauf im Debug-Modus");
+      }
+      
+      // -------------------- VEREINFACHTER MOCK WORKFLOW --------------------
+      // Initialisiere Timeouts Array wenn nötig
+      window._activeTimeouts = window._activeTimeouts || [];
+      
+      // 1. Erstmal kurz klingeln lassen (1.5s)
+      const ringingTimeout = setTimeout(() => {
+        if (!dialerActive || !isCallInProgress) return;
+        
+        if (aircallConfig.debugMode) {
+          console.log("[MOCK] Anruf klingelt...");
+        }
+      }, 500);
+      window._activeTimeouts.push(ringingTimeout);
+      
+      // 2. Nach 2.5 Sekunden Anruf annehmen
+      const answerTimeout = setTimeout(() => {
+        if (!dialerActive || !isCallInProgress) return;
+        
+        console.log(`[MOCK] Anruf ${callId} wurde angenommen`);
+        setCallAnswered(true);
+        setFormLoading(true);
+        
+        // Formular mit kleiner Verzögerung laden
+        const formTimeout = setTimeout(() => {
+          if (!dialerActive || !isCallInProgress) return;
+          
+          setFormLoading(false);
+          setFormLoaded(true);
+          console.log("[MOCK] Formular geladen.");
+        }, 1000);
+        window._activeTimeouts.push(formTimeout);
+      }, 2500);
+      window._activeTimeouts.push(answerTimeout);
+      
+      // 3. Nach eingestellter Dauer Anruf beenden
+      const callDuration = aircallConfig.mockCallDuration || 5000;
+      const endCallTimeout = setTimeout(() => {
+        if (!dialerActive || !isCallInProgress) return;
+        
+        console.log(`[MOCK] Automatisches Beenden des Anrufs nach ${callDuration/1000} Sekunden`);
+        if (timeoutId) clearTimeout(timeoutId);
+        
+        // WICHTIG: Der direkte Aufruf von endCurrentCall scheint ein Problem zu sein
+        // Probieren wir es mit einem expliziten Status-Reset und dann moveToNextContact
+        setCallAnswered(false);
+        setFormLoaded(false);
+        setFormLoading(false);
+        setIsCallInProgress(false);
+        
+        // API-Anruf beenden
+        aircallService.clearCallState().then(() => {
+          console.log("[MOCK] Anruf API bereinigt");
+          
+          // Mit Verzögerung zum nächsten Kontakt
+          if (autoDialingActive && dialerActive) {
+            console.log("[MOCK] Auto-Dialing aktiv, gehe zum nächsten Kontakt");
+            const nextContactTimeout = setTimeout(() => {
+              console.log("[MOCK] Starte moveToNextContact nach Verzögerung");
+              moveToNextContact();
+            }, 1000);
+            window._activeTimeouts.push(nextContactTimeout);
+          }
+        });
+      }, callDuration + 3500); // 3.5s klingeln + anrufsdauer
+      window._activeTimeouts.push(endCallTimeout);
+      
+      return;
+    } 
     
+    // ---------------- ECHTER API-MODUS (NICHT GETESTET) ----------------
     // Direkter Statuscheck - sofort prüfen ob der Anruf wirklich aktiv ist
     setTimeout(async () => {
       try {
@@ -383,7 +488,7 @@ const PowerDialerPage = () => {
           console.error("Anruf konnte nicht initiiert werden");
           setCallError("Anruf konnte nicht gestartet werden");
           setIsCallInProgress(false);
-          clearTimeout(timeoutId);
+          if (timeoutId) clearTimeout(timeoutId);
           
           if (autoDialingActive) {
             setTimeout(() => moveToNextContact(), 2000);
@@ -394,94 +499,64 @@ const PowerDialerPage = () => {
         console.error("Fehler beim Abrufen des Anrufstatus:", error);
       }
     }, 500);
-    
-    // Simulierte Anrufannahme nach zufälliger Zeit (nur für Demo/Test)
-    if (aircallConfig.useMockMode) {
-      // VERBESSERT: Immer eine Antwort simulieren (keine 0-Verzögerung mehr)
-      const randomDelay = 2000 + Math.random() * 3000;
-      
-      // Simuliere Klingeln und dann Annahme mit 80% Wahrscheinlichkeit
-      if (Math.random() < 0.8) {
-        setTimeout(() => {
-          if (dialerActive && isCallInProgress) {
-            console.log(`[MOCK] Anruf ${callId} wurde angenommen`);
-            setCallAnswered(true);
-            setFormLoading(true);
-            
-            // Formular laden
-            setTimeout(() => {
-              if (dialerActive && isCallInProgress) {
-                setFormLoading(false);
-                setFormLoaded(true);
-              }
-            }, 1500);
-            
-            // Nach einer gewissen Zeit Anruf beenden (wenn automatisch)
-            if (autoDialingActive) {
-              const callDuration = 5000 + Math.random() * 5000;
-              setTimeout(() => {
-                if (dialerActive && isCallInProgress) {
-                  console.log(`[MOCK] Automatisches Beenden des Anrufs nach ${Math.round(callDuration/1000)} Sekunden`);
-                  clearTimeout(timeoutId);
-                  endCurrentCall();
-                }
-              }, callDuration);
-            }
-          }
-        }, randomDelay);
-      } else {
-        // Simuliere, dass niemand antwortet
-        setTimeout(() => {
-          if (dialerActive && isCallInProgress) {
-            console.log(`[MOCK] Anruf ${callId} wurde nicht beantwortet`);
-            clearTimeout(timeoutId);
-            
-            if (autoDialingActive) {
-              console.log("Gehe zum nächsten Kontakt (nicht beantwortet)");
-              setIsCallInProgress(false);
-              moveToNextContact();
-            } else {
-              setIsCallInProgress(false);
-              aircallService.clearCallState();
-            }
-          }
-        }, 5000);
-      }
-    } else {
-      // In einer Produktivumgebung würden wir hier auf Webhook-Events reagieren
-      // oder regelmäßig den Status abfragen
-      const statusCheckInterval = setInterval(async () => {
-        try {
-          if (!dialerActive || !isCallInProgress) {
-            clearInterval(statusCheckInterval);
-            return;
-          }
-          
-          const status = await aircallService.getCallStatus(callId);
-          console.log(`Anrufstatus Update: ${status?.status}`);
-          
-          if (status?.status === 'answered' && !callAnswered) {
-            setCallAnswered(true);
-            setFormLoading(true);
-            
-            setTimeout(() => {
-              if (dialerActive && isCallInProgress) {
-                setFormLoading(false);
-                setFormLoaded(true);
-              }
-            }, 1500);
-          } else if (status?.status === 'ended' || status?.status === 'completed') {
-            clearInterval(statusCheckInterval);
-            endCurrentCall();
-          }
-        } catch (error) {
-          console.error("Fehler beim Abrufen des Anrufstatus:", error);
+
+    // In einer Produktivumgebung würden wir hier auf Webhook-Events reagieren
+    // oder regelmäßig den Status abfragen
+    const statusCheckInterval = setInterval(async () => {
+      try {
+        if (!dialerActive || !isCallInProgress) {
+          clearInterval(statusCheckInterval);
+          return;
         }
-      }, 3000);
-      
-      // Speichere das Interval zur Bereinigung
-      return () => clearInterval(statusCheckInterval);
-    }
+        
+        const status = await aircallService.getCallStatus(callId);
+        console.log(`Anrufstatus Update: ${status?.status}`);
+        
+        if (status?.status === 'answered' && !callAnswered) {
+          setCallAnswered(true);
+          setFormLoading(true);
+          
+          setTimeout(() => {
+            if (dialerActive && isCallInProgress) {
+              setFormLoading(false);
+              setFormLoaded(true);
+            }
+          }, 1500);
+        } else if (status?.status === 'ended' || status?.status === 'completed') {
+          clearInterval(statusCheckInterval);
+          
+          // Statt direktem Aufruf setzen wir zuerst die Stati zurück
+          setCallAnswered(false);
+          setFormLoaded(false);
+          setFormLoading(false);
+          setIsCallInProgress(false);
+          
+          // API-Anruf beenden
+          aircallService.clearCallState().then(() => {
+            // Mit Verzögerung zum nächsten Kontakt
+            if (autoDialingActive && dialerActive) {
+              setTimeout(() => {
+                moveToNextContact();
+              }, 1000);
+            }
+          });
+        }
+      } catch (error) {
+        console.error("Fehler beim Abrufen des Anrufstatus:", error);
+      }
+    }, 3000);
+    
+    // Speichere das Interval zur Bereinigung
+    window._activeIntervals = window._activeIntervals || [];
+    window._activeIntervals.push(statusCheckInterval);
+    
+    return () => {
+      clearInterval(statusCheckInterval);
+      const index = window._activeIntervals.indexOf(statusCheckInterval);
+      if (index > -1) {
+        window._activeIntervals.splice(index, 1);
+      }
+    };
   };
   
   /**
