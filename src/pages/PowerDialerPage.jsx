@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   PhoneIcon, 
   PauseIcon, 
@@ -10,45 +10,47 @@ import {
   DocumentTextIcon,
   CheckCircleIcon,
   ChevronDownIcon,
-  XMarkIcon
+  XMarkIcon,
+  ExclamationCircleIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 import aircallService from '../services/aircallService';
 
+/**
+ * PowerDialerPage Komponente - Vollständig überarbeitet
+ * 
+ * Anzeige und Steuerung des PowerDialers mit Aircall-Integration
+ * 
+ * Funktionsweise:
+ * 1. Benutzer aktiviert den PowerDialer
+ * 2. System prüft die Verfügbarkeit des Sales Reps bei Aircall
+ * 3. Bei Verfügbarkeit kann ein Anruf getätigt werden (manuell oder automatisch)
+ * 4. Anrufstatus wird aktiv überwacht (Polling oder Webhooks im Produktivbetrieb)
+ * 5. Bei Anrufende wird entsprechend reagiert (nächste Nummer wählen, Formular schließen)
+ */
 const PowerDialerPage = () => {
-  // States für den PowerDialer
+  // -------------------- States --------------------
+  
+  // PowerDialer States
   const [dialerActive, setDialerActive] = useState(false);
   const [sessionTime, setSessionTime] = useState(0);
   const [sessionInterval, setSessionInterval] = useState(null);
+  const [showDialerControls, setShowDialerControls] = useState(false);
+  
+  // Anruf-UI States
   const [callAnswered, setCallAnswered] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [formLoaded, setFormLoaded] = useState(false);
-  const [showDialerControls, setShowDialerControls] = useState(false);
-  
-  // States für Aircall
   const [showManualDialer, setShowManualDialer] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
+  
+  // Anruf-Tracking States
   const [isCallInProgress, setIsCallInProgress] = useState(false);
   const [callError, setCallError] = useState(null);
+  const [userStatus, setUserStatus] = useState(null);
+  const [statusPollingActive, setStatusPollingActive] = useState(false);
   
-  // Aircall Konfiguration
-  const aircallConfig = {
-    userId: "1527216", // Deine Aircall-Benutzer-ID
-    numberId: "967647", // Deine Aircall-Nummer-ID für "Dorsten - Lokal"
-    useMockMode: true // Aktiviere den Mock-Modus, falls API nicht verfügbar
-  };
-  
-  // Überprüfe, ob der aircallService verfügbar ist
-  useEffect(() => {
-    if (!aircallService || typeof aircallService !== 'object') {
-      console.error("aircallService ist nicht verfügbar oder kein Objekt");
-      setCallError("Anrufservice ist nicht verfügbar. Bitte versuchen Sie es später erneut.");
-    } else {
-      console.log("aircallService erfolgreich initialisiert:", 
-                  Object.keys(aircallService).join(', '));
-    }
-  }, []);
-  
-  // Liste der zu kontaktierenden Personen
+  // Kontakt-States
   const [contactList, setContactList] = useState([
     {
       id: "contact1",
@@ -69,259 +71,25 @@ const PowerDialerPage = () => {
       notes: "Neuer Interessent, wurde noch nicht kontaktiert."
     }
   ]);
-  
-  // Aktuell ausgewählter/angerufener Kontakt
   const [currentContact, setCurrentContact] = useState(null);
-  
-  // Index des aktuellen Kontakts in der Liste
   const [currentContactIndex, setCurrentContactIndex] = useState(0);
   
-  // Status für automatische Wählsequenz
+  // Automatische Wählsequenz States
   const [autoDialingActive, setAutoDialingActive] = useState(false);
-  const [callInProgress, setCallInProgress] = useState(false);
   
-  // PowerDialer aktivieren/deaktivieren
-  const toggleDialer = async () => {
-    const newDialerState = !dialerActive;
-    setDialerActive(newDialerState);
-    setCallAnswered(false);
-    setFormLoaded(false);
-    
-    // Timer starten oder stoppen
-    if (newDialerState) {
-      // PowerDialer wird aktiviert
-      const interval = setInterval(() => {
-        setSessionTime(prev => prev + 1);
-      }, 1000);
-      setSessionInterval(interval);
-      
-      // Setze den aktuellen Kontakt auf den ersten in der Liste
-      setCurrentContactIndex(0);
-      setCurrentContact(contactList[0]);
-      
-      // Prüfe, ob es einen aktiven Anruf gibt und beende ihn
-      if (aircallService && typeof aircallService.hasActiveCall === 'function' && aircallService.hasActiveCall()) {
-        console.log("Es gibt einen aktiven Anruf, der beim Dialer-Start beendet wird.");
-        try {
-          await aircallService.clearCallState();
-        } catch (error) {
-          console.error("Fehler beim Beenden des vorherigen Anrufs:", error);
-        }
-      }
-      
-      // Starte die automatische Wählsequenz, wenn gewünscht
-      if (autoDialingActive) {
-        startDialingSequence();
-      }
-    } else {
-      // PowerDialer wird deaktiviert
-      clearInterval(sessionInterval);
-      setSessionInterval(null);
-      setAutoDialingActive(false);
-      setCallInProgress(false);
-      setIsCallInProgress(false);
-      setCallAnswered(false);
-      setCallError(null);
-      
-      // Wenn ein Anruf läuft, beenden wir diesen explizit über die Aircall API
-      console.log("PowerDialer wird deaktiviert - alle laufenden Anrufe werden beendet");
-      if (aircallService && typeof aircallService.clearCallState === 'function') {
-        try {
-          await aircallService.clearCallState();
-        } catch (error) {
-          console.error("Fehler beim Beenden aktiver Anrufe:", error);
-        }
-      } else {
-        console.warn("aircallService nicht verfügbar beim Deaktivieren des PowerDialers");
-      }
-    }
+  // Aircall-Konfiguration
+  const aircallConfig = {
+    userId: "1527216", // Aircall-Benutzer-ID
+    numberId: "967647", // Aircall-Nummer-ID
+    useMockMode: true,  // Mock-Modus für Tests
+    webhookUrl: window.location.origin + "/api/aircall-webhook" // Optional: URL für Webhooks in Produktivumgebung
   };
   
-  // Startet die automatische Wählsequenz
-  const startDialingSequence = () => {
-    if (!dialerActive) return;
-    
-    setAutoDialingActive(true);
-    dialNextContact();
-  };
+  // -------------------- Hilfsfunktionen --------------------
   
-  // Stoppt die automatische Wählsequenz
-  const stopDialingSequence = () => {
-    setAutoDialingActive(false);
-  };
-  
-  // Ruft den nächsten Kontakt in der Liste an
-  const dialNextContact = async () => {
-    try {
-      // Sicherheitscheck: Nur anrufen, wenn der Dialer aktiv ist
-      if (!dialerActive) {
-        console.log("PowerDialer ist nicht aktiv, kein Anruf wird getätigt");
-        return;
-      }
-      
-      // Wenn bereits ein Anruf läuft, diesen zuerst beenden
-      if (callInProgress || (aircallService && typeof aircallService.hasActiveCall === 'function' && aircallService.hasActiveCall())) {
-        console.log("Es läuft bereits ein Anruf. Beende diesen zuerst.");
-        await endCurrentCall();
-        // Kurze Pause, um sicherzustellen, dass der vorherige Anruf komplett beendet wurde
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      if (currentContactIndex >= contactList.length) {
-        // Am Ende der Liste angekommen
-        console.log("Ende der Kontaktliste erreicht");
-        setAutoDialingActive(false);
-        return;
-      }
-      
-      const contactToCall = contactList[currentContactIndex];
-      setCurrentContact(contactToCall);
-      setCallInProgress(true);
-      setCallAnswered(false);
-      setFormLoaded(false);
-      setCallError(null);
-      
-      console.log(`Rufe ${contactToCall.name} unter ${contactToCall.phone} an...`);
-      
-      // Anruf über Aircall API starten
-      await startCall(contactToCall.phone);
-      
-      // In einer echten Implementierung würden wir hier einen Webhook nutzen,
-      // um über den Anrufstatus informiert zu werden. 
-      // Für den Prototyp simulieren wir das.
-      
-      // Starte einen periodischen Check des Anrufstatus, ob im Mock-Modus oder echter API
-      // Dies stellt sicher, dass wir auf Statusänderungen reagieren können
-      const statusCheckInterval = setInterval(async () => {
-        if (!dialerActive || !callInProgress) {
-          clearInterval(statusCheckInterval);
-          return;
-        }
-        
-        try {
-          if (aircallService && typeof aircallService.getCallStatus === 'function') {
-            const callStatus = await aircallService.getCallStatus();
-            console.log(`Aktueller Anrufstatus: ${callStatus?.status}`);
-            
-            // Wenn der Anruf beendet wurde, zum nächsten Kontakt gehen
-            if (callStatus?.status === 'ended' || callStatus?.status === 'completed') {
-              clearInterval(statusCheckInterval);
-              endCurrentCall();
-            }
-          }
-          
-          // Zusätzlich prüfen wir, ob der Anruf noch aktiv ist
-          if (aircallService && typeof aircallService.hasActiveCall === 'function' && 
-              !aircallService.hasActiveCall()) {
-            console.log("Anruf ist nicht mehr aktiv, gehe zum nächsten Kontakt");
-            clearInterval(statusCheckInterval);
-            endCurrentCall();
-          }
-        } catch (error) {
-          console.error("Fehler beim Abrufen des Anrufstatus:", error);
-          // Trotz Fehler weitermachen, nächster Versuch in 5 Sekunden
-        }
-      }, 3000); // Alle 3 Sekunden prüfen für schnelleres Feedback
-      
-      // Speichere den Interval für die Bereinigung
-      // Wird später in useEffect bereinigt
-      if (typeof window !== 'undefined') {
-        window._activeIntervals = window._activeIntervals || [];
-        window._activeIntervals.push(statusCheckInterval);
-      }
-    } catch (error) {
-      console.error("Fehler beim Anrufen des nächsten Kontakts:", error);
-      setCallError(error.message);
-      setCallInProgress(false);
-      setIsCallInProgress(false);
-      
-      // Bei Fehler nach kurzer Pause zum nächsten Kontakt gehen
-      setTimeout(() => {
-        if (autoDialingActive && dialerActive) {
-          moveToNextContact();
-        }
-      }, 3000);
-    }
-  };
-  
-  // Wechselt zum nächsten Kontakt in der Liste
-  const moveToNextContact = () => {
-    const nextIndex = currentContactIndex + 1;
-    setCurrentContactIndex(nextIndex);
-    
-    if (nextIndex < contactList.length) {
-      setCurrentContact(contactList[nextIndex]);
-      
-      // Wenn Auto-Dialing und Dialer aktiv ist, nächsten Kontakt anrufen
-      if (autoDialingActive && dialerActive) {
-        setTimeout(() => {
-          dialNextContact();
-        }, 1500); // Kurze Pause zwischen Anrufen
-      }
-    } else {
-      console.log("Ende der Kontaktliste erreicht");
-      setAutoDialingActive(false);
-    }
-  };
-  
-  // Beendet den aktuellen Anruf und geht zum nächsten Kontakt
-  const endCurrentCall = async () => {
-    // Markiere Anruf sofort als beendet im UI, unabhängig von API-Erfolg
-    setCallAnswered(false);
-    setFormLoaded(false);
-    setCallInProgress(false);
-    setIsCallInProgress(false);
-    
-    // Bereinige alle laufenden Intervalle für diesen Anruf
-    if (typeof window !== 'undefined' && window._activeIntervals) {
-      window._activeIntervals.forEach(interval => {
-        clearInterval(interval);
-      });
-      window._activeIntervals = [];
-    }
-    
-    // Anruf über die Aircall API beenden
-    let apiEndSuccessful = false;
-    if (aircallService && typeof aircallService.clearCallState === 'function') {
-      try {
-        await aircallService.clearCallState();
-        console.log("Anruf erfolgreich beendet");
-        apiEndSuccessful = true;
-      } catch (error) {
-        console.error("Fehler beim Beenden des Anrufs:", error);
-        // Trotz Fehler weitermachen - wir wollen zum nächsten Kontakt gehen
-      }
-    } else {
-      console.warn("aircallService nicht verfügbar beim Beenden des Anrufs");
-    }
-    
-    // Kurze Pause vor dem nächsten Anruf - länger wenn API-Call fehlgeschlagen ist
-    await new Promise(resolve => setTimeout(resolve, apiEndSuccessful ? 1000 : 2000));
-    
-    // Nur zum nächsten Kontakt gehen, wenn der Dialer aktiv ist
-    if (dialerActive && autoDialingActive) {
-      console.log("Gehe zum nächsten Kontakt");
-      moveToNextContact();
-    } else {
-      console.log("Beende Anruf ohne zum nächsten Kontakt zu gehen (Dialer oder Auto-Dial nicht aktiv)");
-    }
-  };
-  
-  // Simuliere einen angenommenen Anruf
-  const simulateAnsweredCall = () => {
-    if (dialerActive && !callAnswered) {
-      setCallAnswered(true);
-      setFormLoading(true);
-      
-      // Simuliere Ladezeit für das Formular
-      setTimeout(() => {
-        setFormLoading(false);
-        setFormLoaded(true);
-      }, 1500);
-    }
-  };
-  
-  // Formatiert die Zeit im Format HH:MM:SS
+  /**
+   * Formatiert Sekunden in das Format HH:MM:SS
+   */
   const formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -334,248 +102,46 @@ const PowerDialerPage = () => {
     ].join(':');
   };
   
-  // Funktion zum Starten eines Anrufs mit Aircall
-  const startCall = async (phoneNumberToCall) => {
-    try {
-      // Prüfe, ob der PowerDialer überhaupt aktiv ist
-      if (!dialerActive) {
-        console.log("PowerDialer ist nicht aktiv. Anruf wird nicht getätigt.");
-        return;
-      }
-      
-      // Prüfe, ob bereits ein Anruf läuft und beende ihn wenn nötig
-      if (aircallService && typeof aircallService.hasActiveCall === 'function' && aircallService.hasActiveCall()) {
-        console.log("Es gibt bereits einen aktiven Anruf. Der wird zuerst beendet.");
-        await aircallService.clearCallState();
-        // Kurze Pause, um dem System Zeit zu geben
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      setCallError(null);
-      setIsCallInProgress(true);
-      setCallInProgress(true);
-      
-      // Entweder die eingegebene Nummer oder die des aktuellen Kontakts verwenden
-      const number = phoneNumberToCall || phoneNumber;
-      
-      // Validiere, dass die Nummer im E.164-Format ist (mit Ländervorwahl)
-      const e164Regex = /^\+[1-9]\d{1,14}$/;
-      if (!e164Regex.test(number)) {
-        throw new Error('Telefonnummer muss im E.164-Format sein (z.B. +491234567890)');
-      }
-      
-      // Speichern der angerufenen Nummer für spätere Verifikation
-      const calledNumber = number;
-      
-      console.log(`Starte Anruf an ${calledNumber}...`);
-      
-      // Anruf über Aircall API starten (mit Mock-Modus-Unterstützung)
-      const response = await aircallService.startOutboundCall(
-        aircallConfig.userId,
-        aircallConfig.numberId,
-        calledNumber,
-        aircallConfig.useMockMode // Übergeben des useMockMode-Parameters
-      );
-      
-      console.log("Anruf gestartet:", response?.data?.id || "ID nicht verfügbar");
-      
-      // In einer realen Integration würden wir auf Webhook-Events hören
-      // Für den Prototyp simulieren wir die Ereignisse
-      
-      // Wenn manueller Dialer geöffnet war, schließen
-      setShowManualDialer(false);
-      
-      // Telefonnummer im Eingabefeld zurücksetzen
-      setPhoneNumber("");
-      
-      // Prüfe, ob der Anruf wirklich an die angegebene Nummer geht
-      // (Sicherheitsmaßnahme gegen unerwünschte wiederholte Anrufe)
-      if (aircallService && typeof aircallService.getActiveCall === 'function') {
-        const activeCall = aircallService.getActiveCall();
-        if (activeCall && activeCall.to !== calledNumber) {
-          console.error(`Anruf geht an falsche Nummer: ${activeCall.to} statt ${calledNumber}`);
-          if (typeof aircallService.clearCallState === 'function') {
-            await aircallService.clearCallState();
-          }
-          throw new Error('Anruf wurde an falsche Nummer weitergeleitet');
-        }
-      }
-      
-      // Setze einen Timeout, um sicherzustellen, dass Anrufe nicht ewig laufen
-      const callTimeoutId = setTimeout(async () => {
-        if (callInProgress) {
-          console.log("Anruf-Timeout erreicht. Beende Anruf automatisch.");
-          await endCurrentCall();
-        }
-      }, 120000); // 2 Minuten maximale Anrufdauer
-      
-      // Simuliere eine zufällige Zeit, bis der Anruf angenommen wird (Nur für Demozwecke)
-      // In einer echten Integration würden wir hier auf Ereignisse von der Aircall-API warten
-      if (!autoDialingActive) {
-        // Wenn manueller Modus, simuliere sofortige Annahme
-        setTimeout(() => {
-          if (dialerActive && callInProgress) {
-            simulateAnsweredCall();
-          }
-        }, 1500);
-      } else {
-        // Im automatischen Modus simulieren wir ein realistischeres Telefonverhalten
-        const randomDelay = Math.random() > 0.3 ? 3000 + Math.random() * 2000 : 0;
-        
-        if (randomDelay > 0) {
-          // Simuliere, dass der Anruf angenommen wurde
-          setTimeout(() => {
-            if (dialerActive && callInProgress) {
-              simulateAnsweredCall();
-            }
-          }, randomDelay);
-          
-          // Simuliere, dass der Anruf nach einiger Zeit beendet wird
-          setTimeout(() => {
-            if (dialerActive && callInProgress && callAnswered && autoDialingActive) {
-              // Bereinige den Timeout, da wir den Anruf jetzt manuell beenden
-              clearTimeout(callTimeoutId);
-              // Nur wenn der Dialer noch aktiv ist und im Auto-Dial-Modus
-              endCurrentCall();
-            }
-          }, randomDelay + 5000 + Math.random() * 10000);
-        } else {
-          // Simuliere, dass niemand den Anruf angenommen hat
-          setTimeout(() => {
-            if (dialerActive && callInProgress) {
-              console.log("Anruf wurde nicht beantwortet");
-              // Bereinige den Timeout
-              clearTimeout(callTimeoutId);
-              
-              if (autoDialingActive) {
-                // Nur wenn der Dialer noch aktiv ist
-                moveToNextContact();
-              } else {
-                setCallInProgress(false);
-                setIsCallInProgress(false);
-                // Stelle sicher, dass der Anruf beendet wird
-                if (aircallService && typeof aircallService.clearCallState === 'function') {
-                  aircallService.clearCallState().catch(err => {
-                    console.error("Fehler beim Beenden des Anrufs:", err);
-                  });
-                }
-              }
-            }
-          }, 4000);
-        }
-      }
-      
-    } catch (error) {
-      console.error('Fehler beim Starten des Anrufs:', error);
-      setCallError(error.message || 'Fehler beim Starten des Anrufs');
-      setIsCallInProgress(false);
-      setCallInProgress(false);
-      
-      // Stelle sicher, dass kein aktiver Anruf zurückbleibt
-      if (aircallService && typeof aircallService.clearCallState === 'function') {
-        try {
-          await aircallService.clearCallState();
-        } catch (clearError) {
-          console.error("Fehler beim Bereinigen des Anrufzustands:", clearError);
-        }
-      }
-      
-      // Bei automatischem Wählen zum nächsten Kontakt gehen
-      if (autoDialingActive && dialerActive) {
-        // Nur wenn der Dialer noch aktiv ist
-        setTimeout(() => {
-          moveToNextContact();
-        }, 3000);
-      }
-    }
-  };
-  
-  // Funktion zum Anrufen des aktuellen Kontakts
-  const callCurrentContact = async () => {
-    try {
-      // Prüfe, ob ein aktueller Kontakt vorhanden ist
-      if (!currentContact || !currentContact.phone) {
-        throw new Error('Keine Telefonnummer für aktuellen Kontakt verfügbar');
-      }
-      
-      // Prüfe, ob der PowerDialer aktiv ist
-      if (!dialerActive) {
-        console.log("PowerDialer ist nicht aktiv, aktiviere ihn zuerst");
-        throw new Error('PowerDialer nicht aktiv');
-      }
-      
-      // Beende laufende Anrufe, falls vorhanden
-      if (callInProgress || (aircallService && typeof aircallService.hasActiveCall === 'function' && aircallService.hasActiveCall())) {
-        console.log("Beende laufenden Anruf, bevor ein neuer getätigt wird");
-        await endCurrentCall();
-        // Kurze Pause, um dem System Zeit zu geben
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      // Starte Anruf mit der Telefonnummer des aktuellen Kontakts
-      await startCall(currentContact.phone);
-    } catch (error) {
-      console.error('Fehler beim Anrufen des aktuellen Kontakts:', error);
-      setCallError(error.message || 'Fehler beim Anrufen des aktuellen Kontakts');
-      
-      // Stelle sicher, dass der Anrufstatus zurückgesetzt wird
-      setCallInProgress(false);
-      setIsCallInProgress(false);
-    }
-  };
-  
-  // Funktion zum Formatieren einer Telefonnummer in E.164-Format
+  /**
+   * Formatiert eine Telefonnummer in das E.164-Format
+   */
   const formatToE164 = (number) => {
-    // Entferne alle Zeichen außer Ziffern
     const digitsOnly = number.replace(/\D/g, '');
     
-    // Wenn die Nummer mit einer führenden 0 beginnt, ersetze sie durch die deutsche Ländervorwahl
     if (digitsOnly.startsWith('0')) {
       return '+49' + digitsOnly.substring(1);
     }
     
-    // Wenn keine Ländervorwahl vorhanden ist, füge deutsche Vorwahl hinzu
     if (!number.startsWith('+')) {
       return '+49' + digitsOnly;
     }
     
-    // Wenn die Nummer bereits mit + beginnt, stelle sicher, dass das + erhalten bleibt
     return '+' + digitsOnly;
   };
   
-  // Handler für Änderungen im Telefonnummern-Eingabefeld
-  const handlePhoneNumberChange = (e) => {
-    setPhoneNumber(e.target.value);
-  };
+  // -------------------- Effekte --------------------
   
-  // Handler für das Absenden des manuellen Dialer-Formulars
-  const handleDialSubmit = (e) => {
-    e.preventDefault();
-    
-    // Formatiere die Telefonnummer und starte den Anruf
-    const formattedNumber = formatToE164(phoneNumber);
-    startCall(formattedNumber);
-  };
+  /**
+   * Effekt: Überprüft die Verfügbarkeit des aircallService
+   */
+  useEffect(() => {
+    if (!aircallService || typeof aircallService !== 'object') {
+      console.error("aircallService ist nicht verfügbar oder kein Objekt");
+      setCallError("Anrufservice ist nicht verfügbar. Bitte versuchen Sie es später erneut.");
+    } else {
+      console.log("aircallService erfolgreich initialisiert:", 
+                  Object.keys(aircallService).join(', '));
+    }
+  }, []);
   
-  // Cleanup beim Unmount
+  /**
+   * Effekt: Bereinigung beim Component-Unmount
+   */
   useEffect(() => {
     return () => {
       // Timer stoppen
       if (sessionInterval) {
         clearInterval(sessionInterval);
-      }
-      
-      // Alle gespeicherten Intervalle bereinigen
-      if (typeof window !== 'undefined' && window._activeIntervals) {
-        console.log(`Bereinige ${window._activeIntervals.length} aktive Intervalle`);
-        window._activeIntervals.forEach(interval => {
-          try {
-            clearInterval(interval);
-          } catch (error) {
-            console.error("Fehler beim Bereinigen des Intervals:", error);
-          }
-        });
-        window._activeIntervals = [];
       }
       
       // Alle aktiven Anrufe beenden
@@ -592,10 +158,12 @@ const PowerDialerPage = () => {
     };
   }, [sessionInterval]);
   
-  // Effekt, der sicherstellt, dass kein Anruf läuft, wenn der Dialer deaktiviert ist
+  /**
+   * Effekt: Stellt sicher, dass kein Anruf läuft, wenn der Dialer deaktiviert ist
+   */
   useEffect(() => {
-    // Wenn der Dialer ausgeschaltet wird, stelle sicher, dass alle Anrufe beendet werden
-    if (!dialerActive && aircallService && typeof aircallService.hasActiveCall === 'function' && aircallService.hasActiveCall()) {
+    if (!dialerActive && aircallService && typeof aircallService.hasActiveCall === 'function' 
+        && aircallService.hasActiveCall()) {
       console.log("PowerDialer wurde deaktiviert. Beende aktive Anrufe.");
       try {
         aircallService.clearCallState().catch(error => {
@@ -605,9 +173,16 @@ const PowerDialerPage = () => {
         console.error("Fehler beim Zugriff auf aircallService:", error);
       }
     }
+    
+    // Prüfe Benutzerverfügbarkeit, wenn der Dialer aktiviert wird
+    if (dialerActive) {
+      checkSalesRepAvailability();
+    }
   }, [dialerActive]);
   
-  // Klick-Handler für das Dokument (schließt Dropdown beim Klick außerhalb)
+  /**
+   * Effekt: Klick-Handler für das Dokument (schließt Dropdowns bei Klick außerhalb)
+   */
   useEffect(() => {
     const handleOutsideClick = (event) => {
       const controlsElement = document.getElementById('dialer-controls');
@@ -636,6 +211,480 @@ const PowerDialerPage = () => {
       document.removeEventListener('mousedown', handleOutsideClick);
     };
   }, [showDialerControls, showManualDialer]);
+  
+  /**
+   * Effekt: Regelmäßige Überprüfung des User-Status, wenn der Dialer aktiv ist
+   */
+  useEffect(() => {
+    let statusInterval = null;
+    
+    if (dialerActive && !statusPollingActive) {
+      statusInterval = setInterval(() => {
+        checkSalesRepAvailability();
+      }, 60000); // Jede Minute prüfen
+      
+      setStatusPollingActive(true);
+    }
+    
+    return () => {
+      if (statusInterval) {
+        clearInterval(statusInterval);
+        setStatusPollingActive(false);
+      }
+    };
+  }, [dialerActive]);
+  
+  // -------------------- Anruf-Verwaltung --------------------
+  
+  /**
+   * Überprüft die Verfügbarkeit des Sales Reps bei Aircall
+   */
+  const checkSalesRepAvailability = async () => {
+    if (!aircallService) return;
+    
+    try {
+      const availability = await aircallService.checkUserAvailability(
+        aircallConfig.userId, 
+        aircallConfig.useMockMode
+      );
+      
+      setUserStatus(availability);
+      
+      if (!availability.available || !availability.connected) {
+        console.warn(`Sales Rep ist nicht verfügbar. Status: ${availability.status}`);
+        setCallError(`Sales Rep ist nicht verfügbar (${availability.status}). Bitte später versuchen.`);
+      } else {
+        setCallError(null);
+      }
+      
+      return availability;
+    } catch (error) {
+      console.error("Fehler bei der Überprüfung der Sales Rep Verfügbarkeit:", error);
+      setCallError("Fehler bei der Überprüfung der Verfügbarkeit. Bitte versuchen Sie es später erneut.");
+      setUserStatus({ available: false, status: 'error', connected: false });
+      return null;
+    }
+  };
+  
+  /**
+   * Startet einen Anruf über die Aircall-API
+   */
+  const startCall = async (phoneNumberToCall) => {
+    try {
+      // Prüfe, ob der PowerDialer aktiv ist
+      if (!dialerActive) {
+        console.log("PowerDialer ist nicht aktiv. Anruf wird nicht getätigt.");
+        return;
+      }
+      
+      // Prüfe Sales Rep Verfügbarkeit
+      const availability = await checkSalesRepAvailability();
+      if (!availability || !availability.available || !availability.connected) {
+        throw new Error(`Sales Rep ist nicht verfügbar (${availability?.status || 'unbekannt'})`);
+      }
+      
+      // Prüfe, ob bereits ein Anruf läuft
+      if (aircallService.hasActiveCall()) {
+        console.log("Es gibt bereits einen aktiven Anruf. Beende diesen zuerst.");
+        await aircallService.clearCallState();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      setCallError(null);
+      setIsCallInProgress(true);
+      
+      // Zu wählende Nummer
+      const number = phoneNumberToCall || phoneNumber;
+      
+      // Validierung des E.164-Formats
+      const e164Regex = /^\+[1-9]\d{1,14}$/;
+      if (!e164Regex.test(number)) {
+        throw new Error('Telefonnummer muss im E.164-Format sein (z.B. +491234567890)');
+      }
+      
+      console.log(`Starte Anruf an ${number}...`);
+      
+      // Anruf über Aircall API starten
+      const response = await aircallService.startOutboundCall(
+        aircallConfig.userId,
+        aircallConfig.numberId,
+        number,
+        aircallConfig.useMockMode
+      );
+      
+      console.log("Anruf gestartet:", response?.data?.id || "ID nicht verfügbar");
+      
+      // UI-Updates
+      if (showManualDialer) setShowManualDialer(false);
+      setPhoneNumber("");
+      
+      // Prüfe Zielrufnummer für Sicherheit
+      const activeCall = aircallService.getActiveCall();
+      if (activeCall && activeCall.to !== number) {
+        console.error(`Anruf geht an falsche Nummer: ${activeCall.to} statt ${number}`);
+        await aircallService.clearCallState();
+        throw new Error('Anruf wurde an falsche Nummer weitergeleitet');
+      }
+      
+      // Anruf-Timeout nach 120 Sekunden
+      const callTimeoutId = setTimeout(async () => {
+        if (isCallInProgress) {
+          console.log("Anruf-Timeout erreicht. Beende Anruf automatisch.");
+          await endCurrentCall();
+        }
+      }, 120000);
+      
+      // Anruf-Status-Überwachung
+      handleCallStatusChanges(response?.data?.id, callTimeoutId);
+      
+      return response;
+    } catch (error) {
+      console.error('Fehler beim Starten des Anrufs:', error);
+      setCallError(error.message || 'Fehler beim Starten des Anrufs');
+      setIsCallInProgress(false);
+      
+      // Bereinige eventuelle hängende Anrufe
+      if (aircallService && typeof aircallService.clearCallState === 'function') {
+        await aircallService.clearCallState();
+      }
+      
+      // Bei Auto-Dialing zum nächsten Kontakt gehen
+      if (autoDialingActive && dialerActive) {
+        setTimeout(() => {
+          moveToNextContact();
+        }, 3000);
+      }
+    }
+  };
+  
+  /**
+   * Überwacht Änderungen des Anrufstatus
+   */
+  const handleCallStatusChanges = (callId, timeoutId) => {
+    if (!callId) return;
+    
+    // In einer Produktivumgebung würden wir Webhooks verwenden
+    // Im Testmodus verwenden wir die Simulationsfunktion des aircallService
+    
+    // Simulierte Anrufannahme nach zufälliger Zeit (nur für Demo/Test)
+    if (aircallConfig.useMockMode) {
+      const randomDelay = Math.random() > 0.3 ? 2000 + Math.random() * 3000 : 0;
+      
+      if (randomDelay > 0) {
+        // Simuliere Klingeln und dann Annahme
+        setTimeout(() => {
+          if (dialerActive && isCallInProgress) {
+            setCallAnswered(true);
+            setFormLoading(true);
+            
+            // Formular laden
+            setTimeout(() => {
+              if (dialerActive && isCallInProgress) {
+                setFormLoading(false);
+                setFormLoaded(true);
+              }
+            }, 1500);
+            
+            // Nach einer gewissen Zeit Anruf beenden (wenn automatisch)
+            if (autoDialingActive) {
+              setTimeout(() => {
+                if (dialerActive && isCallInProgress) {
+                  clearTimeout(timeoutId);
+                  endCurrentCall();
+                }
+              }, 8000 + Math.random() * 5000);
+            }
+          }
+        }, randomDelay);
+      } else {
+        // Simuliere, dass niemand antwortet
+        setTimeout(() => {
+          if (dialerActive && isCallInProgress) {
+            console.log("Anruf wurde nicht beantwortet");
+            clearTimeout(timeoutId);
+            
+            if (autoDialingActive) {
+              moveToNextContact();
+            } else {
+              setIsCallInProgress(false);
+              aircallService.clearCallState();
+            }
+          }
+        }, 5000);
+      }
+    }
+    
+    // In einer Produktivumgebung würden wir hier auf Webhook-Events reagieren
+    // oder regelmäßig den Status abfragen
+  };
+  
+  /**
+   * Beendet den aktuellen Anruf
+   */
+  const endCurrentCall = async () => {
+    setCallAnswered(false);
+    setFormLoaded(false);
+    setIsCallInProgress(false);
+    
+    // Anruf über die Aircall API beenden
+    let apiEndSuccessful = false;
+    if (aircallService && typeof aircallService.clearCallState === 'function') {
+      try {
+        await aircallService.clearCallState();
+        console.log("Anruf erfolgreich beendet");
+        apiEndSuccessful = true;
+      } catch (error) {
+        console.error("Fehler beim Beenden des Anrufs:", error);
+      }
+    }
+    
+    // Kurze Pause vor dem nächsten Anruf
+    await new Promise(resolve => setTimeout(resolve, apiEndSuccessful ? 1000 : 2000));
+    
+    // Bei aktivem Auto-Dialing zum nächsten Kontakt gehen
+    if (dialerActive && autoDialingActive) {
+      console.log("Gehe zum nächsten Kontakt");
+      moveToNextContact();
+    }
+  };
+  
+  /**
+   * Ruft den aktuellen Kontakt an
+   */
+  const callCurrentContact = async () => {
+    try {
+      if (!currentContact?.phone) {
+        throw new Error('Keine Telefonnummer für aktuellen Kontakt verfügbar');
+      }
+      
+      if (!dialerActive) {
+        throw new Error('PowerDialer nicht aktiv');
+      }
+      
+      // Beende ggf. laufende Anrufe
+      if (isCallInProgress || aircallService.hasActiveCall()) {
+        await endCurrentCall();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Starte Anruf
+      await startCall(currentContact.phone);
+    } catch (error) {
+      console.error('Fehler beim Anrufen des aktuellen Kontakts:', error);
+      setCallError(error.message || 'Fehler beim Anrufen des aktuellen Kontakts');
+      setIsCallInProgress(false);
+    }
+  };
+  
+  // -------------------- PowerDialer-Steuerung --------------------
+  
+  /**
+   * Aktiviert oder deaktiviert den PowerDialer
+   */
+  const toggleDialer = async () => {
+    const newDialerState = !dialerActive;
+    setDialerActive(newDialerState);
+    setCallAnswered(false);
+    setFormLoaded(false);
+    
+    if (newDialerState) {
+      // PowerDialer aktivieren
+      const interval = setInterval(() => {
+        setSessionTime(prev => prev + 1);
+      }, 1000);
+      setSessionInterval(interval);
+      
+      // Kontakt setzen
+      setCurrentContactIndex(0);
+      setCurrentContact(contactList[0]);
+      
+      // Verfügbarkeit prüfen
+      const availability = await checkSalesRepAvailability();
+      
+      // Anrufe beenden, die eventuell noch aktiv sind
+      if (aircallService.hasActiveCall()) {
+        await aircallService.clearCallState();
+      }
+      
+      // Auto-Dial starten, wenn aktiviert
+      if (autoDialingActive && availability?.available) {
+        dialNextContact();
+      }
+    } else {
+      // PowerDialer deaktivieren
+      clearInterval(sessionInterval);
+      setSessionInterval(null);
+      setAutoDialingActive(false);
+      setIsCallInProgress(false);
+      setCallAnswered(false);
+      setCallError(null);
+      
+      // Laufende Anrufe beenden
+      if (aircallService && typeof aircallService.clearCallState === 'function') {
+        await aircallService.clearCallState();
+      }
+    }
+  };
+  
+  /**
+   * Startet die automatische Wählsequenz
+   */
+  const startDialingSequence = () => {
+    if (!dialerActive) return;
+    
+    setAutoDialingActive(true);
+    dialNextContact();
+  };
+  
+  /**
+   * Stoppt die automatische Wählsequenz
+   */
+  const stopDialingSequence = () => {
+    setAutoDialingActive(false);
+  };
+  
+  /**
+   * Wählt den nächsten Kontakt in der Liste
+   */
+  const dialNextContact = async () => {
+    try {
+      // Sicherheitschecks
+      if (!dialerActive) {
+        console.log("PowerDialer ist nicht aktiv, kein Anruf wird getätigt");
+        return;
+      }
+      
+      // Verfügbarkeit prüfen
+      const availability = await checkSalesRepAvailability();
+      if (!availability?.available) {
+        console.log("Sales Rep ist nicht verfügbar. Auto-Dialing wird angehalten.");
+        setAutoDialingActive(false);
+        return;
+      }
+      
+      // Laufende Anrufe beenden
+      if (isCallInProgress || aircallService.hasActiveCall()) {
+        await endCurrentCall();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Prüfe, ob wir am Ende der Liste sind
+      if (currentContactIndex >= contactList.length) {
+        console.log("Ende der Kontaktliste erreicht");
+        setAutoDialingActive(false);
+        return;
+      }
+      
+      // Nächsten Kontakt anrufen
+      const contactToCall = contactList[currentContactIndex];
+      setCurrentContact(contactToCall);
+      setIsCallInProgress(true);
+      setCallAnswered(false);
+      setFormLoaded(false);
+      setCallError(null);
+      
+      console.log(`Rufe ${contactToCall.name} unter ${contactToCall.phone} an...`);
+      await startCall(contactToCall.phone);
+      
+    } catch (error) {
+      console.error("Fehler beim Anrufen des nächsten Kontakts:", error);
+      setCallError(error.message);
+      setIsCallInProgress(false);
+      
+      // Bei Fehler zum nächsten Kontakt
+      if (autoDialingActive && dialerActive) {
+        setTimeout(() => {
+          moveToNextContact();
+        }, 3000);
+      }
+    }
+  };
+  
+  /**
+   * Wechselt zum nächsten Kontakt in der Liste
+   */
+  const moveToNextContact = () => {
+    const nextIndex = currentContactIndex + 1;
+    setCurrentContactIndex(nextIndex);
+    
+    if (nextIndex < contactList.length) {
+      setCurrentContact(contactList[nextIndex]);
+      
+      // Wenn Auto-Dialing aktiv, nächsten Kontakt anrufen
+      if (autoDialingActive && dialerActive) {
+        setTimeout(() => {
+          dialNextContact();
+        }, 1500);
+      }
+    } else {
+      console.log("Ende der Kontaktliste erreicht");
+      setAutoDialingActive(false);
+    }
+  };
+  
+  /**
+   * Simuliert einen angenommenen Anruf (nur für Tests)
+   */
+  const simulateAnsweredCall = () => {
+    if (dialerActive && !callAnswered) {
+      setCallAnswered(true);
+      setFormLoading(true);
+      
+      // Formular laden simulieren
+      setTimeout(() => {
+        setFormLoading(false);
+        setFormLoaded(true);
+      }, 1500);
+    }
+  };
+  
+  // -------------------- Event-Handler --------------------
+  
+  /**
+   * Handler für Änderungen der Telefonnummer
+   */
+  const handlePhoneNumberChange = (e) => {
+    setPhoneNumber(e.target.value);
+  };
+  
+  /**
+   * Handler für das Absenden des manuellen Dialer-Formulars
+   */
+  const handleDialSubmit = (e) => {
+    e.preventDefault();
+    const formattedNumber = formatToE164(phoneNumber);
+    startCall(formattedNumber);
+  };
+  
+  // -------------------- Render-Funktionen --------------------
+  
+  /**
+   * Rendert den Verbindungsstatus
+   */
+  const renderConnectionStatus = () => {
+    if (!userStatus) return null;
+    
+    return (
+      <div className="mt-2 flex items-center justify-center">
+        <div className={`flex items-center rounded-full px-2 py-0.5 ${
+          userStatus.available && userStatus.connected
+            ? 'bg-green-50 text-green-600'
+            : 'bg-red-50 text-red-500'
+        }`}>
+          <div className={`w-2 h-2 rounded-full mr-1.5 ${
+            userStatus.available && userStatus.connected ? 'bg-green-500' : 'bg-red-500'
+          }`}></div>
+          <span className="text-xs font-light">
+            {userStatus.available && userStatus.connected
+              ? 'Verbunden mit Telefonsystem'
+              : `Nicht verbunden (${userStatus.status})`}
+          </span>
+        </div>
+      </div>
+    );
+  };
+  
+  // -------------------- Komponenten-Rendering --------------------
   
   return (
     <div className="h-full w-full bg-[#f5f5f7] overflow-hidden">
@@ -698,12 +747,33 @@ const PowerDialerPage = () => {
                       </div>
                       <div className="flex items-center">
                         <div className={`w-2 h-2 rounded-full mr-1.5 ${
-                          callAnswered ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'
+                          callAnswered ? 'bg-green-500 animate-pulse' : isCallInProgress ? 'bg-yellow-500' : 'bg-gray-300'
                         }`}></div>
                         <span className="text-xs font-light">
-                          {callAnswered ? 'Telefonat läuft' : 'Warte auf Anruf'}
+                          {callAnswered 
+                            ? 'Telefonat läuft' 
+                            : (isCallInProgress ? 'Anruf wird getätigt' : 'Bereit')}
                         </span>
                       </div>
+                    </div>
+                  )}
+                  
+                  {userStatus && dialerActive && (
+                    <div className="mb-4 bg-gray-50 p-2 rounded-lg">
+                      <div className="flex items-center text-xs mb-1">
+                        <div className={`w-5 h-5 rounded-full ${userStatus.available ? 'bg-green-100' : 'bg-red-100'} flex items-center justify-center mr-1.5`}>
+                          {userStatus.available 
+                            ? <ShieldCheckIcon className="w-3 h-3 text-green-500" /> 
+                            : <ExclamationCircleIcon className="w-3 h-3 text-red-500" />
+                          }
+                        </div>
+                        <span className="font-medium">{userStatus.status}</span>
+                      </div>
+                      <p className="text-xs font-light text-gray-500">
+                        {userStatus.available 
+                          ? "Sales Rep ist verfügbar und kann Anrufe tätigen." 
+                          : "Sales Rep ist nicht verfügbar. Auto-Dialing deaktiviert."}
+                      </p>
                     </div>
                   )}
                   
@@ -737,7 +807,7 @@ const PowerDialerPage = () => {
                         )}
                       </button>
                       
-                      {dialerActive && (
+                      {dialerActive && userStatus?.available && (
                         <button
                           onClick={autoDialingActive ? stopDialingSequence : startDialingSequence}
                           className={`flex items-center justify-center rounded-full transition-all duration-300 px-3 py-1.5 ${
@@ -763,7 +833,7 @@ const PowerDialerPage = () => {
                   </div>
                 </div>
                 
-                {dialerActive && !callAnswered && (
+                {dialerActive && !callAnswered && userStatus?.available && (
                   <div className="p-4 bg-gray-50">
                     <div className="flex flex-col space-y-2">
                       <button
@@ -842,9 +912,9 @@ const PowerDialerPage = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isCallInProgress}
+                  disabled={isCallInProgress || !userStatus?.available}
                   className={`px-4 py-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 flex items-center ${
-                    isCallInProgress ? 'opacity-50 cursor-not-allowed' : ''
+                    isCallInProgress || !userStatus?.available ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
                   {isCallInProgress ? (
@@ -861,6 +931,8 @@ const PowerDialerPage = () => {
                 </button>
               </div>
             </form>
+            
+            {renderConnectionStatus()}
           </div>
         </div>
       )}
@@ -895,7 +967,6 @@ const PowerDialerPage = () => {
                       <span>Letzte Session: 1:45:32</span>
                     </div>
                   </div>
-                  
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col h-full">
@@ -913,11 +984,21 @@ const PowerDialerPage = () => {
                       <div className="flex flex-col items-end">
                         <span className="text-xs text-gray-500 font-light block leading-none mb-1">Status</span>
                         <div className="flex items-center">
-                          <div className="w-2 h-2 rounded-full bg-green-500 mr-1.5 animate-pulse"></div>
-                          <span className="text-xs font-light text-gray-800">Live</span>
+                          <div className={`w-2 h-2 rounded-full mr-1.5 ${
+                            userStatus?.available ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                          }`}></div>
+                          <span className="text-xs font-light text-gray-800">
+                            {userStatus?.available ? 'Verfügbar' : 'Nicht verfügbar'}
+                          </span>
                         </div>
                       </div>
                     </div>
+                    
+                    {callError && (
+                      <div className="mt-3 p-2 bg-red-50 rounded-lg text-xs text-red-600">
+                        {callError}
+                      </div>
+                    )}
                   </div>
                   
                   <div className="flex-1 flex flex-col justify-center items-center">
@@ -929,7 +1010,7 @@ const PowerDialerPage = () => {
                           </span>
                         ) : (
                           <ArrowPathIcon className={`w-6 h-6 md:w-8 md:h-8 text-gray-300 ${
-                            dialerActive ? 'animate-spin' : ''
+                            isCallInProgress ? 'animate-spin' : ''
                           }`} />
                         )}
                       </div>
@@ -940,14 +1021,16 @@ const PowerDialerPage = () => {
                     <p className="text-xs text-gray-500 font-light">
                       {autoDialingActive 
                         ? `Auto-Dial aktiv - ${contactList.length - currentContactIndex} verbleibend` 
-                        : "PowerDialer ist aktiv"}
+                        : (isCallInProgress ? "Anruf wird getätigt..." : "PowerDialer ist aktiv")}
                     </p>
                     
-                    {autoDialingActive && callInProgress && (
+                    {isCallInProgress && (
                       <div className="mt-4 text-center">
                         <div className="inline-flex items-center bg-blue-50 rounded-full px-3 py-1">
                           <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse mr-2"></div>
-                          <span className="text-xs text-blue-700">Anruf läuft...</span>
+                          <span className="text-xs text-blue-700">
+                            {callAnswered ? "Gespräch läuft..." : "Anruf wird getätigt..."}
+                          </span>
                         </div>
                       </div>
                     )}
@@ -962,15 +1045,22 @@ const PowerDialerPage = () => {
                     )}
                   </div>
                   
-                  {!callAnswered && (
+                  {!callAnswered && dialerActive && !isCallInProgress && (
                     <button 
-                      onClick={simulateAnsweredCall}
+                      onClick={userStatus?.available ? simulateAnsweredCall : checkSalesRepAvailability}
                       className="mt-auto transition-all duration-300 bg-white rounded-full border border-gray-200 py-2 md:py-3 px-4 md:px-6 flex items-center justify-center text-gray-700 hover:bg-gray-50 shadow-sm hover:shadow group"
                     >
                       <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-gray-100 flex items-center justify-center mr-2 md:mr-3 group-hover:bg-gray-200 transition-colors">
-                        <CheckCircleIcon className="w-2.5 h-2.5 md:w-3 md:h-3 text-gray-500" />
+                        {userStatus?.available 
+                          ? <CheckCircleIcon className="w-2.5 h-2.5 md:w-3 md:h-3 text-gray-500" />
+                          : <ArrowPathIcon className="w-2.5 h-2.5 md:w-3 md:h-3 text-gray-500" />
+                        }
                       </div>
-                      <span className="text-sm font-light">Anruf angenommen</span>
+                      <span className="text-sm font-light">
+                        {userStatus?.available 
+                          ? "Anruf angenommen" 
+                          : "Verbindung prüfen"}
+                      </span>
                     </button>
                   )}
                 </div>
@@ -1037,7 +1127,7 @@ const PowerDialerPage = () => {
                           ? "Warten auf Gesprächsbeginn. Wenn ein Kontakt den Anruf annimmt, wird hier das entsprechende Formular geladen."
                           : "Starten Sie den PowerDialer, um die Formular-Ansicht zu aktivieren."}
                       </p>
-                      {dialerActive && (
+                      {dialerActive && userStatus?.available && (
                         <button 
                           onClick={simulateAnsweredCall}
                           className="text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors inline-flex items-center"
@@ -1046,6 +1136,8 @@ const PowerDialerPage = () => {
                           Gesprächsbeginn simulieren
                         </button>
                       )}
+                      
+                      {renderConnectionStatus()}
                     </div>
                   </div>
                 )}
@@ -1078,7 +1170,7 @@ const PowerDialerPage = () => {
                 }
               </h2>
               
-              {(!dialerActive || !callAnswered) ? (
+              {(!dialerActive || !currentContact) ? (
                 <div className="flex-1 flex flex-col justify-center items-center text-center text-gray-400 py-4 md:py-8">
                   <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gray-50 flex items-center justify-center mb-4">
                     <UserIcon className="w-8 h-8 md:w-10 md:h-10 text-gray-200" />
@@ -1091,65 +1183,49 @@ const PowerDialerPage = () => {
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col">
-                  {currentContact ? (
-                    <div className="text-center mb-4 md:mb-6 bg-[#f5f5f7] rounded-xl md:rounded-2xl p-3 md:p-4 shadow-inner">
-                      <div className="w-12 h-12 md:w-16 md:h-16 mx-auto rounded-full bg-white shadow-sm flex items-center justify-center mb-2">
-                        <span className="text-lg md:text-xl font-light text-gray-400">
-                          {currentContact.name.split(' ').map(name => name[0]).join('')}
-                        </span>
-                      </div>
-                      <h3 className="text-lg md:text-xl font-light text-gray-800">{currentContact.name}</h3>
-                      
-                      <div className="mt-2 mb-2 flex items-center justify-center space-x-2">
-                        <a href={`tel:${currentContact.phone}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 block text-xs md:text-sm">
-                          {currentContact.phone}
-                        </a>
-                        
-                        <button
-                          onClick={callCurrentContact}
-                          disabled={isCallInProgress || !dialerActive || callInProgress}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                            (dialerActive && !callInProgress)
-                              ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          }`}
-                          title={!dialerActive 
-                            ? "Aktivieren Sie zuerst den PowerDialer" 
-                            : (callInProgress ? "Anruf läuft bereits" : "Kontakt anrufen")}
-                        >
-                          <PhoneIcon className="w-3 h-3" />
-                        </button>
-                      </div>
-                      
-                      <a href={`mailto:${currentContact.email}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 text-xs block">
-                        {currentContact.email}
+                  <div className="text-center mb-4 md:mb-6 bg-[#f5f5f7] rounded-xl md:rounded-2xl p-3 md:p-4 shadow-inner">
+                    <div className="w-12 h-12 md:w-16 md:h-16 mx-auto rounded-full bg-white shadow-sm flex items-center justify-center mb-2">
+                      <span className="text-lg md:text-xl font-light text-gray-400">
+                        {currentContact.name.split(' ').map(name => name[0]).join('')}
+                      </span>
+                    </div>
+                    <h3 className="text-lg md:text-xl font-light text-gray-800">{currentContact.name}</h3>
+                    
+                    <div className="mt-2 mb-2 flex items-center justify-center space-x-2">
+                      <a href={`tel:${currentContact.phone}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 block text-xs md:text-sm">
+                        {currentContact.phone}
                       </a>
                       
-                      {autoDialingActive && (
-                        <div className="mt-2 bg-blue-50 text-blue-700 p-2 rounded-lg text-xs">
-                          Kontakt {currentContactIndex + 1} von {contactList.length}
-                        </div>
-                      )}
-                      
-                      {callError && (
-                        <div className="mt-2 bg-red-50 text-red-600 p-2 rounded-lg text-xs">
-                          {callError}
-                        </div>
-                      )}
+                      <button
+                        onClick={callCurrentContact}
+                        disabled={isCallInProgress || !dialerActive || !userStatus?.available}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                          (dialerActive && !isCallInProgress && userStatus?.available)
+                            ? 'bg-green-100 text-green-600 hover:bg-green-200' 
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        }`}
+                        title={!dialerActive 
+                          ? "Aktivieren Sie zuerst den PowerDialer" 
+                          : (isCallInProgress 
+                              ? "Anruf läuft bereits" 
+                              : (!userStatus?.available 
+                                  ? "Sales Rep nicht verfügbar" 
+                                  : "Kontakt anrufen"))}
+                      >
+                        <PhoneIcon className="w-3 h-3" />
+                      </button>
                     </div>
-                  ) : (
-                    <div className="text-center mb-4 md:mb-6 bg-[#f5f5f7] rounded-xl md:rounded-2xl p-6 md:p-8 shadow-inner">
-                      <div className="w-12 h-12 md:w-16 md:h-16 mx-auto rounded-full bg-white shadow-sm flex items-center justify-center mb-3">
-                        <UserIcon className="w-6 h-6 md:w-8 md:h-8 text-gray-300" />
+                    
+                    <a href={`mailto:${currentContact.email}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 text-xs block">
+                      {currentContact.email}
+                    </a>
+                    
+                    {autoDialingActive && (
+                      <div className="mt-2 bg-blue-50 text-blue-700 p-2 rounded-lg text-xs">
+                        Kontakt {currentContactIndex + 1} von {contactList.length}
                       </div>
-                      <p className="text-sm text-gray-500 font-light">
-                        Kein Kontakt ausgewählt
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Starten Sie den PowerDialer, um Kontakte anzurufen
-                      </p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                   
                   <div className="bg-[#f5f5f7] rounded-xl md:rounded-2xl p-3 md:p-4 mb-4 md:mb-5">
                     <div className="flex justify-between text-xs mb-2">
