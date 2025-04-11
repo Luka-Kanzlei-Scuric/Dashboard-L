@@ -361,19 +361,50 @@ const PowerDialerPage = () => {
    * Überwacht Änderungen des Anrufstatus
    */
   const handleCallStatusChanges = (callId, timeoutId) => {
-    if (!callId) return;
+    if (!callId) {
+      console.error("Keine Call-ID für Status-Überwachung verfügbar");
+      setCallError("Fehler beim Tätigen des Anrufs");
+      setIsCallInProgress(false);
+      return;
+    }
+    
+    console.log(`Starte Status-Überwachung für Anruf ${callId}`);
     
     // In einer Produktivumgebung würden wir Webhooks verwenden
     // Im Testmodus verwenden wir die Simulationsfunktion des aircallService
     
+    // Direkter Statuscheck - sofort prüfen ob der Anruf wirklich aktiv ist
+    setTimeout(async () => {
+      try {
+        const status = await aircallService.getCallStatus(callId);
+        console.log("Initialer Anruf-Status:", status?.status);
+        
+        if (!status || status.status === 'error') {
+          console.error("Anruf konnte nicht initiiert werden");
+          setCallError("Anruf konnte nicht gestartet werden");
+          setIsCallInProgress(false);
+          clearTimeout(timeoutId);
+          
+          if (autoDialingActive) {
+            setTimeout(() => moveToNextContact(), 2000);
+          }
+          return;
+        }
+      } catch (error) {
+        console.error("Fehler beim Abrufen des Anrufstatus:", error);
+      }
+    }, 500);
+    
     // Simulierte Anrufannahme nach zufälliger Zeit (nur für Demo/Test)
     if (aircallConfig.useMockMode) {
-      const randomDelay = Math.random() > 0.3 ? 2000 + Math.random() * 3000 : 0;
+      // VERBESSERT: Immer eine Antwort simulieren (keine 0-Verzögerung mehr)
+      const randomDelay = 2000 + Math.random() * 3000;
       
-      if (randomDelay > 0) {
-        // Simuliere Klingeln und dann Annahme
+      // Simuliere Klingeln und dann Annahme mit 80% Wahrscheinlichkeit
+      if (Math.random() < 0.8) {
         setTimeout(() => {
           if (dialerActive && isCallInProgress) {
+            console.log(`[MOCK] Anruf ${callId} wurde angenommen`);
             setCallAnswered(true);
             setFormLoading(true);
             
@@ -387,12 +418,14 @@ const PowerDialerPage = () => {
             
             // Nach einer gewissen Zeit Anruf beenden (wenn automatisch)
             if (autoDialingActive) {
+              const callDuration = 5000 + Math.random() * 5000;
               setTimeout(() => {
                 if (dialerActive && isCallInProgress) {
+                  console.log(`[MOCK] Automatisches Beenden des Anrufs nach ${Math.round(callDuration/1000)} Sekunden`);
                   clearTimeout(timeoutId);
                   endCurrentCall();
                 }
-              }, 8000 + Math.random() * 5000);
+              }, callDuration);
             }
           }
         }, randomDelay);
@@ -400,10 +433,12 @@ const PowerDialerPage = () => {
         // Simuliere, dass niemand antwortet
         setTimeout(() => {
           if (dialerActive && isCallInProgress) {
-            console.log("Anruf wurde nicht beantwortet");
+            console.log(`[MOCK] Anruf ${callId} wurde nicht beantwortet`);
             clearTimeout(timeoutId);
             
             if (autoDialingActive) {
+              console.log("Gehe zum nächsten Kontakt (nicht beantwortet)");
+              setIsCallInProgress(false);
               moveToNextContact();
             } else {
               setIsCallInProgress(false);
@@ -412,26 +447,67 @@ const PowerDialerPage = () => {
           }
         }, 5000);
       }
+    } else {
+      // In einer Produktivumgebung würden wir hier auf Webhook-Events reagieren
+      // oder regelmäßig den Status abfragen
+      const statusCheckInterval = setInterval(async () => {
+        try {
+          if (!dialerActive || !isCallInProgress) {
+            clearInterval(statusCheckInterval);
+            return;
+          }
+          
+          const status = await aircallService.getCallStatus(callId);
+          console.log(`Anrufstatus Update: ${status?.status}`);
+          
+          if (status?.status === 'answered' && !callAnswered) {
+            setCallAnswered(true);
+            setFormLoading(true);
+            
+            setTimeout(() => {
+              if (dialerActive && isCallInProgress) {
+                setFormLoading(false);
+                setFormLoaded(true);
+              }
+            }, 1500);
+          } else if (status?.status === 'ended' || status?.status === 'completed') {
+            clearInterval(statusCheckInterval);
+            endCurrentCall();
+          }
+        } catch (error) {
+          console.error("Fehler beim Abrufen des Anrufstatus:", error);
+        }
+      }, 3000);
+      
+      // Speichere das Interval zur Bereinigung
+      return () => clearInterval(statusCheckInterval);
     }
-    
-    // In einer Produktivumgebung würden wir hier auf Webhook-Events reagieren
-    // oder regelmäßig den Status abfragen
   };
   
   /**
    * Beendet den aktuellen Anruf
    */
   const endCurrentCall = async () => {
+    console.log("endCurrentCall aufgerufen - Beende aktuellen Anruf");
+    
+    // Sofort UI-Status aktualisieren, damit Benutzer Feedback bekommt
     setCallAnswered(false);
     setFormLoaded(false);
+    setFormLoading(false);
     setIsCallInProgress(false);
+    
+    // Ggf. alle Timeouts beenden
+    if (window._activeTimeouts) {
+      window._activeTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+      window._activeTimeouts = [];
+    }
     
     // Anruf über die Aircall API beenden
     let apiEndSuccessful = false;
     if (aircallService && typeof aircallService.clearCallState === 'function') {
       try {
         await aircallService.clearCallState();
-        console.log("Anruf erfolgreich beendet");
+        console.log("Anruf erfolgreich beendet über API");
         apiEndSuccessful = true;
       } catch (error) {
         console.error("Fehler beim Beenden des Anrufs:", error);
@@ -439,12 +515,18 @@ const PowerDialerPage = () => {
     }
     
     // Kurze Pause vor dem nächsten Anruf
-    await new Promise(resolve => setTimeout(resolve, apiEndSuccessful ? 1000 : 2000));
+    const pauseDuration = apiEndSuccessful ? 1000 : 2000;
+    console.log(`Warte ${pauseDuration}ms vor dem nächsten Schritt...`);
+    await new Promise(resolve => setTimeout(resolve, pauseDuration));
     
     // Bei aktivem Auto-Dialing zum nächsten Kontakt gehen
     if (dialerActive && autoDialingActive) {
-      console.log("Gehe zum nächsten Kontakt");
+      console.log("Auto-Dialing aktiv - Gehe zum nächsten Kontakt");
       moveToNextContact();
+    } else if (!dialerActive) {
+      console.log("PowerDialer wurde deaktiviert, breche Anrufsequenz ab");
+    } else if (!autoDialingActive) {
+      console.log("Auto-Dialing ist deaktiviert, warte auf manuellen Anruf");
     }
   };
   
@@ -544,9 +626,11 @@ const PowerDialerPage = () => {
   };
   
   /**
-   * Wählt den nächsten Kontakt in der Liste
+   * Wählt den nächsten Kontakt in der Liste an
    */
   const dialNextContact = async () => {
+    console.log("dialNextContact: Starte Anruf zum nächsten Kontakt");
+    
     try {
       // Sicherheitschecks
       if (!dialerActive) {
@@ -555,28 +639,43 @@ const PowerDialerPage = () => {
       }
       
       // Verfügbarkeit prüfen
+      console.log("Prüfe Verfügbarkeit des Sales Rep...");
       const availability = await checkSalesRepAvailability();
+      
       if (!availability?.available) {
-        console.log("Sales Rep ist nicht verfügbar. Auto-Dialing wird angehalten.");
+        console.log(`Sales Rep ist nicht verfügbar (${availability?.status}). Auto-Dialing wird angehalten.`);
+        setCallError(`Sales Rep ist nicht verfügbar (${availability?.status}). Auto-Dialing angehalten.`);
         setAutoDialingActive(false);
         return;
       }
       
+      console.log("Sales Rep ist verfügbar, fahre fort...");
+      
       // Laufende Anrufe beenden
       if (isCallInProgress || aircallService.hasActiveCall()) {
+        console.log("Es gibt noch einen aktiven Anruf, beende diesen zuerst");
         await endCurrentCall();
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
       // Prüfe, ob wir am Ende der Liste sind
       if (currentContactIndex >= contactList.length) {
-        console.log("Ende der Kontaktliste erreicht");
+        console.log("Ende der Kontaktliste erreicht, beende Auto-Dialing");
         setAutoDialingActive(false);
         return;
       }
       
       // Nächsten Kontakt anrufen
+      console.log(`Kontaktindex: ${currentContactIndex}, Kontaktliste Länge: ${contactList.length}`);
       const contactToCall = contactList[currentContactIndex];
+      
+      if (!contactToCall) {
+        console.error("Kontakt nicht gefunden! Index scheint ungültig zu sein.");
+        setCallError("Fehler: Kontakt nicht gefunden");
+        return;
+      }
+      
+      console.log(`Bereite Anruf für ${contactToCall.name} vor...`);
       setCurrentContact(contactToCall);
       setIsCallInProgress(true);
       setCallAnswered(false);
@@ -584,18 +683,24 @@ const PowerDialerPage = () => {
       setCallError(null);
       
       console.log(`Rufe ${contactToCall.name} unter ${contactToCall.phone} an...`);
-      await startCall(contactToCall.phone);
+      const callResponse = await startCall(contactToCall.phone);
+      console.log("Anruf initiiert:", callResponse?.data?.id);
       
     } catch (error) {
       console.error("Fehler beim Anrufen des nächsten Kontakts:", error);
-      setCallError(error.message);
+      setCallError(error.message || "Unbekannter Fehler beim Anrufen");
       setIsCallInProgress(false);
       
-      // Bei Fehler zum nächsten Kontakt
+      // Bei Fehler zum nächsten Kontakt gehen, aber nur wenn Auto-Dialing aktiv ist
       if (autoDialingActive && dialerActive) {
-        setTimeout(() => {
+        console.log("Fehler aufgetreten, gehe zum nächsten Kontakt in 3 Sekunden...");
+        const errorTimeout = setTimeout(() => {
           moveToNextContact();
         }, 3000);
+        
+        // Speichere Timeout für mögliche Bereinigung
+        window._activeTimeouts = window._activeTimeouts || [];
+        window._activeTimeouts.push(errorTimeout);
       }
     }
   };
@@ -604,17 +709,37 @@ const PowerDialerPage = () => {
    * Wechselt zum nächsten Kontakt in der Liste
    */
   const moveToNextContact = () => {
+    console.log("moveToNextContact aufgerufen - Wechsle zum nächsten Kontakt");
+    
+    // Berechne den Index des nächsten Kontakts
     const nextIndex = currentContactIndex + 1;
+    console.log(`Aktueller Kontaktindex: ${currentContactIndex}, Nächster Index: ${nextIndex}, Kontaktliste Länge: ${contactList.length}`);
+    
+    // Setze den neuen Index
     setCurrentContactIndex(nextIndex);
     
+    // Prüfe, ob wir am Ende der Liste sind
     if (nextIndex < contactList.length) {
-      setCurrentContact(contactList[nextIndex]);
+      // Setze den neuen Kontakt
+      const nextContact = contactList[nextIndex];
+      console.log(`Nächster Kontakt: ${nextContact.name} (${nextContact.phone})`);
+      setCurrentContact(nextContact);
       
-      // Wenn Auto-Dialing aktiv, nächsten Kontakt anrufen
+      // Wenn Auto-Dialing aktiv, rufe nach einer kurzen Pause den nächsten Kontakt an
       if (autoDialingActive && dialerActive) {
-        setTimeout(() => {
+        console.log("Auto-Dialing aktiv, rufe nächsten Kontakt in 1.5 Sekunden an");
+        
+        // Speichere Timeout-ID für mögliche Bereinigung
+        const nextCallTimeout = setTimeout(() => {
+          console.log("Starte Anruf zum nächsten Kontakt...");
           dialNextContact();
         }, 1500);
+        
+        // Speichere Timeout-ID für mögliche Bereinigung
+        window._activeTimeouts = window._activeTimeouts || [];
+        window._activeTimeouts.push(nextCallTimeout);
+      } else {
+        console.log("Auto-Dialing nicht aktiv, warte auf manuellen Anruf");
       }
     } else {
       console.log("Ende der Kontaktliste erreicht");
