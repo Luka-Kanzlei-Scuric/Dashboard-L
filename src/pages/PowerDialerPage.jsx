@@ -41,7 +41,7 @@ const PowerDialerPage = () => {
     {
       id: "contact1",
       name: "Maria Schmidt",
-      phone: "+4915111223344", // Beispiel-Nummer, ersetze mit einer echten Testnummer
+      phone: "+4917693176785", // Echte Testnummer
       email: "maria.schmidt@example.com",
       previousAttempts: 2,
       lastContact: "2025-04-08 14:30",
@@ -50,7 +50,7 @@ const PowerDialerPage = () => {
     {
       id: "contact2",
       name: "Thomas Müller",
-      phone: "+4915111223355", // Beispiel-Nummer, ersetze mit einer echten Testnummer
+      phone: "+491767255021", // Echte Testnummer (ohne Leerzeichen für E.164-Format)
       email: "thomas.mueller@example.com",
       previousAttempts: 0,
       lastContact: "Noch kein Kontakt",
