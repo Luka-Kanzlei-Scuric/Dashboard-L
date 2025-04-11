@@ -33,7 +33,8 @@ const PowerDialerPage = () => {
   // Aircall Konfiguration
   const aircallConfig = {
     userId: "1527216", // Deine Aircall-Benutzer-ID
-    numberId: "967647" // Deine Aircall-Nummer-ID für "Dorsten - Lokal"
+    numberId: "967647", // Deine Aircall-Nummer-ID für "Dorsten - Lokal"
+    useMockMode: true // Aktiviere den Mock-Modus, falls API nicht verfügbar
   };
   
   // Überprüfe, ob der aircallService verfügbar ist
@@ -189,15 +190,16 @@ const PowerDialerPage = () => {
       // um über den Anrufstatus informiert zu werden. 
       // Für den Prototyp simulieren wir das.
       
-      // Starte einen periodischen Check des Anrufstatus, falls verfügbar
-      if (typeof aircallService.getCallStatus === 'function') {
-        const statusCheckInterval = setInterval(async () => {
-          if (!dialerActive || !callInProgress) {
-            clearInterval(statusCheckInterval);
-            return;
-          }
-          
-          try {
+      // Starte einen periodischen Check des Anrufstatus, ob im Mock-Modus oder echter API
+      // Dies stellt sicher, dass wir auf Statusänderungen reagieren können
+      const statusCheckInterval = setInterval(async () => {
+        if (!dialerActive || !callInProgress) {
+          clearInterval(statusCheckInterval);
+          return;
+        }
+        
+        try {
+          if (aircallService && typeof aircallService.getCallStatus === 'function') {
             const callStatus = await aircallService.getCallStatus();
             console.log(`Aktueller Anrufstatus: ${callStatus?.status}`);
             
@@ -206,10 +208,26 @@ const PowerDialerPage = () => {
               clearInterval(statusCheckInterval);
               endCurrentCall();
             }
-          } catch (error) {
-            console.error("Fehler beim Abrufen des Anrufstatus:", error);
           }
-        }, 5000); // Alle 5 Sekunden prüfen
+          
+          // Zusätzlich prüfen wir, ob der Anruf noch aktiv ist
+          if (aircallService && typeof aircallService.hasActiveCall === 'function' && 
+              !aircallService.hasActiveCall()) {
+            console.log("Anruf ist nicht mehr aktiv, gehe zum nächsten Kontakt");
+            clearInterval(statusCheckInterval);
+            endCurrentCall();
+          }
+        } catch (error) {
+          console.error("Fehler beim Abrufen des Anrufstatus:", error);
+          // Trotz Fehler weitermachen, nächster Versuch in 5 Sekunden
+        }
+      }, 3000); // Alle 3 Sekunden prüfen für schnelleres Feedback
+      
+      // Speichere den Interval für die Bereinigung
+      // Wird später in useEffect bereinigt
+      if (typeof window !== 'undefined') {
+        window._activeIntervals = window._activeIntervals || [];
+        window._activeIntervals.push(statusCheckInterval);
       }
     } catch (error) {
       console.error("Fehler beim Anrufen des nächsten Kontakts:", error);
@@ -248,29 +266,44 @@ const PowerDialerPage = () => {
   
   // Beendet den aktuellen Anruf und geht zum nächsten Kontakt
   const endCurrentCall = async () => {
+    // Markiere Anruf sofort als beendet im UI, unabhängig von API-Erfolg
     setCallAnswered(false);
     setFormLoaded(false);
     setCallInProgress(false);
     setIsCallInProgress(false);
     
+    // Bereinige alle laufenden Intervalle für diesen Anruf
+    if (typeof window !== 'undefined' && window._activeIntervals) {
+      window._activeIntervals.forEach(interval => {
+        clearInterval(interval);
+      });
+      window._activeIntervals = [];
+    }
+    
     // Anruf über die Aircall API beenden
+    let apiEndSuccessful = false;
     if (aircallService && typeof aircallService.clearCallState === 'function') {
       try {
         await aircallService.clearCallState();
         console.log("Anruf erfolgreich beendet");
+        apiEndSuccessful = true;
       } catch (error) {
         console.error("Fehler beim Beenden des Anrufs:", error);
+        // Trotz Fehler weitermachen - wir wollen zum nächsten Kontakt gehen
       }
     } else {
       console.warn("aircallService nicht verfügbar beim Beenden des Anrufs");
     }
     
-    // Kurze Pause vor dem nächsten Anruf
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Kurze Pause vor dem nächsten Anruf - länger wenn API-Call fehlgeschlagen ist
+    await new Promise(resolve => setTimeout(resolve, apiEndSuccessful ? 1000 : 2000));
     
     // Nur zum nächsten Kontakt gehen, wenn der Dialer aktiv ist
     if (dialerActive && autoDialingActive) {
+      console.log("Gehe zum nächsten Kontakt");
       moveToNextContact();
+    } else {
+      console.log("Beende Anruf ohne zum nächsten Kontakt zu gehen (Dialer oder Auto-Dial nicht aktiv)");
     }
   };
   
@@ -336,11 +369,12 @@ const PowerDialerPage = () => {
       
       console.log(`Starte Anruf an ${calledNumber}...`);
       
-      // Anruf über Aircall API starten
+      // Anruf über Aircall API starten (mit Mock-Modus-Unterstützung)
       const response = await aircallService.startOutboundCall(
         aircallConfig.userId,
         aircallConfig.numberId,
-        calledNumber
+        calledNumber,
+        aircallConfig.useMockMode // Übergeben des useMockMode-Parameters
       );
       
       console.log("Anruf gestartet:", response?.data?.id || "ID nicht verfügbar");
@@ -529,6 +563,19 @@ const PowerDialerPage = () => {
       // Timer stoppen
       if (sessionInterval) {
         clearInterval(sessionInterval);
+      }
+      
+      // Alle gespeicherten Intervalle bereinigen
+      if (typeof window !== 'undefined' && window._activeIntervals) {
+        console.log(`Bereinige ${window._activeIntervals.length} aktive Intervalle`);
+        window._activeIntervals.forEach(interval => {
+          try {
+            clearInterval(interval);
+          } catch (error) {
+            console.error("Fehler beim Bereinigen des Intervals:", error);
+          }
+        });
+        window._activeIntervals = [];
       }
       
       // Alle aktiven Anrufe beenden
