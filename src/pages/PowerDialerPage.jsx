@@ -36,32 +36,151 @@ const PowerDialerPage = () => {
     numberId: "967647" // Deine Aircall-Nummer-ID für "Dorsten - Lokal"
   };
   
-  // Beispiel-Daten für aktuellen Kontakt
-  const [currentContact, setCurrentContact] = useState({
-    name: "Maria Schmidt",
-    phone: "+49 123 4567890", // Sollte im E.164-Format sein, z.B. "+491234567890"
-    email: "maria.schmidt@example.com",
-    previousAttempts: 2,
-    lastContact: "2025-04-08 14:30",
-    notes: "War beim letzten Mal interessiert, hatte jedoch noch Bedenken wegen der Kosten."
-  });
+  // Liste der zu kontaktierenden Personen
+  const [contactList, setContactList] = useState([
+    {
+      id: "contact1",
+      name: "Maria Schmidt",
+      phone: "+4915111223344", // Beispiel-Nummer, ersetze mit einer echten Testnummer
+      email: "maria.schmidt@example.com",
+      previousAttempts: 2,
+      lastContact: "2025-04-08 14:30",
+      notes: "War beim letzten Mal interessiert, hatte jedoch noch Bedenken wegen der Kosten."
+    },
+    {
+      id: "contact2",
+      name: "Thomas Müller",
+      phone: "+4915111223355", // Beispiel-Nummer, ersetze mit einer echten Testnummer
+      email: "thomas.mueller@example.com",
+      previousAttempts: 0,
+      lastContact: "Noch kein Kontakt",
+      notes: "Neuer Interessent, wurde noch nicht kontaktiert."
+    }
+  ]);
+  
+  // Aktuell ausgewählter/angerufener Kontakt
+  const [currentContact, setCurrentContact] = useState(null);
+  
+  // Index des aktuellen Kontakts in der Liste
+  const [currentContactIndex, setCurrentContactIndex] = useState(0);
+  
+  // Status für automatische Wählsequenz
+  const [autoDialingActive, setAutoDialingActive] = useState(false);
+  const [callInProgress, setCallInProgress] = useState(false);
   
   // PowerDialer aktivieren/deaktivieren
   const toggleDialer = () => {
-    setDialerActive(!dialerActive);
+    const newDialerState = !dialerActive;
+    setDialerActive(newDialerState);
     setCallAnswered(false);
     setFormLoaded(false);
     
     // Timer starten oder stoppen
-    if (!dialerActive) {
+    if (newDialerState) {
+      // PowerDialer wird aktiviert
       const interval = setInterval(() => {
         setSessionTime(prev => prev + 1);
       }, 1000);
       setSessionInterval(interval);
+      
+      // Setze den aktuellen Kontakt auf den ersten in der Liste
+      setCurrentContactIndex(0);
+      setCurrentContact(contactList[0]);
+      
+      // Starte die automatische Wählsequenz, wenn gewünscht
+      if (autoDialingActive) {
+        startDialingSequence();
+      }
     } else {
+      // PowerDialer wird deaktiviert
       clearInterval(sessionInterval);
       setSessionInterval(null);
+      setAutoDialingActive(false);
+      setCallInProgress(false);
     }
+  };
+  
+  // Startet die automatische Wählsequenz
+  const startDialingSequence = () => {
+    if (!dialerActive) return;
+    
+    setAutoDialingActive(true);
+    dialNextContact();
+  };
+  
+  // Stoppt die automatische Wählsequenz
+  const stopDialingSequence = () => {
+    setAutoDialingActive(false);
+  };
+  
+  // Ruft den nächsten Kontakt in der Liste an
+  const dialNextContact = async () => {
+    try {
+      if (currentContactIndex >= contactList.length) {
+        // Am Ende der Liste angekommen
+        console.log("Ende der Kontaktliste erreicht");
+        setAutoDialingActive(false);
+        return;
+      }
+      
+      const contactToCall = contactList[currentContactIndex];
+      setCurrentContact(contactToCall);
+      setCallInProgress(true);
+      setCallAnswered(false);
+      setFormLoaded(false);
+      setCallError(null);
+      
+      console.log(`Rufe ${contactToCall.name} unter ${contactToCall.phone} an...`);
+      
+      // Anruf über Aircall API starten
+      await startCall(contactToCall.phone);
+      
+      // In einer realen Implementierung würden wir hier auf Anruf-Events warten,
+      // aber für den Prototyp simulieren wir das
+    } catch (error) {
+      console.error("Fehler beim Anrufen des nächsten Kontakts:", error);
+      setCallError(error.message);
+      setCallInProgress(false);
+      
+      // Bei Fehler nach kurzer Pause zum nächsten Kontakt gehen
+      setTimeout(() => {
+        if (autoDialingActive) {
+          moveToNextContact();
+        }
+      }, 3000);
+    }
+  };
+  
+  // Wechselt zum nächsten Kontakt in der Liste
+  const moveToNextContact = () => {
+    const nextIndex = currentContactIndex + 1;
+    setCurrentContactIndex(nextIndex);
+    
+    if (nextIndex < contactList.length) {
+      setCurrentContact(contactList[nextIndex]);
+      
+      // Wenn Auto-Dialing aktiv ist, nächsten Kontakt anrufen
+      if (autoDialingActive) {
+        setTimeout(() => {
+          dialNextContact();
+        }, 1500); // Kurze Pause zwischen Anrufen
+      }
+    } else {
+      console.log("Ende der Kontaktliste erreicht");
+      setAutoDialingActive(false);
+    }
+  };
+  
+  // Beendet den aktuellen Anruf und geht zum nächsten Kontakt
+  const endCurrentCall = () => {
+    setCallAnswered(false);
+    setFormLoaded(false);
+    setCallInProgress(false);
+    
+    // In einer realen Implementierung würden wir hier den Anruf beenden
+    // Für den Prototyp gehen wir einfach zum nächsten Kontakt
+    
+    moveToNextContact();
   };
   
   // Simuliere einen angenommenen Anruf
@@ -96,6 +215,7 @@ const PowerDialerPage = () => {
     try {
       setCallError(null);
       setIsCallInProgress(true);
+      setCallInProgress(true);
       
       // Entweder die eingegebene Nummer oder die des aktuellen Kontakts verwenden
       const number = phoneNumberToCall || phoneNumber;
@@ -113,18 +233,67 @@ const PowerDialerPage = () => {
         number
       );
       
-      // Anruf erfolgreich gestartet, simuliere Anruf angenommen
-      simulateAnsweredCall();
+      // In einer realen Integration würden wir hier auf ein Ereignis warten,
+      // das uns mitteilt, dass der Anruf beantwortet wurde
+      // Für den Prototyp simulieren wir die Anrufannahme nach einer zufälligen Zeit
       
       // Wenn manueller Dialer geöffnet war, schließen
       setShowManualDialer(false);
       
       // Telefonnummer im Eingabefeld zurücksetzen
       setPhoneNumber("");
+      
+      // Simuliere eine zufällige Zeit, bis der Anruf angenommen wird (Nur für Demozwecke)
+      // In einer echten Integration würden wir hier auf Ereignisse von der Aircall-API warten
+      if (!autoDialingActive) {
+        // Wenn manueller Modus, simuliere sofortige Annahme
+        setTimeout(() => {
+          simulateAnsweredCall();
+        }, 1500);
+      } else {
+        // Im automatischen Modus simulieren wir ein realistischeres Telefonverhalten
+        const randomDelay = Math.random() > 0.3 ? 3000 + Math.random() * 2000 : 0;
+        
+        if (randomDelay > 0) {
+          // Simuliere, dass der Anruf angenommen wurde
+          setTimeout(() => {
+            if (callInProgress) {
+              simulateAnsweredCall();
+            }
+          }, randomDelay);
+          
+          // Simuliere, dass der Anruf nach einiger Zeit beendet wird
+          setTimeout(() => {
+            if (callInProgress && callAnswered) {
+              endCurrentCall();
+            }
+          }, randomDelay + 5000 + Math.random() * 10000);
+        } else {
+          // Simuliere, dass niemand den Anruf angenommen hat
+          setTimeout(() => {
+            console.log("Anruf wurde nicht beantwortet");
+            if (autoDialingActive) {
+              moveToNextContact();
+            } else {
+              setCallInProgress(false);
+              setIsCallInProgress(false);
+            }
+          }, 4000);
+        }
+      }
+      
     } catch (error) {
       console.error('Fehler beim Starten des Anrufs:', error);
       setCallError(error.message || 'Fehler beim Starten des Anrufs');
       setIsCallInProgress(false);
+      setCallInProgress(false);
+      
+      // Bei automatischem Wählen zum nächsten Kontakt gehen
+      if (autoDialingActive) {
+        setTimeout(() => {
+          moveToNextContact();
+        }, 3000);
+      }
     }
   };
   
@@ -286,36 +455,59 @@ const PowerDialerPage = () => {
                     </div>
                   )}
                   
-                  <div className="flex justify-between items-center">
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500 font-light">
-                        {dialerActive 
-                          ? "PowerDialer ist aktiv. Heute wurden 15 Anrufe getätigt." 
-                          : "PowerDialer starten, um Kontakte anzurufen und Gespräche zu dokumentieren."
-                        }
-                      </p>
-                    </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500 font-light mb-3">
+                      {dialerActive 
+                        ? `PowerDialer ist aktiv. ${contactList.length} Kontakte in der Liste.` 
+                        : "PowerDialer starten, um Kontakte anzurufen und Gespräche zu dokumentieren."
+                      }
+                    </p>
                     
-                    <button
-                      onClick={toggleDialer}
-                      className={`ml-4 flex items-center justify-center rounded-full transition-all duration-300 px-3 py-1.5 ${
-                        dialerActive 
-                          ? 'bg-red-50 text-red-500 hover:bg-red-100' 
-                          : 'bg-green-50 text-green-600 hover:bg-green-100'
-                      }`}
-                    >
-                      {dialerActive ? (
-                        <>
-                          <PauseIcon className="w-3 h-3 mr-1.5" />
-                          <span className="text-xs font-light">Stoppen</span>
-                        </>
-                      ) : (
-                        <>
-                          <PlayIcon className="w-3 h-3 mr-1.5" />
-                          <span className="text-xs font-light">Starten</span>
-                        </>
+                    <div className="flex justify-between items-center">
+                      <button
+                        onClick={toggleDialer}
+                        className={`flex items-center justify-center rounded-full transition-all duration-300 px-3 py-1.5 ${
+                          dialerActive 
+                            ? 'bg-red-50 text-red-500 hover:bg-red-100' 
+                            : 'bg-green-50 text-green-600 hover:bg-green-100'
+                        }`}
+                      >
+                        {dialerActive ? (
+                          <>
+                            <PauseIcon className="w-3 h-3 mr-1.5" />
+                            <span className="text-xs font-light">Stoppen</span>
+                          </>
+                        ) : (
+                          <>
+                            <PlayIcon className="w-3 h-3 mr-1.5" />
+                            <span className="text-xs font-light">Starten</span>
+                          </>
+                        )}
+                      </button>
+                      
+                      {dialerActive && (
+                        <button
+                          onClick={autoDialingActive ? stopDialingSequence : startDialingSequence}
+                          className={`flex items-center justify-center rounded-full transition-all duration-300 px-3 py-1.5 ${
+                            autoDialingActive 
+                              ? 'bg-orange-50 text-orange-500 hover:bg-orange-100' 
+                              : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                          }`}
+                        >
+                          {autoDialingActive ? (
+                            <>
+                              <PauseIcon className="w-3 h-3 mr-1.5" />
+                              <span className="text-xs font-light">Auto-Dial pausieren</span>
+                            </>
+                          ) : (
+                            <>
+                              <PhoneIcon className="w-3 h-3 mr-1.5" />
+                              <span className="text-xs font-light">Auto-Dial starten</span>
+                            </>
+                          )}
+                        </button>
                       )}
-                    </button>
+                    </div>
                   </div>
                 </div>
                 
@@ -479,15 +671,43 @@ const PowerDialerPage = () => {
                   <div className="flex-1 flex flex-col justify-center items-center">
                     <div className="w-20 h-20 md:w-28 md:h-28 rounded-full border-4 border-gray-100 flex items-center justify-center relative mb-4">
                       <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-[#f5f5f7] flex items-center justify-center">
-                        <ArrowPathIcon className={`w-6 h-6 md:w-8 md:h-8 text-gray-300 ${
-                          dialerActive ? 'animate-spin' : ''
-                        }`} />
+                        {autoDialingActive ? (
+                          <span className="text-lg md:text-xl font-light text-gray-500">
+                            {contactList.length - currentContactIndex}
+                          </span>
+                        ) : (
+                          <ArrowPathIcon className={`w-6 h-6 md:w-8 md:h-8 text-gray-300 ${
+                            dialerActive ? 'animate-spin' : ''
+                          }`} />
+                        )}
                       </div>
                       <div className="absolute -top-1 -right-1 w-5 h-5 md:w-6 md:h-6 rounded-full bg-white shadow-sm flex items-center justify-center border border-gray-100">
                         <PhoneIcon className="w-2.5 h-2.5 md:w-3 md:h-3 text-green-500" />
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 font-light">PowerDialer ist aktiv</p>
+                    <p className="text-xs text-gray-500 font-light">
+                      {autoDialingActive 
+                        ? `Auto-Dial aktiv - ${contactList.length - currentContactIndex} verbleibend` 
+                        : "PowerDialer ist aktiv"}
+                    </p>
+                    
+                    {autoDialingActive && callInProgress && (
+                      <div className="mt-4 text-center">
+                        <div className="inline-flex items-center bg-blue-50 rounded-full px-3 py-1">
+                          <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse mr-2"></div>
+                          <span className="text-xs text-blue-700">Anruf läuft...</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {callAnswered && (
+                      <button 
+                        onClick={endCurrentCall}
+                        className="mt-4 flex items-center justify-center rounded-full transition-all duration-300 px-3 py-1.5 bg-red-50 text-red-500 hover:bg-red-100"
+                      >
+                        <span className="text-xs font-light">Gespräch beenden</span>
+                      </button>
+                    )}
                   </div>
                   
                   {!callAnswered && (
@@ -619,52 +839,74 @@ const PowerDialerPage = () => {
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col">
-                  <div className="text-center mb-4 md:mb-6 bg-[#f5f5f7] rounded-xl md:rounded-2xl p-3 md:p-4 shadow-inner">
-                    <div className="w-12 h-12 md:w-16 md:h-16 mx-auto rounded-full bg-white shadow-sm flex items-center justify-center mb-2">
-                      <span className="text-lg md:text-xl font-light text-gray-400">
-                        {currentContact.name.split(' ').map(name => name[0]).join('')}
-                      </span>
-                    </div>
-                    <h3 className="text-lg md:text-xl font-light text-gray-800">{currentContact.name}</h3>
-                    
-                    <div className="mt-2 mb-2 flex items-center justify-center space-x-2">
-                      <a href={`tel:${currentContact.phone}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 block text-xs md:text-sm">
-                        {currentContact.phone}
+                  {currentContact ? (
+                    <div className="text-center mb-4 md:mb-6 bg-[#f5f5f7] rounded-xl md:rounded-2xl p-3 md:p-4 shadow-inner">
+                      <div className="w-12 h-12 md:w-16 md:h-16 mx-auto rounded-full bg-white shadow-sm flex items-center justify-center mb-2">
+                        <span className="text-lg md:text-xl font-light text-gray-400">
+                          {currentContact.name.split(' ').map(name => name[0]).join('')}
+                        </span>
+                      </div>
+                      <h3 className="text-lg md:text-xl font-light text-gray-800">{currentContact.name}</h3>
+                      
+                      <div className="mt-2 mb-2 flex items-center justify-center space-x-2">
+                        <a href={`tel:${currentContact.phone}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 block text-xs md:text-sm">
+                          {currentContact.phone}
+                        </a>
+                        
+                        <button
+                          onClick={callCurrentContact}
+                          disabled={isCallInProgress || !dialerActive || callInProgress}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                            (dialerActive && !callInProgress)
+                              ? 'bg-green-100 text-green-600 hover:bg-green-200' 
+                              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          }`}
+                          title={!dialerActive 
+                            ? "Aktivieren Sie zuerst den PowerDialer" 
+                            : (callInProgress ? "Anruf läuft bereits" : "Kontakt anrufen")}
+                        >
+                          <PhoneIcon className="w-3 h-3" />
+                        </button>
+                      </div>
+                      
+                      <a href={`mailto:${currentContact.email}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 text-xs block">
+                        {currentContact.email}
                       </a>
                       
-                      <button
-                        onClick={callCurrentContact}
-                        disabled={isCallInProgress || !dialerActive}
-                        className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                          dialerActive 
-                            ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        }`}
-                        title={dialerActive ? "Kontakt anrufen" : "Aktivieren Sie zuerst den PowerDialer"}
-                      >
-                        <PhoneIcon className="w-3 h-3" />
-                      </button>
+                      {autoDialingActive && (
+                        <div className="mt-2 bg-blue-50 text-blue-700 p-2 rounded-lg text-xs">
+                          Kontakt {currentContactIndex + 1} von {contactList.length}
+                        </div>
+                      )}
+                      
+                      {callError && (
+                        <div className="mt-2 bg-red-50 text-red-600 p-2 rounded-lg text-xs">
+                          {callError}
+                        </div>
+                      )}
                     </div>
-                    
-                    <a href={`mailto:${currentContact.email}`} className="text-gray-500 hover:text-gray-700 transition-colors duration-200 text-xs block">
-                      {currentContact.email}
-                    </a>
-                    
-                    {callError && (
-                      <div className="mt-2 bg-red-50 text-red-600 p-2 rounded-lg text-xs">
-                        {callError}
+                  ) : (
+                    <div className="text-center mb-4 md:mb-6 bg-[#f5f5f7] rounded-xl md:rounded-2xl p-6 md:p-8 shadow-inner">
+                      <div className="w-12 h-12 md:w-16 md:h-16 mx-auto rounded-full bg-white shadow-sm flex items-center justify-center mb-3">
+                        <UserIcon className="w-6 h-6 md:w-8 md:h-8 text-gray-300" />
                       </div>
-                    )}
-                  </div>
+                      <p className="text-sm text-gray-500 font-light">
+                        Kein Kontakt ausgewählt
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Starten Sie den PowerDialer, um Kontakte anzurufen
+                      </p>
+                    </div>
+                  )}
                   
                   <div className="bg-[#f5f5f7] rounded-xl md:rounded-2xl p-3 md:p-4 mb-4 md:mb-5">
                     <div className="flex justify-between text-xs mb-2">
                       <span className="text-gray-500">Bisherige Versuche:</span>
-                      <span className="font-normal text-gray-800">{currentContact.previousAttempts}</span>
+                      <span className="font-normal text-gray-800">{currentContact?.previousAttempts || 0}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-500">Letzter Kontakt:</span>
-                      <span className="font-normal text-gray-800">{currentContact.lastContact}</span>
+                      <span className="font-normal text-gray-800">{currentContact?.lastContact || "Keiner"}</span>
                     </div>
                   </div>
                   
@@ -674,7 +916,7 @@ const PowerDialerPage = () => {
                       Notizen:
                     </h4>
                     <div className="bg-[#f5f5f7] p-3 rounded-xl md:rounded-2xl flex-1 overflow-auto shadow-inner">
-                      <p className="text-xs text-gray-600 leading-relaxed">{currentContact.notes}</p>
+                      <p className="text-xs text-gray-600 leading-relaxed">{currentContact?.notes || "Keine Notizen verfügbar"}</p>
                     </div>
                   </div>
                 </div>
