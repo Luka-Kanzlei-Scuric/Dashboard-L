@@ -81,10 +81,12 @@ const PowerDialerPage = () => {
   const aircallConfig = {
     userId: "1527216", // Aircall-Benutzer-ID
     numberId: "967647", // Aircall-Nummer-ID
-    useMockMode: true,  // Mock-Modus für Tests MUSS true sein für lokale Entwicklung
+    useMockMode: true,  // Mock-Modus für Tests - IMMER true lassen für Entwicklung ohne echte Aircall-API
     debugMode: true,    // Aktiviert ausführliche Logs
     mockCallDuration: 3000, // Anrufdauer im Mock-Modus in ms (auf 3 Sekunden verkürzt für schnelleres Testen)
-    webhookUrl: window.location.origin + "/api/aircall-webhook" // Optional: URL für Webhooks in Produktivumgebung
+    webhookUrl: window.location.origin + "/api/aircall-webhook", // Optional: URL für Webhooks in Produktivumgebung
+    // Um KEINE API-Anfragen zu stellen und nur lokale Mocks zu verwenden
+    forceCompleteMock: true
   };
   
   // -------------------- Hilfsfunktionen --------------------
@@ -268,26 +270,38 @@ const PowerDialerPage = () => {
    * Überprüft die Verfügbarkeit des Sales Reps bei Aircall
    */
   const checkSalesRepAvailability = async () => {
-    if (!aircallService) return;
+    if (!aircallService) {
+      console.error("Aircall-Service ist nicht verfügbar");
+      return null;
+    }
     
     try {
+      console.log("Prüfe Sales Rep Verfügbarkeit mit Konfiguration:", {
+        userId: aircallConfig.userId,
+        useMockMode: aircallConfig.useMockMode,
+        forceCompleteMock: aircallConfig.forceCompleteMock || false
+      });
+      
       const availability = await aircallService.checkUserAvailability(
         aircallConfig.userId, 
-        aircallConfig.useMockMode
+        // Erzwinge Mock-Modus wenn forceCompleteMock aktiv ist
+        aircallConfig.useMockMode || aircallConfig.forceCompleteMock
       );
       
+      console.log("Verfügbarkeitsantwort erhalten:", availability);
       setUserStatus(availability);
       
       if (!availability.available || !availability.connected) {
         console.warn(`Sales Rep ist nicht verfügbar. Status: ${availability.status}`);
         setCallError(`Sales Rep ist nicht verfügbar (${availability.status}). Bitte später versuchen.`);
       } else {
+        console.log("Sales Rep ist verfügbar und verbunden");
         setCallError(null);
       }
       
       return availability;
     } catch (error) {
-      console.error("Fehler bei der Überprüfung der Sales Rep Verfügbarkeit:", error);
+      console.error("❌ Fehler bei der Überprüfung der Sales Rep Verfügbarkeit:", error);
       setCallError("Fehler bei der Überprüfung der Verfügbarkeit. Bitte versuchen Sie es später erneut.");
       setUserStatus({ available: false, status: 'error', connected: false });
       return null;
@@ -301,7 +315,7 @@ const PowerDialerPage = () => {
     try {
       // Prüfe, ob der PowerDialer aktiv ist
       if (!dialerActive) {
-        console.log("PowerDialer ist nicht aktiv. Anruf wird nicht getätigt.");
+        console.log("⛔ PowerDialer ist nicht aktiv. Anruf wird nicht getätigt.");
         return;
       }
       
@@ -313,7 +327,7 @@ const PowerDialerPage = () => {
       
       // Prüfe, ob bereits ein Anruf läuft
       if (aircallService.hasActiveCall()) {
-        console.log("Es gibt bereits einen aktiven Anruf. Beende diesen zuerst.");
+        console.log("⚠️ Es gibt bereits einen aktiven Anruf. Beende diesen zuerst.");
         await aircallService.clearCallState();
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
@@ -330,17 +344,20 @@ const PowerDialerPage = () => {
         throw new Error('Telefonnummer muss im E.164-Format sein (z.B. +491234567890)');
       }
       
-      console.log(`Starte Anruf an ${number}...`);
+      console.log(`📱 Starte Anruf an ${number}...`);
       
       // Anruf über Aircall API starten
+      const useMock = aircallConfig.useMockMode || aircallConfig.forceCompleteMock;
+      console.log(`Rufe startOutboundCall mit Mock-Modus: ${useMock ? 'aktiv' : 'inaktiv'}`);
+      
       const response = await aircallService.startOutboundCall(
         aircallConfig.userId,
         aircallConfig.numberId,
         number,
-        aircallConfig.useMockMode
+        useMock
       );
       
-      console.log("Anruf gestartet:", response?.data?.id || "ID nicht verfügbar");
+      console.log("✅ Anruf gestartet:", response?.data?.id || "ID nicht verfügbar");
       
       // UI-Updates
       if (showManualDialer) setShowManualDialer(false);
@@ -349,7 +366,7 @@ const PowerDialerPage = () => {
       // Prüfe Zielrufnummer für Sicherheit
       const activeCall = aircallService.getActiveCall();
       if (activeCall && activeCall.to !== number) {
-        console.error(`Anruf geht an falsche Nummer: ${activeCall.to} statt ${number}`);
+        console.error(`⚠️ Anruf geht an falsche Nummer: ${activeCall.to} statt ${number}`);
         await aircallService.clearCallState();
         throw new Error('Anruf wurde an falsche Nummer weitergeleitet');
       }
@@ -357,7 +374,7 @@ const PowerDialerPage = () => {
       // Anruf-Timeout nach 120 Sekunden
       const callTimeoutId = setTimeout(async () => {
         if (isCallInProgress) {
-          console.log("Anruf-Timeout erreicht. Beende Anruf automatisch.");
+          console.log("⏱️ Anruf-Timeout erreicht. Beende Anruf automatisch.");
           await endCurrentCall();
         }
       }, 120000);
@@ -367,7 +384,7 @@ const PowerDialerPage = () => {
       
       return response;
     } catch (error) {
-      console.error('Fehler beim Starten des Anrufs:', error);
+      console.error('❌ Fehler beim Starten des Anrufs:', error);
       setCallError(error.message || 'Fehler beim Starten des Anrufs');
       setIsCallInProgress(false);
       
@@ -378,6 +395,7 @@ const PowerDialerPage = () => {
       
       // Bei Auto-Dialing zum nächsten Kontakt gehen
       if (autoDialingActive && dialerActive) {
+        console.log("⏭️ Fehler beim Anruf - gehe zum nächsten Kontakt in 3 Sekunden");
         setTimeout(() => {
           moveToNextContact();
         }, 3000);

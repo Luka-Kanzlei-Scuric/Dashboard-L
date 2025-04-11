@@ -6,8 +6,11 @@ import api from '../config/api';
  * Komplett überarbeitet nach den Anforderungen und API-Spezifikationen von Aircall:
  * - Prüft Verfügbarkeit des Sales Reps vor Anrufinitiierung
  * - Verwendet offizielle Aircall-Endpunkte gemäß Dokumentation
- * - Robuster Mock-Modus für Test- und Entwicklungszwecke
+ * - Robuster vollständiger Mock-Modus für Test- und Entwicklungszwecke
  * - Verbesserte Fehlerbehandlung und Resilienz
+ * 
+ * WICHTIG: Für den Produktionseinsatz muss das AIRCALL_API_TOKEN konfiguriert werden
+ * und useMockMode sollte auf false gesetzt werden.
  */
 class AircallService {
   constructor() {
@@ -89,6 +92,8 @@ class AircallService {
    */
   async startOutboundCall(userId, numberId, to, useMock = false) {
     try {
+      console.log(`📞 PowerDialer: Starte Anruf an ${to} (Mock-Modus: ${useMock ? 'aktiv' : 'inaktiv'})`);
+      
       // Prüfe zuerst Benutzerverfügbarkeit
       const availability = await this.checkUserAvailability(userId, useMock);
       
@@ -105,8 +110,9 @@ class AircallService {
       let response;
       const mockCallId = Date.now().toString() + '-' + Math.floor(Math.random() * 10000);
       
+      // Im Mock-Modus oder bei API-Fehlern immer Mock-Daten verwenden
       if (useMock) {
-        console.log('[MOCK] Starte Anruf an:', to);
+        console.log(`[MOCK] Starte simulierten Anruf an: ${to}`);
         response = {
           data: { 
             id: mockCallId,
@@ -118,14 +124,17 @@ class AircallService {
       } else {
         try {
           // Verwende den offiziellen Aircall API-Endpunkt für ausgehende Anrufe
+          console.log(`Sende Anrufanfrage an Aircall API: Benutzer ${userId}, Nummer ${numberId}, Ziel ${to}`);
           response = await api.post(`/v1/users/${userId}/calls`, {
             number_id: parseInt(numberId, 10),
             to: to
           });
+          console.log("Antwort von Aircall API:", response);
         } catch (apiError) {
           console.warn('API-Fehler beim Starten des Anrufs:', apiError.message);
           
           // Fallback auf Mock-Daten bei API-Fehler
+          console.log("[FALLBACK] API-Fehler - Verwende Mock-Daten");
           response = {
             data: { 
               id: mockCallId,
@@ -153,7 +162,7 @@ class AircallService {
           direction: response.data.direction || 'outbound'
         });
         
-        console.log(`Anruf initiiert mit ID: ${this.activeCallId}, Status: ${this.activeCallStatus}`);
+        console.log(`✅ Anruf initiiert mit ID: ${this.activeCallId}, Status: ${this.activeCallStatus}`);
         
         // Beginne mit Polling des Anrufstatus, um Updates zu erhalten
         this.startStatusPolling(this.activeCallId);
@@ -163,7 +172,7 @@ class AircallService {
       
       return response;
     } catch (error) {
-      console.error('Fehler beim Starten des Anrufs:', error);
+      console.error('❌ Fehler beim Starten des Anrufs:', error);
       throw error;
     }
   }
