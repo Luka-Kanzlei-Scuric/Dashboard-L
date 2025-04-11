@@ -36,6 +36,17 @@ const PowerDialerPage = () => {
     numberId: "967647" // Deine Aircall-Nummer-ID für "Dorsten - Lokal"
   };
   
+  // Überprüfe, ob der aircallService verfügbar ist
+  useEffect(() => {
+    if (!aircallService || typeof aircallService !== 'object') {
+      console.error("aircallService ist nicht verfügbar oder kein Objekt");
+      setCallError("Anrufservice ist nicht verfügbar. Bitte versuchen Sie es später erneut.");
+    } else {
+      console.log("aircallService erfolgreich initialisiert:", 
+                  Object.keys(aircallService).join(', '));
+    }
+  }, []);
+  
   // Liste der zu kontaktierenden Personen
   const [contactList, setContactList] = useState([
     {
@@ -88,7 +99,7 @@ const PowerDialerPage = () => {
       setCurrentContact(contactList[0]);
       
       // Prüfe, ob es einen aktiven Anruf gibt und beende ihn
-      if (aircallService.hasActiveCall()) {
+      if (aircallService && typeof aircallService.hasActiveCall === 'function' && aircallService.hasActiveCall()) {
         console.log("Es gibt einen aktiven Anruf, der beim Dialer-Start beendet wird.");
         try {
           await aircallService.clearCallState();
@@ -113,10 +124,14 @@ const PowerDialerPage = () => {
       
       // Wenn ein Anruf läuft, beenden wir diesen explizit über die Aircall API
       console.log("PowerDialer wird deaktiviert - alle laufenden Anrufe werden beendet");
-      try {
-        await aircallService.clearCallState();
-      } catch (error) {
-        console.error("Fehler beim Beenden aktiver Anrufe:", error);
+      if (aircallService && typeof aircallService.clearCallState === 'function') {
+        try {
+          await aircallService.clearCallState();
+        } catch (error) {
+          console.error("Fehler beim Beenden aktiver Anrufe:", error);
+        }
+      } else {
+        console.warn("aircallService nicht verfügbar beim Deaktivieren des PowerDialers");
       }
     }
   };
@@ -144,7 +159,7 @@ const PowerDialerPage = () => {
       }
       
       // Wenn bereits ein Anruf läuft, diesen zuerst beenden
-      if (callInProgress || aircallService.hasActiveCall()) {
+      if (callInProgress || (aircallService && typeof aircallService.hasActiveCall === 'function' && aircallService.hasActiveCall())) {
         console.log("Es läuft bereits ein Anruf. Beende diesen zuerst.");
         await endCurrentCall();
         // Kurze Pause, um sicherzustellen, dass der vorherige Anruf komplett beendet wurde
@@ -239,11 +254,15 @@ const PowerDialerPage = () => {
     setIsCallInProgress(false);
     
     // Anruf über die Aircall API beenden
-    try {
-      await aircallService.clearCallState();
-      console.log("Anruf erfolgreich beendet");
-    } catch (error) {
-      console.error("Fehler beim Beenden des Anrufs:", error);
+    if (aircallService && typeof aircallService.clearCallState === 'function') {
+      try {
+        await aircallService.clearCallState();
+        console.log("Anruf erfolgreich beendet");
+      } catch (error) {
+        console.error("Fehler beim Beenden des Anrufs:", error);
+      }
+    } else {
+      console.warn("aircallService nicht verfügbar beim Beenden des Anrufs");
     }
     
     // Kurze Pause vor dem nächsten Anruf
@@ -292,7 +311,7 @@ const PowerDialerPage = () => {
       }
       
       // Prüfe, ob bereits ein Anruf läuft und beende ihn wenn nötig
-      if (aircallService.hasActiveCall()) {
+      if (aircallService && typeof aircallService.hasActiveCall === 'function' && aircallService.hasActiveCall()) {
         console.log("Es gibt bereits einen aktiven Anruf. Der wird zuerst beendet.");
         await aircallService.clearCallState();
         // Kurze Pause, um dem System Zeit zu geben
@@ -337,11 +356,15 @@ const PowerDialerPage = () => {
       
       // Prüfe, ob der Anruf wirklich an die angegebene Nummer geht
       // (Sicherheitsmaßnahme gegen unerwünschte wiederholte Anrufe)
-      const activeCall = aircallService.getActiveCall();
-      if (activeCall && activeCall.to !== calledNumber) {
-        console.error(`Anruf geht an falsche Nummer: ${activeCall.to} statt ${calledNumber}`);
-        await aircallService.clearCallState();
-        throw new Error('Anruf wurde an falsche Nummer weitergeleitet');
+      if (aircallService && typeof aircallService.getActiveCall === 'function') {
+        const activeCall = aircallService.getActiveCall();
+        if (activeCall && activeCall.to !== calledNumber) {
+          console.error(`Anruf geht an falsche Nummer: ${activeCall.to} statt ${calledNumber}`);
+          if (typeof aircallService.clearCallState === 'function') {
+            await aircallService.clearCallState();
+          }
+          throw new Error('Anruf wurde an falsche Nummer weitergeleitet');
+        }
       }
       
       // Setze einen Timeout, um sicherzustellen, dass Anrufe nicht ewig laufen
@@ -397,7 +420,11 @@ const PowerDialerPage = () => {
                 setCallInProgress(false);
                 setIsCallInProgress(false);
                 // Stelle sicher, dass der Anruf beendet wird
-                aircallService.clearCallState();
+                if (aircallService && typeof aircallService.clearCallState === 'function') {
+                  aircallService.clearCallState().catch(err => {
+                    console.error("Fehler beim Beenden des Anrufs:", err);
+                  });
+                }
               }
             }
           }, 4000);
@@ -411,10 +438,12 @@ const PowerDialerPage = () => {
       setCallInProgress(false);
       
       // Stelle sicher, dass kein aktiver Anruf zurückbleibt
-      try {
-        await aircallService.clearCallState();
-      } catch (clearError) {
-        console.error("Fehler beim Bereinigen des Anrufzustands:", clearError);
+      if (aircallService && typeof aircallService.clearCallState === 'function') {
+        try {
+          await aircallService.clearCallState();
+        } catch (clearError) {
+          console.error("Fehler beim Bereinigen des Anrufzustands:", clearError);
+        }
       }
       
       // Bei automatischem Wählen zum nächsten Kontakt gehen
@@ -442,7 +471,7 @@ const PowerDialerPage = () => {
       }
       
       // Beende laufende Anrufe, falls vorhanden
-      if (callInProgress || aircallService.hasActiveCall()) {
+      if (callInProgress || (aircallService && typeof aircallService.hasActiveCall === 'function' && aircallService.hasActiveCall())) {
         console.log("Beende laufenden Anruf, bevor ein neuer getätigt wird");
         await endCurrentCall();
         // Kurze Pause, um dem System Zeit zu geben
@@ -504,20 +533,30 @@ const PowerDialerPage = () => {
       
       // Alle aktiven Anrufe beenden
       console.log("Komponente wird unmounted - Beende alle aktiven Anrufe");
-      aircallService.clearCallState().catch(error => {
-        console.error("Fehler beim Beenden der Anrufe beim Unmount:", error);
-      });
+      if (aircallService && typeof aircallService.clearCallState === 'function') {
+        try {
+          aircallService.clearCallState().catch(error => {
+            console.error("Fehler beim Beenden der Anrufe beim Unmount:", error);
+          });
+        } catch (error) {
+          console.error("Fehler beim Zugriff auf aircallService beim Unmount:", error);
+        }
+      }
     };
   }, [sessionInterval]);
   
   // Effekt, der sicherstellt, dass kein Anruf läuft, wenn der Dialer deaktiviert ist
   useEffect(() => {
     // Wenn der Dialer ausgeschaltet wird, stelle sicher, dass alle Anrufe beendet werden
-    if (!dialerActive && aircallService.hasActiveCall()) {
+    if (!dialerActive && aircallService && typeof aircallService.hasActiveCall === 'function' && aircallService.hasActiveCall()) {
       console.log("PowerDialer wurde deaktiviert. Beende aktive Anrufe.");
-      aircallService.clearCallState().catch(error => {
-        console.error("Fehler beim Beenden der Anrufe nach Dialer-Deaktivierung:", error);
-      });
+      try {
+        aircallService.clearCallState().catch(error => {
+          console.error("Fehler beim Beenden der Anrufe nach Dialer-Deaktivierung:", error);
+        });
+      } catch (error) {
+        console.error("Fehler beim Zugriff auf aircallService:", error);
+      }
     }
   }, [dialerActive]);
   
