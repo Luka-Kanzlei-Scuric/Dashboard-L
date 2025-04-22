@@ -63,6 +63,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
           sidebarOpen={sidebarOpen} 
         />
         <NavItem 
+          to="/new-power-dialer" 
+          icon={<PhoneIcon className="w-6 h-6" />} 
+          title="Neuer Power-Dialer" 
+          sidebarOpen={sidebarOpen} 
+        />
+        <NavItem 
           to="/" 
           icon={<BuildingOffice2Icon className="w-6 h-6" />} 
           title="Backoffice" 

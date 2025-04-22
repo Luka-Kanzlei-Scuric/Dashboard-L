@@ -8,6 +8,10 @@ import Client from './src/models/Client.js';
 import emailService from './src/services/emailService.js';
 import fileService from './src/services/fileService.js';
 import authRoutes from './src/routes/authRoutes.js';
+import dialerRoutes from './src/routes/dialerRoutes.js';
+import aircallService from './src/services/aircallService.js';
+import jobService from './src/services/jobService.js';
+import SystemConfig from './src/models/SystemConfig.js';
 import { createInitialAdmin } from './src/controllers/authController.js';
 
 // Load env variables
@@ -26,6 +30,56 @@ const app = express();
     
     // Create initial admin user if none exists
     await createInitialAdmin();
+    
+    // Initialize PowerDialer services with production-ready error handling
+    console.log('Initializing PowerDialer services for environment:', process.env.NODE_ENV || 'development');
+    try {
+      // Ensure default system configurations exist
+      await SystemConfig.ensureDefaultConfigs();
+      console.log('System configs initialized successfully');
+      
+      // Initialize services with retry logic for production environments
+      const initializeServices = async (retryCount = 0, maxRetries = 3) => {
+        try {
+          // Initialize Aircall service first
+          const aircallInitialized = await aircallService.initialize();
+          console.log('Aircall service initialized:', 
+                      aircallInitialized ? 'successfully' : 
+                      (process.env.ENABLE_MOCK_MODE === 'true' ? 'in mock mode' : 'with warnings'));
+          
+          // Initialize job service with Redis
+          try {
+            const jobInitialized = await jobService.initialize();
+            console.log('Job service initialized:', jobInitialized ? 'successfully' : 'with warnings');
+            
+            if (!jobInitialized && retryCount < maxRetries) {
+              console.log(`Redis connection failed, retrying in 5 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
+              setTimeout(() => initializeServices(retryCount + 1, maxRetries), 5000);
+            }
+          } catch (redisError) {
+            console.error('Redis initialization error:', redisError.message);
+            if (retryCount < maxRetries) {
+              console.log(`Retrying Redis connection in 5 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
+              setTimeout(() => initializeServices(retryCount + 1, maxRetries), 5000);
+            } else {
+              console.error('Max retries reached. PowerDialer will operate in degraded mode without job processing');
+            }
+          }
+        } catch (error) {
+          console.error('Service initialization error:', error.message);
+          if (retryCount < maxRetries) {
+            console.log(`Retrying service initialization in 5 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
+            setTimeout(() => initializeServices(retryCount + 1, maxRetries), 5000);
+          }
+        }
+      };
+      
+      // Start service initialization
+      await initializeServices();
+    } catch (serviceError) {
+      console.error('Error initializing PowerDialer services:', serviceError);
+      // Continue server startup even if services fail to initialize - endpoints will report errors if used
+    }
   } catch (err) {
     console.error('MongoDB connection error:', err);
     console.log('Retrying in 5 seconds...');
@@ -101,6 +155,7 @@ app.use('/uploads', express.static(fileService.uploadsBaseDir));
 
 // Auth routes
 app.use('/api/auth', authRoutes);
+app.use('/api/dialer', dialerRoutes);
 
 // Queue for changes that need to be sent to ClickUp via Make.com
 const changeQueue = [];
@@ -1361,6 +1416,33 @@ app.get('/api/proxy/forms/:taskId', cors(corsOptions), async (req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Backend server running on port ${PORT}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  
+  try {
+    // Shutdown job service gracefully to close Redis connections
+    if (jobService && jobService.initialized) {
+      console.log('Shutting down job service...');
+      await jobService.shutdown();
+      console.log('Job service shut down successfully');
+    }
+  } catch (error) {
+    console.error('Error shutting down services:', error);
+  }
+  
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+// Handle other exit signals
+process.on('SIGINT', async () => {
+  console.log('SIGINT signal received: shutting down gracefully');
+  process.emit('SIGTERM');
 });
