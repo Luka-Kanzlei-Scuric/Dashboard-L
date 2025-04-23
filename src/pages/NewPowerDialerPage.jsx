@@ -77,8 +77,8 @@ const NewPowerDialerPage = () => {
       
       console.log('Anruf-Antwort:', response);
       
-      // Erfolgreicher Anruf (204 No Content bedeutet, der Anruf wurde akzeptiert)
-      if (response.status === 204) {
+      // Erfolgreicher Anruf (204 No Content ODER 200 OK bedeutet, der Anruf wurde akzeptiert)
+      if (response.status === 204 || response.status === 200) {
         // Starte Call-Tracking
         setCallStatus('ringing');
         setCallStartTime(new Date());
