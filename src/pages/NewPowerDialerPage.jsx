@@ -116,18 +116,26 @@ const NewPowerDialerPage = () => {
    * Formatiere eine Telefonnummer im E.164-Format
    */
   const formatE164Number = (number) => {
+    // Prüfe ob die Nummer bereits korrekt mit + beginnt
+    if (number.startsWith('+')) {
+      // Entferne alle Nicht-Ziffern außer dem führenden +
+      let cleaned = '+' + number.substring(1).replace(/\D/g, '');
+      
+      // Einfache Validierung für E.164 Format
+      const e164Regex = /^\+[1-9]\d{1,14}$/;
+      return e164Regex.test(cleaned) ? cleaned : null;
+    }
+    
     // Entferne alle Nicht-Ziffern
     let cleaned = number.replace(/\D/g, '');
     
-    // Wenn Nummer mit 0 beginnt, ersetze sie mit +49
+    // Wenn Nummer mit 0 beginnt, ersetze sie mit 49
     if (cleaned.startsWith('0')) {
       cleaned = '49' + cleaned.substring(1);
     }
     
-    // Stelle sicher, dass sie mit + beginnt
-    if (!number.startsWith('+')) {
-      cleaned = '+' + cleaned;
-    }
+    // Füge + hinzu
+    cleaned = '+' + cleaned;
     
     // Einfache Validierung für E.164 Format
     const e164Regex = /^\+[1-9]\d{1,14}$/;
