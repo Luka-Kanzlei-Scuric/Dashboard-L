@@ -102,7 +102,6 @@ class JobService {
       return 'error-parsing-url';
     }
   }
-  }
   
   /**
    * Initialize the job processor and connect to Redis
