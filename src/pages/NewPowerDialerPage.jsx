@@ -84,7 +84,7 @@ const NewPowerDialerPage = () => {
   };
   
   /**
-   * Start the PowerDialer
+   * Start the PowerDialer and add phone numbers to the queue
    */
   const startDialer = async () => {
     try {
@@ -97,16 +97,36 @@ const NewPowerDialerPage = () => {
         return;
       }
       
-      const data = await dialerService.startDialer(userId, {
+      // 1. Start the PowerDialer to set up the agent
+      const startData = await dialerService.startDialer(userId, {
         userId: aircallConfig.userId,
         numberId: aircallConfig.numberId
       });
       
-      if (data.success) {
+      if (startData.success) {
         setDialerActive(true);
-        getDialerStatus();
+        
+        // 2. Add test phone numbers to the queue
+        const phoneNumbers = ['+4917693176785', '+4917672550210'];
+        
+        try {
+          // Add specified phone numbers to the call queue
+          const queueData = await dialerService.addPhoneNumbersToQueue(userId, phoneNumbers, {
+            priority: 1, // Highest priority
+            notes: 'Test-Anrufe automatisch hinzugefügt'
+          });
+          
+          console.log('Phone numbers added to queue:', queueData);
+          
+          // 3. Refresh the dialer status and queue
+          getDialerStatus();
+          loadCallQueue();
+        } catch (queueError) {
+          console.error('Error adding phone numbers to queue:', queueError);
+          // Continue even if queue adding fails - dialer is still started
+        }
       } else {
-        setError(data.message);
+        setError(startData.message);
       }
     } catch (error) {
       console.error('Error starting dialer:', error);

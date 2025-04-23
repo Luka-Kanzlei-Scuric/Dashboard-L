@@ -12,18 +12,19 @@ let BACKEND_URLS = [
   'http://localhost:5000/api'
 ].filter(Boolean); // Remove null/undefined entries
 
-// Explizite Dialer-Endpunkte
+// Explizite Dialer-Endpunkte - ohne führende /api weil die baseURL das bereits enthält
 export const DIALER_ENDPOINTS = {
-  status: (userId) => `/api/dialer/status/${userId}`,
-  start: (userId) => `/api/dialer/start/${userId}`,
-  pause: (userId) => `/api/dialer/pause/${userId}`,
-  stop: (userId) => `/api/dialer/stop/${userId}`,
-  queue: (userId) => userId ? `/api/dialer/queue/${userId}` : '/api/dialer/queue',
-  history: '/api/dialer/history',
-  stats: '/api/dialer/stats',
-  agents: '/api/dialer/agents',
-  config: '/api/dialer/config',
-  webhook: '/api/dialer/webhook'
+  status: (userId) => `/dialer/status/${userId}`,
+  start: (userId) => `/dialer/start/${userId}`,
+  pause: (userId) => `/dialer/pause/${userId}`,
+  stop: (userId) => `/dialer/stop/${userId}`,
+  queue: (userId) => userId ? `/dialer/queue/${userId}` : '/dialer/queue',
+  history: '/dialer/history',
+  stats: '/dialer/stats',
+  agents: '/dialer/agents',
+  config: '/dialer/config',
+  initialize: '/dialer/initialize',
+  webhook: '/dialer/webhook'
 };
 
 // Remove duplicates

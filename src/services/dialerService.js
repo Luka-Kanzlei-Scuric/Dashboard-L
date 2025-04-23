@@ -14,7 +14,9 @@ class DialerService {
    */
   async getDialerStatus(userId) {
     try {
-      const response = await api.get(DIALER_ENDPOINTS.status(userId));
+      // Make sure we remove any potential /api prefix that might be duplicated
+      const endpoint = DIALER_ENDPOINTS.status(userId).replace(/^\/api/, '');
+      const response = await api.get(endpoint);
       return response.data;
     } catch (error) {
       console.error('Error getting dialer status:', error);
@@ -30,7 +32,8 @@ class DialerService {
    */
   async startDialer(userId, config) {
     try {
-      const response = await api.post(DIALER_ENDPOINTS.start(userId), {
+      const endpoint = DIALER_ENDPOINTS.start(userId).replace(/^\/api/, '');
+      const response = await api.post(endpoint, {
         aircallUserId: config.userId,
         numberId: config.numberId
       });
@@ -49,7 +52,8 @@ class DialerService {
    */
   async pauseDialer(userId, reason) {
     try {
-      const response = await api.post(DIALER_ENDPOINTS.pause(userId), { reason });
+      const endpoint = DIALER_ENDPOINTS.pause(userId).replace(/^\/api/, '');
+      const response = await api.post(endpoint, { reason });
       return response.data;
     } catch (error) {
       console.error('Error pausing dialer:', error);
@@ -64,7 +68,8 @@ class DialerService {
    */
   async stopDialer(userId) {
     try {
-      const response = await api.post(DIALER_ENDPOINTS.stop(userId));
+      const endpoint = DIALER_ENDPOINTS.stop(userId).replace(/^\/api/, '');
+      const response = await api.post(endpoint);
       return response.data;
     } catch (error) {
       console.error('Error stopping dialer:', error);
@@ -86,7 +91,8 @@ class DialerService {
         skip: options.skip
       };
       
-      const response = await api.get(DIALER_ENDPOINTS.queue(userId), { params });
+      const endpoint = DIALER_ENDPOINTS.queue(userId).replace(/^\/api/, '');
+      const response = await api.get(endpoint, { params });
       return response.data;
     } catch (error) {
       console.error('Error loading call queue:', error);
@@ -111,7 +117,8 @@ class DialerService {
         status: options.status
       };
       
-      const response = await api.get(DIALER_ENDPOINTS.history, { params });
+      const endpoint = DIALER_ENDPOINTS.history.replace(/^\/api/, '');
+      const response = await api.get(endpoint, { params });
       return response.data;
     } catch (error) {
       console.error('Error loading call history:', error);
@@ -132,7 +139,8 @@ class DialerService {
         endDate: options.endDate
       };
       
-      const response = await api.get(DIALER_ENDPOINTS.stats, { params });
+      const endpoint = DIALER_ENDPOINTS.stats.replace(/^\/api/, '');
+      const response = await api.get(endpoint, { params });
       return response.data;
     } catch (error) {
       console.error('Error loading call statistics:', error);
@@ -146,7 +154,8 @@ class DialerService {
    */
   async getAvailableAgents() {
     try {
-      const response = await api.get(DIALER_ENDPOINTS.agents);
+      const endpoint = DIALER_ENDPOINTS.agents.replace(/^\/api/, '');
+      const response = await api.get(endpoint);
       return response.data;
     } catch (error) {
       console.error('Error loading available agents:', error);
@@ -162,13 +171,36 @@ class DialerService {
    */
   async addToQueue(clients, options = {}) {
     try {
-      const response = await api.post(DIALER_ENDPOINTS.queue(), {
+      const endpoint = DIALER_ENDPOINTS.queue().replace(/^\/api/, '');
+      const response = await api.post(endpoint, {
         clients,
         options
       });
       return response.data;
     } catch (error) {
       console.error('Error adding to call queue:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Fügt Telefonnummern direkt zur Call-Queue hinzu (ohne Clientverknüpfung)
+   * @param {string} userId - Die ID des Benutzers, der diese Nummern anrufen soll
+   * @param {Array<string>} phoneNumbers - Liste der anzurufenden Telefonnummern
+   * @param {Object} options - Optionen für die Queue
+   * @returns {Promise<Object>} Erfolg/Misserfolg und Statusinformationen
+   */
+  async addPhoneNumbersToQueue(userId, phoneNumbers, options = {}) {
+    try {
+      const endpoint = DIALER_ENDPOINTS.queue().replace(/^\/api/, '');
+      const response = await api.post(endpoint, {
+        userId,
+        phoneNumbers,
+        options
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error adding phone numbers to call queue:', error);
       throw error;
     }
   }
@@ -181,7 +213,7 @@ class DialerService {
    */
   async updateQueueItem(queueItemId, updates) {
     try {
-      const response = await api.put(`/api/dialer/queue/${queueItemId}`, updates);
+      const response = await api.put(`/dialer/queue/${queueItemId}`, updates);
       return response.data;
     } catch (error) {
       console.error('Error updating queue item:', error);
@@ -196,7 +228,7 @@ class DialerService {
    */
   async removeFromQueue(queueItemId) {
     try {
-      const response = await api.delete(`/api/dialer/queue/${queueItemId}`);
+      const response = await api.delete(`/dialer/queue/${queueItemId}`);
       return response.data;
     } catch (error) {
       console.error('Error removing from call queue:', error);
@@ -210,7 +242,8 @@ class DialerService {
    */
   async initialize() {
     try {
-      const response = await api.post(DIALER_ENDPOINTS.initialize);
+      const endpoint = DIALER_ENDPOINTS.initialize.replace(/^\/api/, '');
+      const response = await api.post(endpoint);
       return response.data;
     } catch (error) {
       console.error('Error initializing dialer:', error);

@@ -348,7 +348,12 @@ class DialerController {
    */
   async addToQueue(req, res) {
     try {
-      const { clients, options } = req.body;
+      const { clients, options, phoneNumbers, userId } = req.body;
+      
+      // Neue Funktionalität: Direkte Hinzufügung von Telefonnummern ohne Client-Zuordnung
+      if (phoneNumbers && Array.isArray(phoneNumbers) && phoneNumbers.length > 0) {
+        return this.addPhoneNumbersToQueue(req, res);
+      }
       
       if (!clients || !Array.isArray(clients) || clients.length === 0) {
         return res.status(400).json({
@@ -447,6 +452,105 @@ class DialerController {
       res.status(500).json({
         success: false,
         message: 'Failed to add clients to call queue',
+        error: error.message
+      });
+    }
+  }
+  
+  /**
+   * Add phone numbers directly to the call queue without client association
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  async addPhoneNumbersToQueue(req, res) {
+    try {
+      const { phoneNumbers, userId, options = {} } = req.body;
+      
+      if (!phoneNumbers || !Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone numbers list is required'
+        });
+      }
+      
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          message: 'User ID is required to assign the calls'
+        });
+      }
+      
+      // Verify that user exists
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+      
+      const results = [];
+      let failureCount = 0;
+      
+      // Normalisiere Telefonnummern und entferne Duplikate
+      const uniquePhoneNumbers = [...new Set(phoneNumbers.map(num => {
+        // Einfache Normalisierung: Entferne alle Leerzeichen
+        return num.replace(/\s+/g, '');
+      }))];
+      
+      // Process each phone number
+      for (const phoneNumber of uniquePhoneNumbers) {
+        try {
+          // Check E.164 format
+          const e164Regex = /^\+[1-9]\d{1,14}$/;
+          if (!e164Regex.test(phoneNumber)) {
+            results.push({
+              success: false,
+              message: 'Phone number must be in E.164 format (e.g. +49123456789)',
+              phoneNumber
+            });
+            failureCount++;
+            continue;
+          }
+          
+          // Create call queue entry without client
+          const queueItem = new CallQueue({
+            phoneNumber,
+            priority: options.priority || 10,
+            assignedTo: userId,
+            scheduledFor: options.scheduledFor || new Date(),
+            notes: options.notes || `Direkt hinzugefügt am ${new Date().toLocaleDateString()}`
+          });
+          
+          await queueItem.save();
+          
+          results.push({
+            success: true,
+            phoneNumber,
+            queueItemId: queueItem._id,
+            scheduledFor: queueItem.scheduledFor
+          });
+        } catch (error) {
+          console.error('Error adding phone number to queue:', error);
+          results.push({
+            success: false,
+            message: error.message,
+            phoneNumber
+          });
+          failureCount++;
+        }
+      }
+      
+      res.status(failureCount === uniquePhoneNumbers.length ? 400 : 200).json({
+        success: failureCount < uniquePhoneNumbers.length,
+        message: `${uniquePhoneNumbers.length - failureCount} of ${uniquePhoneNumbers.length} phone numbers added to queue successfully`,
+        results
+      });
+    } catch (error) {
+      console.error('Error adding phone numbers to call queue:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to add phone numbers to call queue',
         error: error.message
       });
     }

@@ -6,9 +6,15 @@ services:
     staticPublishPath: ./dist
     routes:
       # Wichtig: Leite /api/dialer/* und alle API-Anfragen an den Backend-Service weiter
+      # Explizite Routen für spezifische PowerDialer-Endpunkte
       - type: rewrite
         source: /api/dialer/*
         destination: https://dashboard-l-backend.onrender.com/api/dialer/:splat
+      # Vermeide doppelte /api Präfixe
+      - type: rewrite
+        source: /api/api/dialer/*
+        destination: https://dashboard-l-backend.onrender.com/api/dialer/:splat
+      # Auth und allgemeine API-Routen
       - type: rewrite
         source: /api/auth/*
         destination: https://dashboard-l-backend.onrender.com/api/auth/:splat

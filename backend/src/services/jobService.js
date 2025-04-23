@@ -63,8 +63,13 @@ class JobService {
       
       // For Render deployments, set a connection timeout
       if (process.env.RENDER || process.env.IS_RENDER === 'true') {
-        this.redisConfig.connectTimeout = 10000; // 10 seconds
-        this.redisConfig.maxRetriesPerRequest = 3;
+        this.redisConfig.connectTimeout = 20000; // 20 seconds
+        this.redisConfig.maxRetriesPerRequest = 5;
+        this.redisConfig.retryStrategy = function(times) {
+          const delay = Math.min(times * 1000, 10000);
+          console.log(`Redis connection retry attempt ${times} with delay ${delay}ms`);
+          return delay;
+        };
       }
     }
     // Fallback for local development
@@ -164,13 +169,11 @@ class JobService {
         console.error('Failed to create queues:', error.message);
         
         // Try to create a fallback in-memory queue system
-        if (process.env.ENABLE_MEMORY_FALLBACK === 'true') {
-          console.log('Attempting to use in-memory queue fallback');
-          this._setupMemoryFallback();
-          queuesCreated = true;
-        } else {
-          console.log('In-memory fallback not enabled. Set ENABLE_MEMORY_FALLBACK=true to enable.');
-        }
+        // Always enable in-memory fallback when Redis fails to connect
+        console.log('Attempting to use in-memory queue fallback');
+        this._setupMemoryFallback();
+        queuesCreated = true;
+        console.log('In-memory queue fallback initialized successfully');
       }
       
       if (queuesCreated) {
