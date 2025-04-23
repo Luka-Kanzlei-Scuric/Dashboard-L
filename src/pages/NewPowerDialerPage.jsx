@@ -97,40 +97,66 @@ const NewPowerDialerPage = () => {
         return;
       }
       
+      console.log('Starting PowerDialer with config:', {
+        userId,
+        aircallUserId: aircallConfig.userId,
+        numberId: aircallConfig.numberId
+      });
+      
       // 1. Start the PowerDialer to set up the agent
       const startData = await dialerService.startDialer(userId, {
         userId: aircallConfig.userId,
         numberId: aircallConfig.numberId
       });
       
+      // Handle both success and error cases (API calls return objects now instead of throwing)
       if (startData.success) {
         setDialerActive(true);
+        console.log('PowerDialer started successfully');
         
         // 2. Add test phone numbers to the queue
         const phoneNumbers = ['+4917693176785', '+4917672550210'];
         
-        try {
-          // Add specified phone numbers to the call queue
-          const queueData = await dialerService.addPhoneNumbersToQueue(userId, phoneNumbers, {
-            priority: 1, // Highest priority
-            notes: 'Test-Anrufe automatisch hinzugefügt'
-          });
-          
+        // In our new implementation, this won't throw
+        const queueData = await dialerService.addPhoneNumbersToQueue(userId, phoneNumbers, {
+          priority: 1, // Highest priority
+          notes: 'Test-Anrufe automatisch hinzugefügt'
+        });
+        
+        if (queueData.success) {
           console.log('Phone numbers added to queue:', queueData);
-          
-          // 3. Refresh the dialer status and queue
+        } else {
+          console.warn('Adding phone numbers returned error but we continue:', queueData.message);
+        }
+        
+        // 3. Refresh the dialer status and queue regardless of queue add result
+        getDialerStatus();
+        loadCallQueue();
+        
+      } else {
+        console.warn('Start dialer returned error:', startData.message);
+        setError(startData.message || 'Unknown error starting dialer');
+        
+        // Even if we couldn't start the dialer via API, we activate the UI in development mode
+        if (process.env.NODE_ENV !== 'production' || window.location.hostname === 'localhost') {
+          console.log('Development mode: Activating dialer UI despite API error');
+          setDialerActive(true);
           getDialerStatus();
           loadCallQueue();
-        } catch (queueError) {
-          console.error('Error adding phone numbers to queue:', queueError);
-          // Continue even if queue adding fails - dialer is still started
         }
-      } else {
-        setError(startData.message);
       }
     } catch (error) {
-      console.error('Error starting dialer:', error);
-      setError(error.response?.data?.message || 'Failed to start dialer');
+      // This should not happen with our new implementation, but just in case
+      console.error('Unexpected error starting dialer:', error);
+      setError(error.message || 'Failed to start dialer');
+      
+      // Even if we get an error, activate the UI in development mode
+      if (process.env.NODE_ENV !== 'production' || window.location.hostname === 'localhost') {
+        console.log('Development mode: Activating dialer UI despite error');
+        setDialerActive(true);
+        getDialerStatus();
+        loadCallQueue();
+      }
     } finally {
       setLoading(false);
     }
