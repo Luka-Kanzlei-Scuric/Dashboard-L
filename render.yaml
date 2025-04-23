@@ -5,6 +5,17 @@ services:
     buildCommand: npm run build
     staticPublishPath: ./dist
     routes:
+      # Wichtig: Leite /api/dialer/* und alle API-Anfragen an den Backend-Service weiter
+      - type: rewrite
+        source: /api/dialer/*
+        destination: https://dashboard-l-backend.onrender.com/api/dialer/:splat
+      - type: rewrite
+        source: /api/auth/*
+        destination: https://dashboard-l-backend.onrender.com/api/auth/:splat
+      - type: rewrite
+        source: /api/*
+        destination: https://dashboard-l-backend.onrender.com/api/:splat
+      # Client-Routen
       - type: rewrite
         source: /portal/*
         destination: /index.html
