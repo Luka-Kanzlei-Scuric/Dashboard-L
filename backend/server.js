@@ -322,10 +322,8 @@ app.post('/api/aircall/users/:id/calls', async (req, res) => {
       });
     }
     
-    // Get Aircall API key - verwende fest codierten API-Schlüssel als Fallback
-    // API Key: 75d27d3e184df759cee102d8e922e7de, API ID: 44acb43f91f0a7ee678afa4cd1136887
-    const hardcodedAPIKey = '75d27d3e184df759cee102d8e922e7de:44acb43f91f0a7ee678afa4cd1136887';
-    const aircallApiKey = process.env.AIRCALL_API_KEY || hardcodedAPIKey;
+    // Get Aircall API key from environment variable
+    const aircallApiKey = process.env.AIRCALL_API_KEY;
     
     if (!aircallApiKey) {
       return res.status(500).json({
@@ -399,10 +397,8 @@ app.post('/api/aircall/users/:id/dial', async (req, res) => {
       });
     }
     
-    // Get Aircall API key - verwende fest codierten API-Schlüssel als Fallback
-    // API Key: 75d27d3e184df759cee102d8e922e7de, API ID: 44acb43f91f0a7ee678afa4cd1136887
-    const hardcodedAPIKey = '75d27d3e184df759cee102d8e922e7de:44acb43f91f0a7ee678afa4cd1136887';
-    const aircallApiKey = process.env.AIRCALL_API_KEY || hardcodedAPIKey;
+    // Get Aircall API key from environment variable
+    const aircallApiKey = process.env.AIRCALL_API_KEY;
     
     if (!aircallApiKey) {
       return res.status(500).json({

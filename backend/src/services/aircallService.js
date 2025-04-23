@@ -22,11 +22,8 @@ class AircallService {
    */
   async initialize() {
     try {
-      // Überprüfe auf fest codierte Credentials - AirCall API Key und ID
-      const hardcodedAPIKey = '75d27d3e184df759cee102d8e922e7de:44acb43f91f0a7ee678afa4cd1136887';
-      
-      // Check environment variables first, then hardcoded API key, then database config
-      const apiKey = process.env.AIRCALL_API_KEY || hardcodedAPIKey || await SystemConfig.getConfigValue('aircall.apiKey', '');
+      // Check environment variables first, then database config
+      const apiKey = process.env.AIRCALL_API_KEY || await SystemConfig.getConfigValue('aircall.apiKey', '');
       const apiSecret = ''; // Nicht benötigt, da die API-Schlüssel bereits im Format 'user:pass' vorliegen
       const enableMockMode = process.env.ENABLE_MOCK_MODE === 'true';
       
