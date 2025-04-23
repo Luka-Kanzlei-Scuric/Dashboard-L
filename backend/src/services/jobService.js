@@ -21,11 +21,19 @@ class JobService {
     };
     
     // Redis config defaults - override with SystemConfig
-    this.redisConfig = {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: process.env.REDIS_PASSWORD || undefined
-    };
+    // Check if a REDIS_URL is provided (common format for managed Redis services)
+    if (process.env.REDIS_URL) {
+      console.log(`Using Redis connection string from REDIS_URL: ${process.env.REDIS_URL.substring(0, process.env.REDIS_URL.indexOf('@') > 0 ? process.env.REDIS_URL.indexOf('@') : 10)}...`);
+      this.redisConfig = {
+        url: process.env.REDIS_URL
+      };
+    } else {
+      this.redisConfig = {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+        password: process.env.REDIS_PASSWORD || undefined
+      };
+    }
   }
   
   /**
@@ -36,15 +44,22 @@ class JobService {
     try {
       // Get Redis config from system config if available
       try {
-        const redisHost = await SystemConfig.getConfigValue('redis.host', this.redisConfig.host);
-        const redisPort = await SystemConfig.getConfigValue('redis.port', this.redisConfig.port);
-        const redisPassword = await SystemConfig.getConfigValue('redis.password', this.redisConfig.password);
-        
-        this.redisConfig = {
-          host: redisHost,
-          port: parseInt(redisPort),
-          password: redisPassword
-        };
+        // If we're using a Redis URL, prioritize that over individual connection parameters
+        if (this.redisConfig.url) {
+          const redisUrl = await SystemConfig.getConfigValue('redis.url', this.redisConfig.url);
+          this.redisConfig = { url: redisUrl };
+          console.log(`Configured Redis URL from system config (masked): ${redisUrl.substring(0, redisUrl.indexOf('@') > 0 ? redisUrl.indexOf('@') : 10)}...`);
+        } else {
+          const redisHost = await SystemConfig.getConfigValue('redis.host', this.redisConfig.host);
+          const redisPort = await SystemConfig.getConfigValue('redis.port', this.redisConfig.port);
+          const redisPassword = await SystemConfig.getConfigValue('redis.password', this.redisConfig.password);
+          
+          this.redisConfig = {
+            host: redisHost,
+            port: parseInt(redisPort),
+            password: redisPassword
+          };
+        }
       } catch (error) {
         console.warn('Failed to load Redis config from database, using defaults:', error.message);
       }
