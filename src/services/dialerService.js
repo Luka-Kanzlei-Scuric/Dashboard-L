@@ -1,5 +1,4 @@
-import api from '../config/api';
-import { DIALER_ENDPOINTS } from '../config/api';
+import api, { DIALER_ENDPOINTS } from '../config/api';
 
 /**
  * PowerDialer Service
