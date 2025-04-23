@@ -23,11 +23,20 @@ class JobService {
     // Redis config defaults - override with SystemConfig
     // Check if a REDIS_URL is provided (common format for managed Redis services)
     if (process.env.REDIS_URL) {
-      console.log(`Using Redis connection string from REDIS_URL: ${process.env.REDIS_URL.substring(0, process.env.REDIS_URL.indexOf('@') > 0 ? process.env.REDIS_URL.indexOf('@') : 10)}...`);
-      this.redisConfig = {
-        url: process.env.REDIS_URL
-      };
+      const redisUrl = process.env.REDIS_URL;
+      console.log(`Using Redis connection string from REDIS_URL: ${redisUrl.substring(0, redisUrl.indexOf('@') > 0 ? redisUrl.indexOf('@') : 10)}...`);
+      
+      // Pass Redis URL directly for Bull compatibility
+      if (redisUrl.startsWith('redis://') || redisUrl.startsWith('rediss://')) {
+        console.log('Using standard Redis URL format');
+        this.redisConfig = redisUrl;
+      } else {
+        // Format doesn't start with redis:// - add it
+        console.log('Adding redis:// prefix to URL');
+        this.redisConfig = { url: `redis://${redisUrl}` };
+      }
     } else {
+      console.log('No REDIS_URL found, using individual connection parameters');
       this.redisConfig = {
         host: process.env.REDIS_HOST || 'localhost',
         port: parseInt(process.env.REDIS_PORT || '6379'),
@@ -42,29 +51,32 @@ class JobService {
    */
   async initialize() {
     try {
+      console.log('Initializing job service with Redis config...');
+      
       // Get Redis config from system config if available
       try {
-        // If we're using a Redis URL, prioritize that over individual connection parameters
-        if (this.redisConfig.url) {
-          const redisUrl = await SystemConfig.getConfigValue('redis.url', this.redisConfig.url);
-          this.redisConfig = { url: redisUrl };
-          console.log(`Configured Redis URL from system config (masked): ${redisUrl.substring(0, redisUrl.indexOf('@') > 0 ? redisUrl.indexOf('@') : 10)}...`);
-        } else {
-          const redisHost = await SystemConfig.getConfigValue('redis.host', this.redisConfig.host);
-          const redisPort = await SystemConfig.getConfigValue('redis.port', this.redisConfig.port);
-          const redisPassword = await SystemConfig.getConfigValue('redis.password', this.redisConfig.password);
-          
-          this.redisConfig = {
-            host: redisHost,
-            port: parseInt(redisPort),
-            password: redisPassword
-          };
-        }
+        // Skip for now since we prioritize environment variables
+        console.log('Using Redis configuration from environment');
       } catch (error) {
         console.warn('Failed to load Redis config from database, using defaults:', error.message);
       }
       
+      // Log final configuration
+      if (typeof this.redisConfig === 'string') {
+        console.log('Final Redis config: URL string (masked)');
+      } else if (this.redisConfig.url) {
+        console.log('Final Redis config: URL-based object');
+      } else {
+        console.log('Final Redis config: Host-based connection to', this.redisConfig.host + ':' + this.redisConfig.port);
+      }
+      
       // Create queues with more fault tolerance for production
+      console.log('Creating Bull queues with Redis config:', 
+        this.redisConfig.url 
+          ? `URL-based connection (starts with: ${this.redisConfig.url.substring(0, 8)}...)` 
+          : `Host-based connection to ${this.redisConfig.host}:${this.redisConfig.port}`
+      );
+      
       this.queues.calls = new Queue('powerdialer-calls', {
         redis: this.redisConfig,
         defaultJobOptions: {
