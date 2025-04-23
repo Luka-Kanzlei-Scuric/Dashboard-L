@@ -22,13 +22,18 @@ class AircallService {
    */
   async initialize() {
     try {
-      // Check environment variables first, then fall back to database config
-      const apiKey = process.env.AIRCALL_API_KEY || await SystemConfig.getConfigValue('aircall.apiKey', '');
-      const apiSecret = process.env.AIRCALL_API_SECRET || await SystemConfig.getConfigValue('aircall.apiSecret', '');
+      // Überprüfe auf fest codierte Credentials - AirCall API Key und ID
+      const hardcodedAPIKey = '75d27d3e184df759cee102d8e922e7de:44acb43f91f0a7ee678afa4cd1136887';
+      
+      // Check environment variables first, then hardcoded API key, then database config
+      const apiKey = process.env.AIRCALL_API_KEY || hardcodedAPIKey || await SystemConfig.getConfigValue('aircall.apiKey', '');
+      const apiSecret = ''; // Nicht benötigt, da die API-Schlüssel bereits im Format 'user:pass' vorliegen
       const enableMockMode = process.env.ENABLE_MOCK_MODE === 'true';
       
+      console.log('Using API Key:', apiKey ? 'API key found (not showing for security)' : 'No API key found');
+      
       // For production or testing
-      if ((!apiKey || !apiSecret) && !enableMockMode) {
+      if ((!apiKey) && !enableMockMode) {
         console.warn('Aircall API credentials not configured and mock mode is disabled');
         return false;
       }
@@ -40,12 +45,15 @@ class AircallService {
         return true;
       }
       
-      // Setup axios client with basic auth
+      // Setup axios client with basic auth - Beachte das andere Format, wenn API-Schlüssel bereits das Format "user:pass" hat
       this.apiClient = axios.create({
         baseURL: this.baseUrl,
-        auth: {
+        auth: apiKey.includes(':') ? {
+          username: apiKey.split(':')[0],
+          password: apiKey.split(':')[1]
+        } : {
           username: apiKey,
-          password: apiSecret
+          password: apiSecret || ''
         },
         headers: {
           'Content-Type': 'application/json'

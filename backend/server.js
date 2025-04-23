@@ -92,7 +92,10 @@ const allowedOrigins = [
   'https://dashboard-l.onrender.com',
   'https://dashboard-l.vercel.app',
   'http://localhost:3000',
-  'http://localhost:5173'
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174'
 ];
 
 // Add origins from environment variable if available
@@ -100,17 +103,29 @@ if (process.env.CORS_ORIGIN) {
   allowedOrigins.push(...process.env.CORS_ORIGIN.split(','));
 }
 
+console.log('Allowed CORS origins:', allowedOrigins);
+
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, curl, etc)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('CORS: Request with no origin allowed');
+      return callback(null, true);
+    }
     
+    // Immer alle Origins erlauben für Debugging-Zwecke
+    console.log('CORS: Request from origin:', origin);
+    callback(null, true);
+    
+    // Ursprüngliche Logik auskommentiert
+    /*
     if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
       console.log(`CORS blocked origin: ${origin}`);
       callback(null, true); // Temporarily allow all origins while debugging
     }
+    */
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
@@ -307,14 +322,19 @@ app.post('/api/aircall/users/:id/calls', async (req, res) => {
       });
     }
     
-    // Get Aircall API key from environment variable
-    const aircallApiKey = process.env.AIRCALL_API_KEY;
+    // Get Aircall API key - verwende fest codierten API-Schlüssel als Fallback
+    // API Key: 75d27d3e184df759cee102d8e922e7de, API ID: 44acb43f91f0a7ee678afa4cd1136887
+    const hardcodedAPIKey = '75d27d3e184df759cee102d8e922e7de:44acb43f91f0a7ee678afa4cd1136887';
+    const aircallApiKey = process.env.AIRCALL_API_KEY || hardcodedAPIKey;
+    
     if (!aircallApiKey) {
       return res.status(500).json({
         success: false,
         message: 'Aircall API key not configured'
       });
     }
+    
+    console.log('Using Aircall API key to make call (masked):', aircallApiKey ? '*******' : 'Not found');
     
     // Make request to Aircall API
     const response = await axios.post(
@@ -379,14 +399,19 @@ app.post('/api/aircall/users/:id/dial', async (req, res) => {
       });
     }
     
-    // Get Aircall API key from environment variable
-    const aircallApiKey = process.env.AIRCALL_API_KEY;
+    // Get Aircall API key - verwende fest codierten API-Schlüssel als Fallback
+    // API Key: 75d27d3e184df759cee102d8e922e7de, API ID: 44acb43f91f0a7ee678afa4cd1136887
+    const hardcodedAPIKey = '75d27d3e184df759cee102d8e922e7de:44acb43f91f0a7ee678afa4cd1136887';
+    const aircallApiKey = process.env.AIRCALL_API_KEY || hardcodedAPIKey;
+    
     if (!aircallApiKey) {
       return res.status(500).json({
         success: false,
         message: 'Aircall API key not configured'
       });
     }
+    
+    console.log('Using Aircall API key to dial (masked):', aircallApiKey ? '*******' : 'Not found');
     
     // Make request to Aircall API
     const response = await axios.post(

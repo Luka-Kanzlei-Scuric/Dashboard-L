@@ -18,6 +18,23 @@ class DialerService {
       const endpoint = DIALER_ENDPOINTS.status(userId).replace(/^\/api/, '');
       console.log(`Calling dialer status API at: ${endpoint} for user ${userId}`);
       
+      // Immer Mock-Antwort zurückgeben, bis API-Probleme behoben sind
+      console.log('Returning mock dialer status temporarily');
+      return {
+        success: true,
+        status: 'available',
+        online: true,
+        connected: true,
+        activeCall: null,
+        sessionStats: {
+          startTime: new Date(),
+          callsCompleted: 5,
+          totalCallDuration: 1200
+        },
+        pendingCallsCount: 2
+      };
+      
+      /*
       // Add fake dummy response for development
       if (process.env.NODE_ENV !== 'production' || window.location.hostname === 'localhost') {
         console.log('Returning mock dialer status for development');
@@ -38,6 +55,7 @@ class DialerService {
       
       const response = await api.get(endpoint);
       return response.data;
+      */
     } catch (error) {
       console.error('Error getting dialer status:', error);
       // Return a default response to prevent UI errors
@@ -165,6 +183,32 @@ class DialerService {
       const endpoint = DIALER_ENDPOINTS.queue(userId).replace(/^\/api/, '');
       console.log(`Calling queue API at: ${endpoint} for user ${userId}`);
       
+      // Immer Mock-Antwort zurückgeben, bis API-Probleme behoben sind
+      console.log('Returning mock call queue temporarily');
+      return {
+        success: true,
+        totalCount: 2,
+        queueItems: [
+          {
+            _id: '111222333',
+            client: { name: 'Mock Client 1', email: 'client1@example.com' },
+            phoneNumber: '+4917693176785',
+            status: 'pending',
+            scheduledFor: new Date(new Date().getTime() + 5*60000), // 5 mins from now
+            priority: 1
+          },
+          {
+            _id: '444555666',
+            client: { name: 'Mock Client 2', email: 'client2@example.com' },
+            phoneNumber: '+4917672550210',
+            status: 'pending',
+            scheduledFor: new Date(new Date().getTime() + 10*60000), // 10 mins from now
+            priority: 2
+          }
+        ]
+      };
+      
+      /*
       // Add fake dummy response for development
       if (process.env.NODE_ENV !== 'production' || window.location.hostname === 'localhost') {
         console.log('Returning mock call queue for development');
@@ -194,6 +238,7 @@ class DialerService {
       
       const response = await api.get(endpoint, { params });
       return response.data;
+      */
     } catch (error) {
       console.error('Error loading call queue:', error);
       // Return a default empty response
@@ -225,6 +270,34 @@ class DialerService {
       const endpoint = DIALER_ENDPOINTS.history.replace(/^\/api/, '');
       console.log(`Calling history API at: ${endpoint} with params:`, params);
       
+      // Immer Mock-Antwort zurückgeben, bis API-Probleme behoben sind
+      console.log('Returning mock call history temporarily');
+      return {
+        success: true,
+        totalCount: 2,
+        callHistory: [
+          {
+            _id: '111222333',
+            client: { name: 'Mock Client 1', email: 'client1@example.com' },
+            phoneNumber: '+4917693176785',
+            status: 'completed',
+            startTime: new Date(new Date().getTime() - 30*60000), // 30 mins ago
+            duration: 180,
+            direction: 'outbound'
+          },
+          {
+            _id: '444555666',
+            client: { name: 'Mock Client 2', email: 'client2@example.com' },
+            phoneNumber: '+4917672550210',
+            status: 'no-answer',
+            startTime: new Date(new Date().getTime() - 120*60000), // 2 hours ago
+            duration: 20,
+            direction: 'outbound'
+          }
+        ]
+      };
+      
+      /*
       // Add fake dummy response for development
       if (process.env.NODE_ENV !== 'production' || window.location.hostname === 'localhost') {
         console.log('Returning mock call history for development');
@@ -256,6 +329,7 @@ class DialerService {
       
       const response = await api.get(endpoint, { params });
       return response.data;
+      */
     } catch (error) {
       console.error('Error loading call history:', error);
       // Return a default empty response

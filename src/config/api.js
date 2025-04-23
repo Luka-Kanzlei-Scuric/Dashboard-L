@@ -41,6 +41,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    // Temporär einen Auth-Header hinzufügen für den PowerDialer mit dem API-Schlüssel (75d27d3e184df759cee102d8e922e7de:44acb43f91f0a7ee678afa4cd1136887)
+    'Authorization': 'Basic NzVkMjdkM2UxODRkZjc1OWNlZTEwMmQ4ZTkyMmU3ZGU6NDRhY2I0M2Y5MWYwYTdlZTY3OGFmYTRjZDExMzY4ODc=', 
     // Temporarily remove Cache-Control to avoid CORS issues
     // 'Cache-Control': 'no-cache',
     // Add timestamp to prevent caching issues with CORS preflight responses
