@@ -4,6 +4,10 @@ import aircallService from './aircallService.js';
 import CallQueue from '../models/CallQueue.js';
 import UserStatus from '../models/UserStatus.js';
 import CallHistory from '../models/CallHistory.js';
+import dotenv from 'dotenv';
+
+// Ensure environment variables are loaded
+dotenv.config();
 
 /**
  * JobService
@@ -20,29 +24,84 @@ class JobService {
       maintenance: null
     };
     
-    // Redis config defaults - override with SystemConfig
-    // Check if a REDIS_URL is provided (common format for managed Redis services)
+    console.log('JobService constructor - Environment:', process.env.NODE_ENV || 'development');
+    
+    // Detect Render.com deployment
+    const isRenderDeployment = !!process.env.RENDER || process.env.IS_RENDER === 'true';
+    console.log('Detected environment:', isRenderDeployment ? 'Render.com' : 'Standard deployment');
+    
+    // Configure Redis connection
+    this._configureRedisConnection();
+  }
+  
+  /**
+   * Configure Redis connection based on environment
+   * @private
+   */
+  _configureRedisConnection() {
+    console.log('Configuring Redis connection...');
+    
+    // Check for REDIS_URL environment variable (highest priority)
     if (process.env.REDIS_URL) {
       const redisUrl = process.env.REDIS_URL;
-      console.log(`Using Redis connection string from REDIS_URL: ${redisUrl.substring(0, redisUrl.indexOf('@') > 0 ? redisUrl.indexOf('@') : 10)}...`);
+      const maskedUrl = this._maskSensitiveUrl(redisUrl);
+      console.log(`Found REDIS_URL in environment: ${maskedUrl}`);
       
-      // Pass Redis URL directly for Bull compatibility
-      if (redisUrl.startsWith('redis://') || redisUrl.startsWith('rediss://')) {
-        console.log('Using standard Redis URL format');
-        this.redisConfig = redisUrl;
-      } else {
-        // Format doesn't start with redis:// - add it
-        console.log('Adding redis:// prefix to URL');
-        this.redisConfig = { url: `redis://${redisUrl}` };
-      }
-    } else {
-      console.log('No REDIS_URL found, using individual connection parameters');
-      this.redisConfig = {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-        password: process.env.REDIS_PASSWORD || undefined
-      };
+      // Direct string for Bull
+      this.redisConfig = redisUrl;
     }
+    // Check for individual Redis configuration values
+    else if (process.env.REDIS_HOST) {
+      console.log(`Found individual Redis config: ${process.env.REDIS_HOST}:${process.env.REDIS_PORT || '6379'}`);
+      
+      // Build config object
+      this.redisConfig = {
+        host: process.env.REDIS_HOST,
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+        password: process.env.REDIS_PASSWORD
+      };
+      
+      // For Render deployments, set a connection timeout
+      if (process.env.RENDER || process.env.IS_RENDER === 'true') {
+        this.redisConfig.connectTimeout = 10000; // 10 seconds
+        this.redisConfig.maxRetriesPerRequest = 3;
+      }
+    }
+    // Fallback for local development
+    else {
+      console.log('No Redis configuration found, using default localhost:6379');
+      this.redisConfig = 'redis://localhost:6379';
+    }
+  }
+  
+  /**
+   * Mask sensitive information in URLs for logging
+   * @private
+   */
+  _maskSensitiveUrl(url) {
+    try {
+      if (!url) return 'undefined';
+      if (typeof url !== 'string') return 'non-string-url';
+      
+      // For redis URLs like redis://user:password@host:port
+      if (url.includes('@')) {
+        const parts = url.split('@');
+        const auth = parts[0].split('://')[1];
+        if (auth.includes(':')) {
+          // Has username:password
+          const prefix = parts[0].split('://')[0];
+          return `${prefix}://****:****@${parts[1]}`;
+        }
+        // Just show prefix and host
+        return `${url.split('://')[0]}://****@${parts[1]}`;
+      }
+      
+      // For simple URLs without auth, just return as is
+      return url;
+    } catch (error) {
+      return 'error-parsing-url';
+    }
+  }
   }
   
   /**
@@ -53,73 +112,83 @@ class JobService {
     try {
       console.log('Initializing job service with Redis config...');
       
-      // Get Redis config from system config if available
+      // Attempt to check if Redis is reachable
+      let redisAvailable = false;
+      
       try {
-        // Skip for now since we prioritize environment variables
-        console.log('Using Redis configuration from environment');
+        // Log Redis configuration (safely)
+        if (typeof this.redisConfig === 'string') {
+          console.log('Redis config: URL string (masked)', this._maskSensitiveUrl(this.redisConfig));
+        } else {
+          console.log('Redis config:', {
+            host: this.redisConfig.host,
+            port: this.redisConfig.port,
+            hasPassword: !!this.redisConfig.password
+          });
+        }
       } catch (error) {
-        console.warn('Failed to load Redis config from database, using defaults:', error.message);
+        console.error('Error checking Redis configuration:', error.message);
       }
       
-      // Log final configuration
-      if (typeof this.redisConfig === 'string') {
-        console.log('Final Redis config: URL string (masked)');
-      } else if (this.redisConfig.url) {
-        console.log('Final Redis config: URL-based object');
-      } else {
-        console.log('Final Redis config: Host-based connection to', this.redisConfig.host + ':' + this.redisConfig.port);
-      }
+      console.log('Creating Bull queues with Redis config...');
       
-      // Create queues with more fault tolerance for production
-      console.log('Creating Bull queues with Redis config:', 
-        this.redisConfig.url 
-          ? `URL-based connection (starts with: ${this.redisConfig.url.substring(0, 8)}...)` 
-          : `Host-based connection to ${this.redisConfig.host}:${this.redisConfig.port}`
-      );
-      
-      this.queues.calls = new Queue('powerdialer-calls', {
+      // Set up Bull queue options with error handlers
+      const queueOptions = {
         redis: this.redisConfig,
         defaultJobOptions: {
-          attempts: 5, // Increased retry attempts for production
+          attempts: 5,
           backoff: {
             type: 'exponential',
             delay: 5000
           },
-          removeOnComplete: 500,  // Keep more completed jobs for audit history
-          removeOnFail: 200,      // Keep more failed jobs for debugging
-          timeout: 60000          // 1 minute timeout for calls
+          removeOnComplete: 500,
+          removeOnFail: 200,
+          timeout: 60000
         }
-      });
+      };
       
-      this.queues.webhooks = new Queue('powerdialer-webhooks', {
-        redis: this.redisConfig,
-        defaultJobOptions: {
-          attempts: 8,            // More retries for webhook processing
-          backoff: {
-            type: 'exponential',
-            delay: 2000           // Slightly longer delay for production
-          },
-          timeout: 30000          // 30s timeout for webhook processing
+      // Create queues with more robust error handling
+      let queuesCreated = false;
+      
+      try {
+        this.queues.calls = new Queue('powerdialer-calls', queueOptions);
+        console.log('Created calls queue successfully');
+        
+        this.queues.webhooks = new Queue('powerdialer-webhooks', queueOptions);
+        console.log('Created webhooks queue successfully');
+        
+        this.queues.maintenance = new Queue('powerdialer-maintenance', queueOptions);
+        console.log('Created maintenance queue successfully');
+        
+        queuesCreated = true;
+      } catch (error) {
+        console.error('Failed to create queues:', error.message);
+        
+        // Try to create a fallback in-memory queue system
+        if (process.env.ENABLE_MEMORY_FALLBACK === 'true') {
+          console.log('Attempting to use in-memory queue fallback');
+          this._setupMemoryFallback();
+          queuesCreated = true;
+        } else {
+          console.log('In-memory fallback not enabled. Set ENABLE_MEMORY_FALLBACK=true to enable.');
         }
-      });
+      }
       
-      this.queues.maintenance = new Queue('powerdialer-maintenance', {
-        redis: this.redisConfig,
-        defaultJobOptions: {
-          attempts: 3,
-          timeout: 300000         // 5 minute timeout for maintenance tasks
-        }
-      });
-      
-      // Set up processors
-      this._setupProcessors();
-      
-      // Set up recurring jobs
-      this._setupRecurringJobs();
-      
-      this.initialized = true;
-      console.log('Job service initialized successfully');
-      return true;
+      if (queuesCreated) {
+        // Set up processors
+        this._setupProcessors();
+        
+        // Set up recurring jobs
+        this._setupRecurringJobs();
+        
+        this.initialized = true;
+        console.log('Job service initialized successfully');
+        return true;
+      } else {
+        this.initialized = false;
+        console.error('Job service could not be initialized due to Redis connection issues');
+        return false;
+      }
     } catch (error) {
       console.error('Failed to initialize job service:', error.message);
       this.initialized = false;
@@ -139,6 +208,97 @@ class JobService {
     if (!this.initialized) {
       throw new Error('Job service not initialized');
     }
+  }
+  
+  /**
+   * Set up memory fallback when Redis is not available
+   * This is a simplified version that mimics the Queue interface
+   * but stores jobs in memory (will be lost on restart)
+   * @private
+   */
+  _setupMemoryFallback() {
+    console.log('Setting up in-memory queue fallback...');
+    
+    // Simple in-memory queues
+    const createMemoryQueue = (name) => {
+      const jobs = [];
+      const eventHandlers = {};
+      
+      const queue = {
+        name,
+        add: (jobName, data, options = {}) => {
+          console.log(`[Memory Queue ${name}] Adding job ${jobName}`);
+          const job = { 
+            id: Date.now() + Math.random().toString(36).substring(2, 10),
+            name: jobName, 
+            data,
+            options,
+            timestamp: Date.now()
+          };
+          jobs.push(job);
+          return Promise.resolve({ id: job.id });
+        },
+        process: (jobName, handler) => {
+          console.log(`[Memory Queue ${name}] Registered processor for ${jobName}`);
+          setInterval(() => {
+            const job = jobs.find(j => j.name === jobName && !j.processing);
+            if (job) {
+              job.processing = true;
+              console.log(`[Memory Queue ${name}] Processing job ${job.name}`);
+              try {
+                handler({ data: job.data });
+                const index = jobs.indexOf(job);
+                if (index > -1) {
+                  jobs.splice(index, 1);
+                }
+              } catch (error) {
+                console.error(`[Memory Queue ${name}] Error processing job:`, error);
+                job.processing = false;
+                job.attempts = (job.attempts || 0) + 1;
+                if (job.attempts >= (job.options.attempts || 3)) {
+                  const index = jobs.indexOf(job);
+                  if (index > -1) {
+                    jobs.splice(index, 1);
+                  }
+                  if (eventHandlers.failed) {
+                    eventHandlers.failed(job, error);
+                  }
+                }
+              }
+            }
+          }, 5000); // Check every 5 seconds
+          return this;
+        },
+        on: (event, handler) => {
+          eventHandlers[event] = handler;
+          return this;
+        },
+        getJobCounts: () => {
+          return Promise.resolve({
+            waiting: jobs.filter(j => !j.processing).length,
+            active: jobs.filter(j => j.processing).length,
+            completed: 0,
+            failed: 0
+          });
+        },
+        empty: () => {
+          jobs.length = 0;
+          return Promise.resolve();
+        },
+        close: () => {
+          return Promise.resolve();
+        }
+      };
+      
+      return queue;
+    };
+    
+    // Create memory queues
+    this.queues.calls = createMemoryQueue('powerdialer-calls');
+    this.queues.webhooks = createMemoryQueue('powerdialer-webhooks');
+    this.queues.maintenance = createMemoryQueue('powerdialer-maintenance');
+    
+    console.log('In-memory queue fallback set up successfully');
   }
   
   /**
