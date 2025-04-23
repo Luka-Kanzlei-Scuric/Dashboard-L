@@ -6,10 +6,25 @@ export const API_BASE_URL = '/api';
 // Available backend URLs to try if the primary one fails
 let BACKEND_URLS = [
   import.meta.env.VITE_API_URL,
+  '/api', // Lokaler Pfad über Render-Rewrites
   'https://dashboard-l-backend.onrender.com/api',
   'https://scuric-dashboard-backend.onrender.com/api',
   'http://localhost:5000/api'
 ].filter(Boolean); // Remove null/undefined entries
+
+// Explizite Dialer-Endpunkte
+export const DIALER_ENDPOINTS = {
+  status: (userId) => `/api/dialer/status/${userId}`,
+  start: (userId) => `/api/dialer/start/${userId}`,
+  pause: (userId) => `/api/dialer/pause/${userId}`,
+  stop: (userId) => `/api/dialer/stop/${userId}`,
+  queue: (userId) => userId ? `/api/dialer/queue/${userId}` : '/api/dialer/queue',
+  history: '/api/dialer/history',
+  stats: '/api/dialer/stats',
+  agents: '/api/dialer/agents',
+  config: '/api/dialer/config',
+  webhook: '/api/dialer/webhook'
+};
 
 // Remove duplicates
 BACKEND_URLS = [...new Set(BACKEND_URLS)];

@@ -9,7 +9,7 @@ import {
   XMarkIcon,
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
-import api from '../config/api';
+import dialerService from '../services/dialerService';
 
 /**
  * NewPowerDialerPage - Integrates with the server-side PowerDialer architecture
@@ -63,13 +63,13 @@ const NewPowerDialerPage = () => {
   const getDialerStatus = async (id) => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/dialer/status/${id || userId}`);
+      const data = await dialerService.getDialerStatus(id || userId);
       
-      if (response.data.success) {
-        setDialerStatus(response.data);
-        setDialerActive(response.data.online && response.data.connected);
-        setActiveCall(response.data.activeCall);
-        setSessionStats(response.data.sessionStats || {
+      if (data.success) {
+        setDialerStatus(data);
+        setDialerActive(data.online && data.connected);
+        setActiveCall(data.activeCall);
+        setSessionStats(data.sessionStats || {
           startTime: null,
           callsCompleted: 0,
           totalCallDuration: 0
@@ -97,16 +97,16 @@ const NewPowerDialerPage = () => {
         return;
       }
       
-      const response = await api.post(`/api/dialer/start/${userId}`, {
-        aircallUserId: aircallConfig.userId,
+      const data = await dialerService.startDialer(userId, {
+        userId: aircallConfig.userId,
         numberId: aircallConfig.numberId
       });
       
-      if (response.data.success) {
+      if (data.success) {
         setDialerActive(true);
         getDialerStatus();
       } else {
-        setError(response.data.message);
+        setError(data.message);
       }
     } catch (error) {
       console.error('Error starting dialer:', error);
@@ -124,14 +124,12 @@ const NewPowerDialerPage = () => {
       setLoading(true);
       setError(null);
       
-      const response = await api.post(`/api/dialer/pause/${userId}`, {
-        reason: 'break'
-      });
+      const data = await dialerService.pauseDialer(userId, 'break');
       
-      if (response.data.success) {
+      if (data.success) {
         getDialerStatus();
       } else {
-        setError(response.data.message);
+        setError(data.message);
       }
     } catch (error) {
       console.error('Error pausing dialer:', error);
@@ -149,18 +147,18 @@ const NewPowerDialerPage = () => {
       setLoading(true);
       setError(null);
       
-      const response = await api.post(`/api/dialer/stop/${userId}`);
+      const data = await dialerService.stopDialer(userId);
       
-      if (response.data.success) {
+      if (data.success) {
         setDialerActive(false);
         setActiveCall(null);
-        setSessionStats(response.data.sessionStats || {
+        setSessionStats(data.sessionStats || {
           startTime: null,
           callsCompleted: 0,
           totalCallDuration: 0
         });
       } else {
-        setError(response.data.message);
+        setError(data.message);
       }
     } catch (error) {
       console.error('Error stopping dialer:', error);
@@ -175,10 +173,10 @@ const NewPowerDialerPage = () => {
    */
   const loadCallQueue = async () => {
     try {
-      const response = await api.get(`/api/dialer/queue/${userId}`);
+      const data = await dialerService.getCallQueue(userId);
       
-      if (response.data.success) {
-        setCallQueue(response.data.queueItems || []);
+      if (data.success) {
+        setCallQueue(data.queueItems || []);
       }
     } catch (error) {
       console.error('Error loading call queue:', error);
@@ -190,12 +188,13 @@ const NewPowerDialerPage = () => {
    */
   const loadCallHistory = async () => {
     try {
-      const response = await api.get('/api/dialer/history', {
-        params: { userId, limit: 10 }
+      const data = await dialerService.getCallHistory({ 
+        userId, 
+        limit: 10 
       });
       
-      if (response.data.success) {
-        setCallHistory(response.data.callHistory || []);
+      if (data.success) {
+        setCallHistory(data.callHistory || []);
       }
     } catch (error) {
       console.error('Error loading call history:', error);
