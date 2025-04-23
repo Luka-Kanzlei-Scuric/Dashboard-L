@@ -7,259 +7,135 @@ import {
   UserIcon,
   CheckCircleIcon,
   XMarkIcon,
-  ExclamationCircleIcon
+  ExclamationCircleIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import dialerService from '../services/dialerService';
+import axios from 'axios';
 
 /**
- * NewPowerDialerPage - Integrates with the server-side PowerDialer architecture
+ * SimpleDialerPage - Einfache direkte Anruffunktion über Aircall API
  * 
- * This component demonstrates how to connect to the new PowerDialer backend
- * and provides a simple interface for dialer control and queue management.
+ * Diese Komponente bietet eine einfache Oberfläche zum direkten Wählen von Telefonnummern
+ * über die Aircall API, ohne komplexe Dialer-Funktionalität.
  */
 const NewPowerDialerPage = () => {
-  // User states
-  const [userId, setUserId] = useState(null);
+  // Anruf-Konfiguration
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [aircallConfig, setAircallConfig] = useState({
-    userId: '',
-    numberId: ''
+    userId: '1527216',  // Default Aircall User ID
+    numberId: '967647'  // Default Aircall Number ID
   });
   
-  // Dialer states
-  const [dialerActive, setDialerActive] = useState(false);
-  const [dialerStatus, setDialerStatus] = useState(null);
+  // Status-Verwaltung
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [callStatus, setCallStatus] = useState(null); // 'ringing', 'connected', 'completed', 'failed'
+  const [callStartTime, setCallStartTime] = useState(null);
+  const [callDuration, setCallDuration] = useState(0);
   
-  // Queue and call states
-  const [callQueue, setCallQueue] = useState([]);
+  // UI-State
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [callHistory, setCallHistory] = useState([]);
-  const [activeCall, setActiveCall] = useState(null);
-  
-  // Stats
-  const [sessionStats, setSessionStats] = useState({
-    startTime: null,
-    callsCompleted: 0,
-    totalCallDuration: 0
-  });
   
   /**
-   * Initialize the component with current user ID
+   * Direkte Anruf-Funktion über die Aircall API
    */
-  useEffect(() => {
-    // In a real implementation, get the user ID from auth context
-    const currentUserId = localStorage.getItem('userId') || '64a12b3c5f7d2e1a3c9b8e7f';
-    setUserId(currentUserId);
+  const makeDirectCall = async (e) => {
+    if (e) e.preventDefault();
     
-    // Get initial status
-    if (currentUserId) {
-      getDialerStatus(currentUserId);
-    }
-  }, []);
-  
-  /**
-   * Get the current status of the PowerDialer
-   */
-  const getDialerStatus = async (id) => {
-    try {
-      setLoading(true);
-      const data = await dialerService.getDialerStatus(id || userId);
-      
-      if (data.success) {
-        setDialerStatus(data);
-        setDialerActive(data.online && data.connected);
-        setActiveCall(data.activeCall);
-        setSessionStats(data.sessionStats || {
-          startTime: null,
-          callsCompleted: 0,
-          totalCallDuration: 0
-        });
-      }
-    } catch (error) {
-      console.error('Error getting dialer status:', error);
-      setError('Failed to get dialer status');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  /**
-   * Start the PowerDialer and add phone numbers to the queue
-   */
-  const startDialer = async () => {
     try {
       setLoading(true);
       setError(null);
+      setCallStatus(null);
       
-      // Validate inputs
-      if (!aircallConfig.userId || !aircallConfig.numberId) {
-        setError('Aircall User ID and Number ID are required');
+      // Validiere Eingaben
+      if (!phoneNumber) {
+        setError('Bitte geben Sie eine Telefonnummer ein');
         return;
       }
       
-      console.log('Starting PowerDialer with config:', {
-        userId,
-        aircallUserId: aircallConfig.userId,
-        numberId: aircallConfig.numberId
+      if (!aircallConfig.userId || !aircallConfig.numberId) {
+        setError('Aircall User ID und Number ID sind erforderlich');
+        return;
+      }
+      
+      // Validiere Telefonnummer (einfaches E.164 Format: +49...)
+      const formattedNumber = formatE164Number(phoneNumber);
+      if (!formattedNumber) {
+        setError('Ungültiges Telefonnummernformat. Bitte im Format +49... eingeben.');
+        return;
+      }
+      
+      console.log(`Starte direkten Anruf an ${formattedNumber}`);
+      
+      // Direkter Anruf über Aircall API-Proxy
+      const response = await axios.post(`/api/aircall/users/${aircallConfig.userId}/calls`, {
+        number_id: aircallConfig.numberId,
+        to: formattedNumber
       });
       
-      // 1. Start the PowerDialer to set up the agent
-      const startData = await dialerService.startDialer(userId, {
-        userId: aircallConfig.userId,
-        numberId: aircallConfig.numberId
-      });
+      console.log('Anruf-Antwort:', response);
       
-      // Handle both success and error cases (API calls return objects now instead of throwing)
-      if (startData.success) {
-        setDialerActive(true);
-        console.log('PowerDialer started successfully');
+      // Erfolgreicher Anruf (204 No Content bedeutet, der Anruf wurde akzeptiert)
+      if (response.status === 204) {
+        // Starte Call-Tracking
+        setCallStatus('ringing');
+        setCallStartTime(new Date());
         
-        // 2. Add test phone numbers to the queue
-        const phoneNumbers = ['+4917693176785', '+4917672550210'];
+        // Füge zur Call-Historie hinzu
+        const newCall = {
+          id: Math.random().toString(36).substring(2, 15),
+          phoneNumber: formattedNumber,
+          userId: aircallConfig.userId,
+          numberId: aircallConfig.numberId,
+          startTime: new Date(),
+          status: 'started'
+        };
+        setCallHistory(prev => [newCall, ...prev]);
         
-        // In our new implementation, this won't throw
-        const queueData = await dialerService.addPhoneNumbersToQueue(userId, phoneNumbers, {
-          priority: 1, // Highest priority
-          notes: 'Test-Anrufe automatisch hinzugefügt'
-        });
+        // Zeige Erfolgsmeldung
+        setShowSuccessMessage(true);
+        setTimeout(() => setShowSuccessMessage(false), 3000);
         
-        if (queueData.success) {
-          console.log('Phone numbers added to queue:', queueData);
-        } else {
-          console.warn('Adding phone numbers returned error but we continue:', queueData.message);
-        }
-        
-        // 3. Refresh the dialer status and queue regardless of queue add result
-        getDialerStatus();
-        loadCallQueue();
-        
+        // Leere das Telefonnummernfeld
+        setPhoneNumber('');
       } else {
-        console.warn('Start dialer returned error:', startData.message);
-        setError(startData.message || 'Unknown error starting dialer');
-        
-        // Even if we couldn't start the dialer via API, we activate the UI in development mode
-        if (process.env.NODE_ENV !== 'production' || window.location.hostname === 'localhost') {
-          console.log('Development mode: Activating dialer UI despite API error');
-          setDialerActive(true);
-          getDialerStatus();
-          loadCallQueue();
-        }
+        throw new Error(`Unerwartete Antwort vom Server: ${response.status}`);
       }
     } catch (error) {
-      // This should not happen with our new implementation, but just in case
-      console.error('Unexpected error starting dialer:', error);
-      setError(error.message || 'Failed to start dialer');
-      
-      // Even if we get an error, activate the UI in development mode
-      if (process.env.NODE_ENV !== 'production' || window.location.hostname === 'localhost') {
-        console.log('Development mode: Activating dialer UI despite error');
-        setDialerActive(true);
-        getDialerStatus();
-        loadCallQueue();
-      }
+      console.error('Fehler beim Anruf:', error);
+      setError(error.response?.data?.message || error.message || 'Fehler beim Starten des Anrufs');
+      setCallStatus('failed');
     } finally {
       setLoading(false);
     }
   };
   
   /**
-   * Pause the PowerDialer
+   * Formatiere eine Telefonnummer im E.164-Format
    */
-  const pauseDialer = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const data = await dialerService.pauseDialer(userId, 'break');
-      
-      if (data.success) {
-        getDialerStatus();
-      } else {
-        setError(data.message);
-      }
-    } catch (error) {
-      console.error('Error pausing dialer:', error);
-      setError(error.response?.data?.message || 'Failed to pause dialer');
-    } finally {
-      setLoading(false);
+  const formatE164Number = (number) => {
+    // Entferne alle Nicht-Ziffern
+    let cleaned = number.replace(/\D/g, '');
+    
+    // Wenn Nummer mit 0 beginnt, ersetze sie mit +49
+    if (cleaned.startsWith('0')) {
+      cleaned = '49' + cleaned.substring(1);
     }
-  };
-  
-  /**
-   * Stop the PowerDialer
-   */
-  const stopDialer = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const data = await dialerService.stopDialer(userId);
-      
-      if (data.success) {
-        setDialerActive(false);
-        setActiveCall(null);
-        setSessionStats(data.sessionStats || {
-          startTime: null,
-          callsCompleted: 0,
-          totalCallDuration: 0
-        });
-      } else {
-        setError(data.message);
-      }
-    } catch (error) {
-      console.error('Error stopping dialer:', error);
-      setError(error.response?.data?.message || 'Failed to stop dialer');
-    } finally {
-      setLoading(false);
+    
+    // Stelle sicher, dass sie mit + beginnt
+    if (!number.startsWith('+')) {
+      cleaned = '+' + cleaned;
     }
+    
+    // Einfache Validierung für E.164 Format
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+    return e164Regex.test(cleaned) ? cleaned : null;
   };
   
   /**
-   * Load the call queue
-   */
-  const loadCallQueue = async () => {
-    try {
-      const data = await dialerService.getCallQueue(userId);
-      
-      if (data.success) {
-        setCallQueue(data.queueItems || []);
-      }
-    } catch (error) {
-      console.error('Error loading call queue:', error);
-    }
-  };
-  
-  /**
-   * Load call history
-   */
-  const loadCallHistory = async () => {
-    try {
-      const data = await dialerService.getCallHistory({ 
-        userId, 
-        limit: 10 
-      });
-      
-      if (data.success) {
-        setCallHistory(data.callHistory || []);
-      }
-    } catch (error) {
-      console.error('Error loading call history:', error);
-    }
-  };
-  
-  /**
-   * Handle changes to Aircall config fields
-   */
-  const handleConfigChange = (e) => {
-    const { name, value } = e.target;
-    setAircallConfig(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-  
-  /**
-   * Format duration in seconds to HH:MM:SS
+   * Formatiere Sekunden in das Format HH:MM:SS
    */
   const formatDuration = (seconds) => {
     if (!seconds) return '00:00:00';
@@ -276,7 +152,7 @@ const NewPowerDialerPage = () => {
   };
   
   /**
-   * Format date to local date and time
+   * Formatiere Datum zu lokalem Datum und Uhrzeit
    */
   const formatDateTime = (date) => {
     if (!date) return '';
@@ -284,25 +160,70 @@ const NewPowerDialerPage = () => {
   };
   
   /**
-   * Auto-refresh dialer status periodically when active
+   * Event-Handler für Änderungen an der Telefonnummer
+   */
+  const handlePhoneNumberChange = (e) => {
+    setPhoneNumber(e.target.value);
+  };
+  
+  /**
+   * Event-Handler für Änderungen an der Aircall-Konfiguration
+   */
+  const handleConfigChange = (e) => {
+    const { name, value } = e.target;
+    setAircallConfig(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  /**
+   * Updates the call duration when a call is active
    */
   useEffect(() => {
-    if (dialerActive && userId) {
-      const interval = setInterval(() => {
-        getDialerStatus();
-      }, 5000); // Check every 5 seconds
-      
-      return () => clearInterval(interval);
+    let interval;
+    if (callStatus === 'ringing' || callStatus === 'connected') {
+      interval = setInterval(() => {
+        const currentDuration = Math.floor((new Date() - callStartTime) / 1000);
+        setCallDuration(currentDuration);
+      }, 1000);
     }
-  }, [dialerActive, userId]);
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [callStatus, callStartTime]);
   
-  // Load initial data
+  /**
+   * Simuliere einen abgeschlossenen Anruf nach einer bestimmten Zeit
+   */
   useEffect(() => {
-    if (userId) {
-      loadCallQueue();
-      loadCallHistory();
+    let timeout;
+    
+    if (callStatus === 'ringing') {
+      // Nach 5 Sekunden auf 'connected' setzen
+      timeout = setTimeout(() => {
+        setCallStatus('connected');
+        
+        // Nach weiteren 10 Sekunden auf 'completed' setzen
+        setTimeout(() => {
+          setCallStatus('completed');
+          
+          // Call History aktualisieren
+          setCallHistory(prev => prev.map(call => {
+            if (call.id === prev[0].id) {
+              return { ...call, status: 'completed', duration: Math.floor((new Date() - call.startTime) / 1000) };
+            }
+            return call;
+          }));
+        }, 10000);
+      }, 5000);
     }
-  }, [userId]);
+    
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [callStatus]);
   
   return (
     <div className="h-full w-full bg-[#f5f5f7] overflow-hidden">
@@ -310,48 +231,23 @@ const NewPowerDialerPage = () => {
       <div className="bg-white px-4 sm:px-6 md:px-8 py-4 md:py-5 border-b border-gray-100 shadow-sm sticky top-0 z-20">
         <div className="max-w-screen-xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-xl md:text-2xl font-light text-gray-800">New PowerDialer</h1>
-            <p className="text-xs md:text-sm text-gray-500 font-light">Server-based architecture</p>
-          </div>
-          
-          {/* Dialer Controls */}
-          <div className="flex items-center space-x-2">
-            {dialerActive ? (
-              <>
-                <button
-                  onClick={pauseDialer}
-                  disabled={loading}
-                  className="flex items-center rounded-full py-1.5 px-3 transition-all duration-300 bg-orange-50 text-orange-500 hover:bg-orange-100"
-                >
-                  <PauseIcon className="w-3 h-3 mr-1.5" />
-                  <span className="text-xs font-light">Pause</span>
-                </button>
-                <button
-                  onClick={stopDialer}
-                  disabled={loading}
-                  className="flex items-center rounded-full py-1.5 px-3 transition-all duration-300 bg-red-50 text-red-500 hover:bg-red-100"
-                >
-                  <XMarkIcon className="w-3 h-3 mr-1.5" />
-                  <span className="text-xs font-light">Stop</span>
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={startDialer}
-                disabled={loading}
-                className="flex items-center rounded-full py-1.5 px-3 transition-all duration-300 bg-green-50 text-green-600 hover:bg-green-100"
-              >
-                <PlayIcon className="w-3 h-3 mr-1.5" />
-                <span className="text-xs font-light">Start Dialer</span>
-              </button>
-            )}
+            <h1 className="text-xl md:text-2xl font-light text-gray-800">Einfacher Dialer</h1>
+            <p className="text-xs md:text-sm text-gray-500 font-light">Direkte Anrufe über Aircall API</p>
           </div>
         </div>
       </div>
       
       {/* Main Content */}
       <div className="max-w-screen-xl mx-auto p-4 md:p-6 space-y-6">
-        {/* Error message */}
+        {/* Erfolgsmeldung */}
+        {showSuccessMessage && (
+          <div className="bg-green-50 text-green-600 p-3 rounded-lg mb-4 text-sm flex items-start">
+            <CheckCircleIcon className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
+            <span>Anruf erfolgreich gestartet!</span>
+          </div>
+        )}
+        
+        {/* Fehlermeldung */}
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm flex items-start">
             <ExclamationCircleIcon className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
@@ -359,257 +255,265 @@ const NewPowerDialerPage = () => {
           </div>
         )}
         
-        {/* Configuration Panel */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-100">
-            <h2 className="text-base font-medium text-gray-700">PowerDialer Configuration</h2>
-          </div>
-          <div className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="aircallUserId" className="block text-sm text-gray-600 mb-1">
-                  Aircall User ID
-                </label>
-                <input
-                  type="text"
-                  id="aircallUserId"
-                  name="userId"
-                  value={aircallConfig.userId}
-                  onChange={handleConfigChange}
-                  placeholder="Your Aircall User ID"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-                  disabled={dialerActive}
-                />
+        {/* Hauptbereich */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Linke Spalte: Anruf-Eingabe */}
+          <div className="md:col-span-2">
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100">
+                <h2 className="text-base font-medium text-gray-700">Telefonnummer wählen</h2>
               </div>
-              <div>
-                <label htmlFor="numberId" className="block text-sm text-gray-600 mb-1">
-                  Aircall Number ID
-                </label>
-                <input
-                  type="text"
-                  id="numberId"
-                  name="numberId"
-                  value={aircallConfig.numberId}
-                  onChange={handleConfigChange}
-                  placeholder="Your Aircall Number ID"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-                  disabled={dialerActive}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Status Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-          {/* Dialer Status */}
-          <div className="bg-white rounded-xl shadow-sm">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="text-base font-medium text-gray-700">Dialer Status</h2>
-            </div>
-            <div className="p-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Status:</span>
-                  <div className={`flex items-center rounded-full px-2 py-0.5 ${
-                    dialerActive ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-500'
-                  }`}>
-                    <div className={`w-2 h-2 rounded-full mr-1.5 ${
-                      dialerActive ? 'bg-green-500' : 'bg-gray-400'
-                    }`}></div>
-                    <span className="text-xs font-light">
-                      {dialerActive ? 'Active' : 'Inactive'}
-                    </span>
+              <div className="p-6">
+                <form onSubmit={makeDirectCall} className="space-y-4">
+                  <div>
+                    <label htmlFor="phoneNumber" className="block text-sm text-gray-600 mb-1">
+                      Telefonnummer
+                    </label>
+                    <input
+                      type="text"
+                      id="phoneNumber"
+                      value={phoneNumber}
+                      onChange={handlePhoneNumberChange}
+                      placeholder="+49 123 456789"
+                      className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                      disabled={loading || callStatus === 'ringing' || callStatus === 'connected'}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Format: +49... (oder beginne mit 0 für deutsche Nummern)
+                    </p>
                   </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Session time:</span>
-                  <span className="text-sm font-mono">
-                    {sessionStats.startTime 
-                      ? formatDuration(Math.floor((new Date() - new Date(sessionStats.startTime)) / 1000))
-                      : '00:00:00'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Calls completed:</span>
-                  <span className="text-sm font-mono">{sessionStats.callsCompleted || 0}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Total call time:</span>
-                  <span className="text-sm font-mono">{formatDuration(sessionStats.totalCallDuration || 0)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Active Call */}
-          <div className="bg-white rounded-xl shadow-sm">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="text-base font-medium text-gray-700">Active Call</h2>
-            </div>
-            <div className="p-4">
-              {activeCall ? (
-                <div className="space-y-4">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mr-3">
-                      <UserIcon className="w-5 h-5 text-blue-500" />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="aircallUserId" className="block text-sm text-gray-600 mb-1">
+                        Aircall User ID
+                      </label>
+                      <input
+                        type="text"
+                        id="aircallUserId"
+                        name="userId"
+                        value={aircallConfig.userId}
+                        onChange={handleConfigChange}
+                        placeholder="Aircall User ID"
+                        className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                        disabled={loading || callStatus === 'ringing' || callStatus === 'connected'}
+                      />
                     </div>
                     <div>
-                      <h3 className="text-sm font-medium text-gray-800">
-                        {activeCall.client?.name || 'Unknown Client'}
-                      </h3>
-                      <p className="text-xs text-gray-500">{activeCall.phoneNumber}</p>
+                      <label htmlFor="numberId" className="block text-sm text-gray-600 mb-1">
+                        Aircall Number ID
+                      </label>
+                      <input
+                        type="text"
+                        id="numberId"
+                        name="numberId"
+                        value={aircallConfig.numberId}
+                        onChange={handleConfigChange}
+                        placeholder="Aircall Number ID"
+                        className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                        disabled={loading || callStatus === 'ringing' || callStatus === 'connected'}
+                      />
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Status:</span>
-                    <div className="flex items-center rounded-full px-2 py-0.5 bg-green-50 text-green-600">
-                      <div className="w-2 h-2 rounded-full mr-1.5 bg-green-500 animate-pulse"></div>
-                      <span className="text-xs font-light">In progress</span>
-                    </div>
+                  
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={loading || callStatus === 'ringing' || callStatus === 'connected' || !phoneNumber}
+                      className={`px-5 py-3 rounded-lg flex items-center ${
+                        loading || callStatus === 'ringing' || callStatus === 'connected' || !phoneNumber
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-green-50 text-green-600 hover:bg-green-100'
+                      }`}
+                    >
+                      {loading ? (
+                        <>
+                          <ArrowPathIcon className="w-5 h-5 mr-2 animate-spin" />
+                          Wird verarbeitet...
+                        </>
+                      ) : callStatus === 'ringing' ? (
+                        <>
+                          <PhoneIcon className="w-5 h-5 mr-2 animate-pulse" />
+                          Anruf wird gestartet...
+                        </>
+                      ) : callStatus === 'connected' ? (
+                        <>
+                          <PhoneIcon className="w-5 h-5 mr-2" />
+                          Gespräch läuft...
+                        </>
+                      ) : (
+                        <>
+                          <PhoneIcon className="w-5 h-5 mr-2" />
+                          Anrufen
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Started:</span>
-                    <span className="text-xs font-light">{formatDateTime(activeCall.startTime)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Duration:</span>
-                    <span className="text-sm font-mono">
-                      {formatDuration(Math.floor((new Date() - new Date(activeCall.startTime)) / 1000))}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-32 text-center">
-                  <PhoneIcon className="w-8 h-8 text-gray-300 mb-2" />
-                  <p className="text-sm text-gray-500">No active call</p>
-                </div>
-              )}
+                </form>
+              </div>
+            </div>
+            
+            {/* Anruf-Historie */}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden mt-6">
+              <div className="p-4 border-b border-gray-100">
+                <h2 className="text-base font-medium text-gray-700">Letzte Anrufe</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Telefonnummer
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Zeit
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Dauer
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {callHistory.length > 0 ? (
+                      callHistory.map((call) => (
+                        <tr key={call.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{call.phoneNumber}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              call.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                              call.status === 'started' ? 'bg-blue-100 text-blue-800' :
+                              call.status === 'failed' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {call.status === 'completed' ? 'Abgeschlossen' : 
+                               call.status === 'started' ? 'Gestartet' :
+                               call.status === 'failed' ? 'Fehlgeschlagen' : call.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {formatDateTime(call.startTime)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {call.duration ? formatDuration(call.duration) : '-'}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                          Keine Anrufhistorie vorhanden
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
           
-          {/* Call Queue */}
-          <div className="bg-white rounded-xl shadow-sm">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-base font-medium text-gray-700">Call Queue</h2>
-              <button 
-                onClick={loadCallQueue}
-                className="text-xs text-blue-500 hover:text-blue-700"
-              >
-                Refresh
-              </button>
-            </div>
-            <div className="p-4">
-              {callQueue.length > 0 ? (
-                <div className="space-y-4 max-h-60 overflow-y-auto">
-                  {callQueue.map((item) => (
-                    <div key={item._id} className="flex items-center justify-between border-b border-gray-100 pb-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
-                          {item.client?.name || 'Unknown Client'}
-                        </p>
-                        <p className="text-xs text-gray-500">{item.phoneNumber}</p>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-xs font-light text-gray-500">
-                          {formatDateTime(item.scheduledFor)}
-                        </span>
-                        <span className={`text-xs rounded-full px-2 py-0.5 ${
-                          item.status === 'pending' ? 'bg-blue-50 text-blue-500' : 
-                          item.status === 'in-progress' ? 'bg-yellow-50 text-yellow-600' :
-                          'bg-gray-50 text-gray-500'
-                        }`}>
-                          {item.status}
-                        </span>
+          {/* Rechte Spalte: Anruf-Status */}
+          <div>
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100">
+                <h2 className="text-base font-medium text-gray-700">Aktueller Anruf</h2>
+              </div>
+              
+              <div className="p-6">
+                {callStatus ? (
+                  <div className="space-y-6">
+                    {/* Statussymbol */}
+                    <div className="flex justify-center">
+                      <div className={`w-20 h-20 rounded-full flex items-center justify-center ${
+                        callStatus === 'ringing' ? 'bg-yellow-50 animate-pulse' : 
+                        callStatus === 'connected' ? 'bg-green-50 animate-pulse' :
+                        callStatus === 'completed' ? 'bg-blue-50' :
+                        'bg-red-50'
+                      }`}>
+                        <PhoneIcon className={`w-10 h-10 ${
+                          callStatus === 'ringing' ? 'text-yellow-500' : 
+                          callStatus === 'connected' ? 'text-green-500' :
+                          callStatus === 'completed' ? 'text-blue-500' :
+                          'text-red-500'
+                        }`} />
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-32 text-center">
-                  <ClockIcon className="w-8 h-8 text-gray-300 mb-2" />
-                  <p className="text-sm text-gray-500">No calls in queue</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        
-        {/* Call History */}
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-base font-medium text-gray-700">Recent Call History</h2>
-            <button 
-              onClick={loadCallHistory}
-              className="text-xs text-blue-500 hover:text-blue-700"
-            >
-              Refresh
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Client
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Phone
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Time
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Duration
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {callHistory.length > 0 ? (
-                  callHistory.map((call) => (
-                    <tr key={call._id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {call.client?.name || 'Unknown'}
+                    
+                    {/* Statustext */}
+                    <div className="text-center">
+                      <p className="font-medium text-lg text-gray-800">
+                        {callStatus === 'ringing' ? 'Verbindung wird hergestellt...' : 
+                         callStatus === 'connected' ? 'Gespräch läuft' :
+                         callStatus === 'completed' ? 'Anruf abgeschlossen' :
+                         'Anruf fehlgeschlagen'}
+                      </p>
+                      
+                      {(callStatus === 'ringing' || callStatus === 'connected') && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          {callStatus === 'ringing' ? 
+                            'Warte auf Antwort...' : 
+                            'Der Anruf wurde angenommen'}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {/* Letzter Anruf-Details */}
+                    {callHistory.length > 0 && (
+                      <div className="pt-4 border-t border-gray-100">
+                        <h3 className="text-sm font-medium text-gray-700 mb-3">Anruf-Details</h3>
+                        
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-500">Telefonnummer:</span>
+                            <span className="text-sm font-medium">{callHistory[0].phoneNumber}</span>
+                          </div>
+                          
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-500">Startzeit:</span>
+                            <span className="text-sm">{formatDateTime(callHistory[0].startTime)}</span>
+                          </div>
+                          
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-500">Dauer:</span>
+                            <span className="text-sm font-mono">
+                              {callStatus === 'completed' ? 
+                                formatDuration(callHistory[0].duration || 0) : 
+                                formatDuration(callDuration)}
+                            </span>
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{call.phoneNumber}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          call.status === 'completed' ? 'bg-green-100 text-green-800' : 
-                          call.status === 'no-answer' ? 'bg-yellow-100 text-yellow-800' :
-                          call.status === 'failed' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {call.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {formatDateTime(call.startTime)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {formatDuration(call.duration || 0)}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                      </div>
+                    )}
+                  </div>
                 ) : (
-                  <tr>
-                    <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
-                      No call history found
-                    </td>
-                  </tr>
+                  <div className="text-center py-8">
+                    <PhoneIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">Kein aktiver Anruf</p>
+                    <p className="text-sm text-gray-400 mt-2">
+                      Geben Sie eine Nummer ein und starten Sie einen Anruf
+                    </p>
+                  </div>
                 )}
-              </tbody>
-            </table>
+              </div>
+            </div>
+            
+            {/* Hinweis zur Verwendung */}
+            <div className="bg-blue-50 rounded-xl p-4 mt-6">
+              <h3 className="text-sm font-medium text-blue-700 mb-2">Hinweis</h3>
+              <p className="text-xs text-blue-600">
+                Diese einfache Anruffunktion verwendet die Aircall API, um direkte Anrufe zu tätigen.
+                Die Anrufe werden über die hinterlegte Aircall-Nummer durchgeführt und an Ihren
+                Aircall-Account weitergeleitet.
+              </p>
+            </div>
           </div>
         </div>
       </div>
