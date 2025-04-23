@@ -1,6 +1,6 @@
 import express from 'express';
 import dialerController from '../controllers/dialerController.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { auth as authMiddleware } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
