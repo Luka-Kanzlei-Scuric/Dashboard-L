@@ -160,13 +160,25 @@ userStatusSchema.methods.endCall = function(duration) {
 
 // Static methods
 userStatusSchema.statics.getAvailableAgents = function() {
-  return this.find({
-    availabilityStatus: 'available',
-    online: true,
-    connected: true
-  })
-  .populate('user', 'name email')
-  .sort({ 'sessionStats.callsCompleted': 1 }); // Load balancing
+  // Check if we're in mock mode
+  const enableMockMode = process.env.ENABLE_MOCK_MODE === 'true';
+  
+  if (enableMockMode) {
+    console.log('MOCK MODE: Returning all agents regardless of status');
+    // In mock mode, return all agents regardless of status
+    return this.find({})
+      .populate('user', 'name email')
+      .sort({ 'sessionStats.callsCompleted': 1 }); // Load balancing
+  } else {
+    // Regular mode, check all criteria
+    return this.find({
+      availabilityStatus: 'available',
+      online: true,
+      connected: true
+    })
+    .populate('user', 'name email')
+    .sort({ 'sessionStats.callsCompleted': 1 }); // Load balancing
+  }
 };
 
 userStatusSchema.statics.getAgentStatus = function(userId) {
