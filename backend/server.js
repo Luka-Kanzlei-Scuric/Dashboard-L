@@ -451,6 +451,75 @@ app.post('/api/aircall/users/:id/dial', async (req, res) => {
   }
 });
 
+// Neue Route: Anrufdetails abrufen
+app.get('/api/aircall/calls/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`Fetching call details for call ${id}`);
+    
+    // Wenn die ID ein Mock-Format hat (enthält einen Bindestrich), geben wir Mock-Daten zurück
+    if (id.includes('-')) {
+      console.log(`Detected mock call ID: ${id}, returning mock data`);
+      return res.status(200).json({
+        id: id,
+        status: 'answered',
+        direction: 'outbound',
+        started_at: new Date().toISOString(),
+        answered_at: new Date().toISOString(),
+        ended_at: null,
+        duration: 0,
+        voicemail: false,
+        archived: false,
+        missed: false,
+        isMock: true
+      });
+    }
+    
+    // Andernfalls, echte API-Anfrage
+    const aircallApiKey = process.env.AIRCALL_API_KEY;
+    
+    if (!aircallApiKey) {
+      return res.status(500).json({
+        success: false,
+        message: 'Aircall API key not configured'
+      });
+    }
+    
+    const response = await axios.get(
+      `https://api.aircall.io/v1/calls/${id}`,
+      {
+        auth: {
+          username: aircallApiKey.split(':')[0],
+          password: aircallApiKey.split(':')[1]
+        },
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    return res.status(200).json(response.data);
+  } catch (error) {
+    console.error(`Error fetching call details for ${req.params.id}:`, error.message);
+    
+    // Wenn der Fehler ein 404 ist (Call nicht gefunden), geben wir Mock-Daten zurück
+    if (error.response && error.response.status === 404) {
+      return res.status(200).json({
+        id: req.params.id,
+        status: 'unknown',
+        direction: 'outbound',
+        started_at: new Date().toISOString(),
+        isFallback: true
+      });
+    }
+    
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // Get all clients
 app.get('/api/clients', async (req, res) => {
   try {
