@@ -1413,13 +1413,23 @@ const PowerDialerPage = () => {
                           : "Starten Sie den PowerDialer, um die Formular-Ansicht zu aktivieren."}
                       </p>
                       {dialerActive && userStatus?.available && (
-                        <button 
-                          onClick={simulateAnsweredCall}
-                          className="text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors inline-flex items-center"
-                        >
-                          <CheckCircleIcon className="w-3 h-3 md:w-4 md:h-4 mr-2" />
-                          Gesprächsbeginn simulieren
-                        </button>
+                        <div className="flex flex-col gap-3">
+                          <button 
+                            onClick={simulateAnsweredCall}
+                            className="text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors inline-flex items-center justify-center"
+                          >
+                            <CheckCircleIcon className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                            Gesprächsbeginn simulieren
+                          </button>
+                          
+                          <button 
+                            onClick={() => setShowManualDialer(true)}
+                            className="text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors inline-flex items-center justify-center"
+                          >
+                            <PhoneIcon className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                            Manuelle Nummer wählen
+                          </button>
+                        </div>
                       )}
                       
                       {renderConnectionStatus()}

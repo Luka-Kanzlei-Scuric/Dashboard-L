@@ -43,8 +43,9 @@ class AircallService {
         console.log(`[MOCK] Benutzer ${userId} Verfügbarkeit geprüft:`, availability.data);
       } else {
         try {
-          // Offizielle Aircall API für Benutzerverfügbarkeit
-          availability = await api.get(`/v1/users/${userId}/availability`);
+          // Offizielle Aircall API für Benutzerverfügbarkeit über Backend-Proxy
+          availability = await api.get(`/aircall/users/${userId}/availability`);
+          console.log(`Benutzer ${userId} Verfügbarkeit über API geprüft:`, availability.data);
         } catch (error) {
           console.warn(`API-Fehler bei Verfügbarkeitsprüfung für Benutzer ${userId}:`, error.message);
           // Fallback auf Mock im Fehlerfall
@@ -56,6 +57,7 @@ class AircallService {
             },
             isFallback: true
           };
+          console.log(`[FALLBACK] Verwende Mock-Daten für Benutzer ${userId} Verfügbarkeit`);
         }
       }
       
@@ -123,13 +125,23 @@ class AircallService {
         };
       } else {
         try {
-          // Verwende den offiziellen Aircall API-Endpunkt für ausgehende Anrufe
+          // Verwende den offiziellen Aircall API-Endpunkt über den Backend-Proxy
           console.log(`Sende Anrufanfrage an Aircall API: Benutzer ${userId}, Nummer ${numberId}, Ziel ${to}`);
-          response = await api.post(`/v1/users/${userId}/calls`, {
+          response = await api.post(`/aircall/users/${userId}/calls`, {
             number_id: parseInt(numberId, 10),
             to: to
           });
           console.log("Antwort von Aircall API:", response);
+          
+          // Wenn response.data leer ist (bei 204 No Content), ein Mock-Objekt erstellen
+          if (!response.data || Object.keys(response.data).length === 0) {
+            response.data = { 
+              id: mockCallId,
+              status: 'ringing',
+              to: to,
+              direction: 'outbound'
+            };
+          }
         } catch (apiError) {
           console.warn('API-Fehler beim Starten des Anrufs:', apiError.message);
           
@@ -296,14 +308,16 @@ class AircallService {
         };
       } else {
         try {
-          // Echten Status von der API abrufen
-          const response = await api.get(`/v1/calls/${idToCheck}`);
+          // Echten Status von der API abrufen über Backend-Proxy
+          const response = await api.get(`/aircall/calls/${idToCheck}`);
           callStatus = response.data;
+          console.log(`Status für Anruf ${idToCheck} über API abgerufen:`, callStatus);
         } catch (apiError) {
           console.warn(`API-Fehler beim Abrufen des Anrufstatus für ${idToCheck}:`, apiError.message);
           
-          // Fallback auf lokale Daten bei API-Fehler
+          // Fallback auf lokale Daten oder simulierte Daten bei API-Fehler
           if (callIndex !== -1) {
+            // Wenn Anruf im Verlauf gefunden, verwende diese Daten
             callStatus = {
               id: idToCheck,
               status: this.callHistory[callIndex].status || 'unknown',
@@ -313,10 +327,29 @@ class AircallService {
               isFallback: true,
               direction: this.callHistory[callIndex].direction || 'outbound'
             };
-          } else {
+          } else if (this.activeCallId === idToCheck) {
+            // Wenn es der aktive Anruf ist, simuliere Status basierend auf Zeit
+            const startTime = new Date(Date.now() - 5000); // Angenommen der Anruf läuft seit 5 Sekunden
+            const callAge = Date.now() - startTime;
+            
+            let simulatedStatus;
+            if (callAge < 3000) {
+              simulatedStatus = 'ringing';
+            } else {
+              simulatedStatus = 'answered';
+            }
+            
             callStatus = {
               id: idToCheck,
-              status: this.activeCallStatus || 'unknown',
+              status: simulatedStatus,
+              startTime: startTime,
+              isFallback: true
+            };
+          } else {
+            // Fallback für unbekannte Anrufe
+            callStatus = {
+              id: idToCheck,
+              status: 'unknown',
               isFallback: true
             };
           }

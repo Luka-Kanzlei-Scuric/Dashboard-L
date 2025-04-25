@@ -27,7 +27,6 @@ function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
               <Route path="power-dialer" element={<PowerDialerPage />} />
-              <Route path="new-power-dialer" element={<NewPowerDialerPage />} />
               <Route path="client/:id" element={<ClientDetailPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
