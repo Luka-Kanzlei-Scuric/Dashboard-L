@@ -29,17 +29,17 @@ class AircallService {
       
       console.log('Using API Key:', apiKey ? 'API key found (not showing for security)' : 'No API key found');
       
-      // For production or testing
-      if ((!apiKey) && !enableMockMode) {
-        console.warn('Aircall API credentials not configured and mock mode is disabled');
-        return false;
-      }
-      
       // If mock mode is enabled, we can proceed even without credentials
       if (enableMockMode) {
         console.log('Aircall Service running in MOCK MODE - no API credentials required');
         this.initialized = true;
         return true;
+      }
+      
+      // For production or testing - check if we have valid credentials
+      if (!apiKey || apiKey === 'your-aircall-api-key') {
+        console.warn('No valid Aircall API key found and mock mode is disabled');
+        return false;
       }
       
       // Setup axios client with basic auth - Beachte das andere Format, wenn API-Schlüssel bereits das Format "user:pass" hat
@@ -69,6 +69,13 @@ class AircallService {
         return true;
       } catch (connError) {
         console.error('Failed to connect to Aircall API:', connError.message);
+        
+        // In development or with FORCE_COMPLETE_MOCK enabled, fall back to mock mode
+        if (process.env.NODE_ENV !== 'production' || process.env.FORCE_COMPLETE_MOCK === 'true') {
+          console.log('Falling back to mock mode after API connection failure');
+          this.initialized = true;
+          return true;
+        }
         
         // Handle some common server errors more gracefully in production
         if (connError.response && connError.response.status >= 500) {
@@ -160,7 +167,8 @@ class AircallService {
    */
   async checkUserAvailability(userId, useMock = false) {
     try {
-      if (useMock) {
+      // Use mock data if explicitly requested or if mock mode is enabled
+      if (useMock || process.env.ENABLE_MOCK_MODE === 'true') {
         return this._getMockResponse('user.availability');
       }
       
@@ -199,7 +207,8 @@ class AircallService {
         throw new Error('Phone number must be in E.164 format');
       }
       
-      if (useMock) {
+      // Use mock data if explicitly requested or if mock mode is enabled
+      if (useMock || process.env.ENABLE_MOCK_MODE === 'true') {
         return this._getMockResponse('call.create', { to });
       }
       
@@ -270,8 +279,8 @@ class AircallService {
         throw new Error('Call ID is required');
       }
       
-      // Check if it's a mock/fallback call ID
-      if (callId.includes('-')) {
+      // Check if it's a mock/fallback call ID or if we're in mock mode
+      if (callId.includes('-') || process.env.ENABLE_MOCK_MODE === 'true') {
         return this._getMockResponse('call.status', { 
           callId,
           ...mockParams
