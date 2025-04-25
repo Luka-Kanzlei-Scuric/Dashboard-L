@@ -61,7 +61,7 @@ class DialerController {
           },
           jobService: {
             status: jobServiceStatus ? 'ready' : 'warning',
-            redisConnected: jobServiceStatus
+            mode: 'in-memory'
           },
           database: {
             status: 'ready' // We would have thrown earlier if DB was unavailable

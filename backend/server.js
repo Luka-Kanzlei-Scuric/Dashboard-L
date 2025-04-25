@@ -47,19 +47,19 @@ const app = express();
                       aircallInitialized ? 'successfully' : 
                       (process.env.ENABLE_MOCK_MODE === 'true' ? 'in mock mode' : 'with warnings'));
           
-          // Initialize job service with Redis
+          // Initialize job service with in-memory implementation
           try {
             const jobInitialized = await jobService.initialize();
             console.log('Job service initialized:', jobInitialized ? 'successfully' : 'with warnings');
             
             if (!jobInitialized && retryCount < maxRetries) {
-              console.log(`Redis connection failed, retrying in 5 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
+              console.log(`Job service initialization failed, retrying in 5 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
               setTimeout(() => initializeServices(retryCount + 1, maxRetries), 5000);
             }
-          } catch (redisError) {
-            console.error('Redis initialization error:', redisError.message);
+          } catch (jobError) {
+            console.error('Job service initialization error:', jobError.message);
             if (retryCount < maxRetries) {
-              console.log(`Retrying Redis connection in 5 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
+              console.log(`Retrying job service initialization in 5 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
               setTimeout(() => initializeServices(retryCount + 1, maxRetries), 5000);
             } else {
               console.error('Max retries reached. PowerDialer will operate in degraded mode without job processing');

@@ -1,4 +1,3 @@
-import Queue from 'bull';
 import SystemConfig from '../models/SystemConfig.js';
 import aircallService from './aircallService.js';
 import CallQueue from '../models/CallQueue.js';
@@ -12,7 +11,7 @@ dotenv.config();
 /**
  * JobService
  * 
- * Background job processor for PowerDialer using Bull/Redis
+ * Background job processor for PowerDialer using in-memory queues
  * Handles scheduling, queueing, and processing of calls and related tasks
  */
 class JobService {
@@ -25,172 +24,29 @@ class JobService {
     };
     
     console.log('JobService constructor - Environment:', process.env.NODE_ENV || 'development');
-    
-    // Detect Render.com deployment
-    const isRenderDeployment = !!process.env.RENDER || process.env.IS_RENDER === 'true';
-    console.log('Detected environment:', isRenderDeployment ? 'Render.com' : 'Standard deployment');
-    
-    // Configure Redis connection
-    this._configureRedisConnection();
+    console.log('Running in in-memory mode (no Redis)');
   }
   
   /**
-   * Configure Redis connection based on environment
-   * @private
-   */
-  _configureRedisConnection() {
-    console.log('Configuring Redis connection...');
-    
-    // Check for REDIS_URL environment variable (highest priority)
-    if (process.env.REDIS_URL) {
-      const redisUrl = process.env.REDIS_URL;
-      const maskedUrl = this._maskSensitiveUrl(redisUrl);
-      console.log(`Found REDIS_URL in environment: ${maskedUrl}`);
-      
-      // Direct string for Bull
-      this.redisConfig = redisUrl;
-    }
-    // Check for individual Redis configuration values
-    else if (process.env.REDIS_HOST) {
-      console.log(`Found individual Redis config: ${process.env.REDIS_HOST}:${process.env.REDIS_PORT || '6379'}`);
-      
-      // Build config object
-      this.redisConfig = {
-        host: process.env.REDIS_HOST,
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-        password: process.env.REDIS_PASSWORD
-      };
-      
-      // For Render deployments, set a connection timeout
-      if (process.env.RENDER || process.env.IS_RENDER === 'true') {
-        this.redisConfig.connectTimeout = 20000; // 20 seconds
-        this.redisConfig.maxRetriesPerRequest = 5;
-        this.redisConfig.retryStrategy = function(times) {
-          const delay = Math.min(times * 1000, 10000);
-          console.log(`Redis connection retry attempt ${times} with delay ${delay}ms`);
-          return delay;
-        };
-      }
-    }
-    // Fallback for local development
-    else {
-      console.log('No Redis configuration found, using default localhost:6379');
-      this.redisConfig = 'redis://localhost:6379';
-    }
-  }
-  
-  /**
-   * Mask sensitive information in URLs for logging
-   * @private
-   */
-  _maskSensitiveUrl(url) {
-    try {
-      if (!url) return 'undefined';
-      if (typeof url !== 'string') return 'non-string-url';
-      
-      // For redis URLs like redis://user:password@host:port
-      if (url.includes('@')) {
-        const parts = url.split('@');
-        const auth = parts[0].split('://')[1];
-        if (auth.includes(':')) {
-          // Has username:password
-          const prefix = parts[0].split('://')[0];
-          return `${prefix}://****:****@${parts[1]}`;
-        }
-        // Just show prefix and host
-        return `${url.split('://')[0]}://****@${parts[1]}`;
-      }
-      
-      // For simple URLs without auth, just return as is
-      return url;
-    } catch (error) {
-      return 'error-parsing-url';
-    }
-  }
-  
-  /**
-   * Initialize the job processor and connect to Redis
+   * Initialize the job processor using in-memory implementation
    * @returns {Promise<boolean>} Success status
    */
   async initialize() {
     try {
-      console.log('Initializing job service with Redis config...');
+      console.log('Initializing job service with in-memory implementation...');
       
-      // Attempt to check if Redis is reachable
-      let redisAvailable = false;
+      // Set up memory-based queue system
+      this._setupMemoryImplementation();
       
-      try {
-        // Log Redis configuration (safely)
-        if (typeof this.redisConfig === 'string') {
-          console.log('Redis config: URL string (masked)', this._maskSensitiveUrl(this.redisConfig));
-        } else {
-          console.log('Redis config:', {
-            host: this.redisConfig.host,
-            port: this.redisConfig.port,
-            hasPassword: !!this.redisConfig.password
-          });
-        }
-      } catch (error) {
-        console.error('Error checking Redis configuration:', error.message);
-      }
+      // Set up processors
+      this._setupProcessors();
       
-      console.log('Creating Bull queues with Redis config...');
+      // Set up recurring jobs
+      this._setupRecurringJobs();
       
-      // Set up Bull queue options with error handlers
-      const queueOptions = {
-        redis: this.redisConfig,
-        defaultJobOptions: {
-          attempts: 5,
-          backoff: {
-            type: 'exponential',
-            delay: 5000
-          },
-          removeOnComplete: 500,
-          removeOnFail: 200,
-          timeout: 60000
-        }
-      };
-      
-      // Create queues with more robust error handling
-      let queuesCreated = false;
-      
-      try {
-        this.queues.calls = new Queue('powerdialer-calls', queueOptions);
-        console.log('Created calls queue successfully');
-        
-        this.queues.webhooks = new Queue('powerdialer-webhooks', queueOptions);
-        console.log('Created webhooks queue successfully');
-        
-        this.queues.maintenance = new Queue('powerdialer-maintenance', queueOptions);
-        console.log('Created maintenance queue successfully');
-        
-        queuesCreated = true;
-      } catch (error) {
-        console.error('Failed to create queues:', error.message);
-        
-        // Try to create a fallback in-memory queue system
-        // Always enable in-memory fallback when Redis fails to connect
-        console.log('Attempting to use in-memory queue fallback');
-        this._setupMemoryFallback();
-        queuesCreated = true;
-        console.log('In-memory queue fallback initialized successfully');
-      }
-      
-      if (queuesCreated) {
-        // Set up processors
-        this._setupProcessors();
-        
-        // Set up recurring jobs
-        this._setupRecurringJobs();
-        
-        this.initialized = true;
-        console.log('Job service initialized successfully');
-        return true;
-      } else {
-        this.initialized = false;
-        console.error('Job service could not be initialized due to Redis connection issues');
-        return false;
-      }
+      this.initialized = true;
+      console.log('Job service initialized successfully (in-memory mode)');
+      return true;
     } catch (error) {
       console.error('Failed to initialize job service:', error.message);
       this.initialized = false;
@@ -213,23 +69,86 @@ class JobService {
   }
   
   /**
-   * Set up memory fallback when Redis is not available
+   * Set up in-memory implementation
    * This is a simplified version that mimics the Queue interface
    * but stores jobs in memory (will be lost on restart)
    * @private
    */
-  _setupMemoryFallback() {
-    console.log('Setting up in-memory queue fallback...');
+  _setupMemoryImplementation() {
+    console.log('Setting up in-memory queue implementation...');
     
     // Simple in-memory queues
     const createMemoryQueue = (name) => {
       const jobs = [];
       const eventHandlers = {};
+      const recurringJobs = new Map();
+      
+      // Simulate recurring jobs with setInterval
+      const setupRecurring = (jobName, data, options) => {
+        if (options.repeat && options.repeat.cron) {
+          // Simple cron parser - this is a very basic implementation!
+          // For simplicity, we'll just turn all crons into fixed intervals
+          let intervalMinutes = 5; // Default 5 minutes
+          
+          // Parse common patterns (this is simplified)
+          if (options.repeat.cron.includes('* * * * *')) {
+            intervalMinutes = 1; // Every minute
+          } else if (options.repeat.cron.includes('*/3 * * * *')) {
+            intervalMinutes = 3; // Every 3 minutes
+          } else if (options.repeat.cron.includes('*/5 * * * *')) {
+            intervalMinutes = 5; // Every 5 minutes
+          } else if (options.repeat.cron.includes('*/10 * * * *')) {
+            intervalMinutes = 10; // Every 10 minutes
+          } else if (options.repeat.cron.includes('*/30 * * * *')) {
+            intervalMinutes = 30; // Every 30 minutes
+          } else if (options.repeat.cron.includes('0 * * * *')) {
+            intervalMinutes = 60; // Hourly
+          } else if (options.repeat.cron.includes('0 */4 * * *')) {
+            intervalMinutes = 240; // Every 4 hours
+          } else if (options.repeat.cron.includes('0 2 * * *')) {
+            intervalMinutes = 1440; // Daily at 2am
+          }
+          
+          console.log(`[Memory Queue ${name}] Setting up recurring job ${jobName} with interval ${intervalMinutes} minutes`);
+          
+          // Convert to milliseconds
+          const intervalMs = intervalMinutes * 60 * 1000;
+          
+          // Cancel existing interval if it exists
+          if (recurringJobs.has(options.jobId)) {
+            clearInterval(recurringJobs.get(options.jobId));
+          }
+          
+          // Set up interval
+          const intervalId = setInterval(() => {
+            console.log(`[Memory Queue ${name}] Running recurring job ${jobName}`);
+            jobs.push({ 
+              id: Date.now() + Math.random().toString(36).substring(2, 10),
+              name: jobName, 
+              data,
+              options,
+              timestamp: Date.now()
+            });
+          }, intervalMs);
+          
+          // Store interval ID for later cleanup
+          recurringJobs.set(options.jobId, intervalId);
+          
+          return true;
+        }
+        return false;
+      };
       
       const queue = {
         name,
         add: (jobName, data, options = {}) => {
           console.log(`[Memory Queue ${name}] Adding job ${jobName}`);
+          
+          // Check if this is a recurring job
+          if (options.repeat) {
+            return setupRecurring(jobName, data, options);
+          }
+          
           const job = { 
             id: Date.now() + Math.random().toString(36).substring(2, 10),
             name: jobName, 
@@ -288,6 +207,12 @@ class JobService {
           return Promise.resolve();
         },
         close: () => {
+          // Clear all intervals
+          for (const intervalId of recurringJobs.values()) {
+            clearInterval(intervalId);
+          }
+          recurringJobs.clear();
+          jobs.length = 0;
           return Promise.resolve();
         }
       };
@@ -300,7 +225,7 @@ class JobService {
     this.queues.webhooks = createMemoryQueue('powerdialer-webhooks');
     this.queues.maintenance = createMemoryQueue('powerdialer-maintenance');
     
-    console.log('In-memory queue fallback set up successfully');
+    console.log('In-memory queue implementation set up successfully');
   }
   
   /**
@@ -317,7 +242,7 @@ class JobService {
         return await this._processCallQueueItem(queueItemId, userId);
       } catch (error) {
         console.error(`Error processing call queue item ${queueItemId}:`, error.message);
-        throw error; // Rethrow to trigger Bull's retry mechanism
+        throw error; // Rethrow to trigger retry mechanism
       }
     });
     
@@ -554,7 +479,7 @@ class JobService {
         userStatus.aircall.numberId,
         queueItem.phoneNumber,
         {
-          clientId: queueItem.client._id,
+          clientId: queueItem.client?._id,
           queueItemId: queueItem._id
         }
       );
@@ -566,7 +491,7 @@ class JobService {
       // Update user status
       userStatus.startCall(
         callResponse.id, 
-        queueItem.client._id, 
+        queueItem.client?._id, 
         queueItem.phoneNumber
       );
       await userStatus.save();
@@ -574,7 +499,7 @@ class JobService {
       // Create call history record
       const callHistory = new CallHistory({
         callId: callResponse.id,
-        client: queueItem.client._id,
+        client: queueItem.client?._id,
         agent: userStatus.user,
         phoneNumber: queueItem.phoneNumber,
         direction: 'outbound',
@@ -713,6 +638,7 @@ class JobService {
       
       const status = {
         initialized: this.initialized,
+        mode: 'in-memory',
         queues: {}
       };
       
