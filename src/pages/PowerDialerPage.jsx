@@ -362,16 +362,27 @@ const PowerDialerPage = () => {
       
       console.log(`📱 Starte Anruf an ${number}...`);
       
-      // Direkte Anfrage an den einfachen Aircall-Endpunkt
+      // Direkte Anfrage an den einfachen Aircall-Endpunkt mit vollem URL-Pfad
       try {
-        const response = await axios.post(`/api/direct-aircall`, {
+        console.log('Sende Anfrage an: /api/direct-aircall mit Nummer:', number);
+        
+        // Füge HTTP-Header für Debugging hinzu
+        const response = await axios.post('/api/direct-aircall', {
           phoneNumber: number
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-By': 'PowerDialer'
+          }
         });
         
-        console.log("✅ Anruf gestartet");
+        console.log("✅ Anruf gestartet", response.status, response.data);
+        
+        // Bei Erfolg Lade-Indikator zurücksetzen
+        setIsCallInProgress(true);
         
         // Mock call state um UI zu aktualisieren
-        const mockCallId = Date.now().toString() + '-' + Math.floor(Math.random() * 10000);
+        const mockCallId = response.data?.callId || (Date.now().toString() + '-' + Math.floor(Math.random() * 10000));
         
         // UI-Updates
         if (showManualDialer) setShowManualDialer(false);
@@ -395,7 +406,26 @@ const PowerDialerPage = () => {
       }
     } catch (error) {
       console.error('❌ Fehler beim Starten des Anrufs:', error);
-      setCallError(error.message || 'Fehler beim Starten des Anrufs');
+      
+      // Detailliertere Fehlerdiagnose
+      if (error.response) {
+        // Der Server hat geantwortet, aber mit Fehler
+        console.error('Server Antwort mit Fehler:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+        setCallError(`Serverfehler: ${error.response.status} - ${error.response.data?.message || 'Unbekannter Fehler'}`);
+      } else if (error.request) {
+        // Die Anfrage wurde gesendet, aber keine Antwort erhalten
+        console.error('Keine Antwort vom Server erhalten');
+        setCallError('Keine Antwort vom Server erhalten. Bitte überprüfen Sie Ihre Netzwerkverbindung.');
+      } else {
+        // Fehler bei der Einrichtung der Anfrage
+        console.error('Fehler beim Einrichten der Anfrage:', error.message);
+        setCallError(`Anfrage konnte nicht gesendet werden: ${error.message}`);
+      }
+      
       setIsCallInProgress(false);
       
       // Bereinige eventuelle hängende Anrufe

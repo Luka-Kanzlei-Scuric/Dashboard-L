@@ -69,15 +69,17 @@ const NewPowerDialerPage = () => {
       
       console.log(`Starte direkten Anruf an ${formattedNumber}`);
       
-      // Direkter Anruf über vereinfachten Aircall-Endpunkt
-      const response = await axios.post(`/api/direct-aircall`, {
+      console.log('Sende Anruf an: /api/direct-aircall mit Nummer:', formattedNumber);
+      
+      // Direkter Anruf über vereinfachten Aircall-Endpunkt mit vollem URL-Pfad
+      const response = await axios.post('/api/direct-aircall', {
         phoneNumber: formattedNumber
       });
       
-      console.log('Anruf-Antwort:', response);
+      console.log('Anruf-Antwort:', response.status, response.data);
       
-      // Erfolgreicher Anruf (204 No Content ODER 200 OK bedeutet, der Anruf wurde akzeptiert)
-      if (response.status === 204 || response.status === 200) {
+      // Erfolgreicher Anruf (200 OK bedeutet, der Anruf wurde akzeptiert)
+      if (response.status === 200) {
         // Starte Call-Tracking
         setCallStatus('ringing');
         setCallStartTime(new Date());
@@ -104,9 +106,28 @@ const NewPowerDialerPage = () => {
       }
     } catch (error) {
       console.error('Fehler beim Anruf:', error);
-      setError(error.response?.data?.message || error.message || 'Fehler beim Starten des Anrufs');
+      // Detailliertere Fehlerdiagnose
+      if (error.response) {
+        // Der Server hat geantwortet, aber mit Fehler
+        console.error('Server Antwort mit Fehler:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+        setError(`Serverfehler: ${error.response.status} - ${error.response.data?.message || 'Unbekannter Fehler'}`);
+      } else if (error.request) {
+        // Die Anfrage wurde gesendet, aber keine Antwort erhalten
+        console.error('Keine Antwort vom Server erhalten');
+        setError('Keine Antwort vom Server erhalten. Bitte überprüfen Sie Ihre Netzwerkverbindung oder kontaktieren Sie den Administrator.');
+      } else {
+        // Fehler bei der Einrichtung der Anfrage
+        console.error('Fehler beim Einrichten der Anfrage:', error.message);
+        setError(`Anfrage konnte nicht gesendet werden: ${error.message}`);
+      }
+      
       setCallStatus('failed');
     } finally {
+      // Auf jeden Fall Ladestatus zurücksetzen
       setLoading(false);
     }
   };

@@ -258,46 +258,53 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// DIREKTER AIRCALL ENDPUNKT - Vereinfachte Implementation
+// DIREKTER AIRCALL ENDPUNKT - SEHR vereinfachte Implementation mit Form-Data
 app.post('/api/direct-aircall', async (req, res) => {
   try {
+    // Log Request Details
+    console.log('Received direct-aircall request:');
+    console.log('- Headers:', req.headers);
+    console.log('- Body:', req.body);
+    
     const { phoneNumber } = req.body;
     
     if (!phoneNumber) {
+      console.error('Keine Telefonnummer angegeben!');
       return res.status(400).json({
         success: false,
         message: 'Telefonnummer ist erforderlich'
       });
     }
     
-    console.log(`Direkte Aircall-Anfrage für Nummer: ${phoneNumber}`);
+    console.log(`⚡ Direkte Aircall-Anfrage für Nummer: ${phoneNumber}`);
     
-    // Aircall API Konfiguration
-    const AIRCALL_API_KEY = '741a32c4ab34d47a2d2dd929efbfb925:090aaff4ece9c050715ef58bd38d149d';
+    // Aircall API Konfiguration - genau wie in deinem curl Beispiel
+    const apiAuth = 'Basic NzQxYTMyYzRhYjM0ZDQ3YTJkMmRkOTI5ZWZiZmI5MjU6MDkwYWFmZjRlY2U5YzA1MDcxNWVmNThiZDM4ZDE0OWQ=';
     const AIRCALL_USER_ID = '1527216';
     const AIRCALL_NUMBER_ID = '967647';
     
-    const [apiId, apiToken] = AIRCALL_API_KEY.split(':');
+    // FormData-Ansatz genau wie in deinem curl-Beispiel
+    const FormData = (await import('form-data')).default;
+    const formData = new FormData();
+    formData.append('number_id', AIRCALL_NUMBER_ID);
+    formData.append('to', phoneNumber);
     
     try {
-      // Direkter Anruf über Aircall API
+      // Direkter Anruf über Aircall API mit FormData
+      console.log(`Sende Anfrage an https://api.aircall.io/v1/users/${AIRCALL_USER_ID}/calls`);
+      console.log('Mit FormData:', { number_id: AIRCALL_NUMBER_ID, to: phoneNumber });
+      
       const response = await axios({
         method: 'post',
         url: `https://api.aircall.io/v1/users/${AIRCALL_USER_ID}/calls`,
-        data: {
-          number_id: AIRCALL_NUMBER_ID,
-          to: phoneNumber
-        },
-        auth: {
-          username: apiId,
-          password: apiToken
-        },
+        data: formData,
         headers: {
-          'Content-Type': 'application/json'
+          'Authorization': apiAuth,
+          'Content-Type': `multipart/form-data; boundary=${formData._boundary}`
         }
       });
       
-      console.log('Aircall API Response:', response.status);
+      console.log('✅ Aircall API Response:', response.status);
       
       return res.status(200).json({
         success: true,
@@ -305,18 +312,54 @@ app.post('/api/direct-aircall', async (req, res) => {
         callId: `call-${Date.now()}`
       });
     } catch (aircallError) {
-      console.error('Fehler bei Aircall API:', aircallError.response?.data || aircallError.message);
-      return res.status(500).json({
-        success: false,
-        message: 'Fehler beim Starten des Anrufs',
-        error: aircallError.response?.data || aircallError.message
-      });
+      console.error('❌ Fehler bei Aircall API:');
+      console.error('- Status:', aircallError.response?.status);
+      console.error('- Daten:', aircallError.response?.data);
+      console.error('- Nachricht:', aircallError.message);
+      
+      // Versuche alternativen Ansatz mit JSON falls FormData fehlschlägt
+      try {
+        console.log('Versuche alternativen Ansatz mit JSON...');
+        
+        const jsonResponse = await axios({
+          method: 'post',
+          url: `https://api.aircall.io/v1/users/${AIRCALL_USER_ID}/calls`,
+          data: {
+            number_id: AIRCALL_NUMBER_ID,
+            to: phoneNumber
+          },
+          headers: {
+            'Authorization': apiAuth,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log('✅ Alternative Aircall API Response:', jsonResponse.status);
+        
+        return res.status(200).json({
+          success: true,
+          message: 'Anruf erfolgreich initiiert (alternativer Ansatz)',
+          callId: `call-${Date.now()}`
+        });
+      } catch (alternativeError) {
+        console.error('❌ Auch alternativer Ansatz fehlgeschlagen:');
+        console.error('- Status:', alternativeError.response?.status);
+        console.error('- Daten:', alternativeError.response?.data);
+        
+        return res.status(500).json({
+          success: false,
+          message: 'Fehler beim Starten des Anrufs',
+          error: aircallError.response?.data || aircallError.message,
+          alternativeError: alternativeError.response?.data || alternativeError.message
+        });
+      }
     }
   } catch (error) {
-    console.error('Server Error:', error);
+    console.error('❌ Allgemeiner Server Error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Serverfehler'
+      message: 'Serverfehler',
+      error: error.message
     });
   }
 });
