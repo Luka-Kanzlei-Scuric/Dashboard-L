@@ -45,11 +45,12 @@ const NewPowerDialerPage = () => {
     if (e) e.preventDefault();
     
     try {
+      // UI-Status zurücksetzen
       setLoading(true);
       setError(null);
       setCallStatus(null);
       
-      // Validiere Eingaben
+      // 1. Eingaben validieren
       if (!phoneNumber) {
         setError('Bitte geben Sie eine Telefonnummer ein');
         return;
@@ -60,106 +61,175 @@ const NewPowerDialerPage = () => {
         return;
       }
       
-      // Validiere Telefonnummer (einfaches E.164 Format: +49...)
+      // 2. Telefonnummer im E.164-Format formatieren (wichtig für Aircall)
       const formattedNumber = formatE164Number(phoneNumber);
       if (!formattedNumber) {
         setError('Ungültiges Telefonnummernformat. Bitte im Format +49... eingeben.');
         return;
       }
       
-      console.log(`Starte direkten Anruf an ${formattedNumber}`);
+      // 3. API-Anfrage vorbereiten und senden
+      console.log(`✨ Starte direkten Anruf an ${formattedNumber}`);
+      console.log('📞 Sende Anruf an: /api/direct-aircall mit Telefonnummer:', formattedNumber);
       
-      console.log('Sende Anruf an: /api/direct-aircall mit Nummer:', formattedNumber);
+      // 4. API-Anfrage durchführen
+      setCallStatus('initiating');
       
-      // Direkter Anruf über vereinfachten Aircall-Endpunkt mit vollem URL-Pfad
       const response = await axios.post('/api/direct-aircall', {
         phoneNumber: formattedNumber
+      }, {
+        // Lange Timeout-Zeit setzen, da Aircall-API langsam sein kann
+        timeout: 20000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
-      console.log('Anruf-Antwort:', response.status, response.data);
+      console.log('🟢 Anruf-Antwort vom Server:', response.status, response.data);
       
-      // Erfolgreicher Anruf (200 OK bedeutet, der Anruf wurde akzeptiert)
-      if (response.status === 200) {
-        // Starte Call-Tracking
+      // 5. Erfolgreiche Antwort verarbeiten
+      if (response.status === 200 && response.data.success) {
+        console.log('🟢 Anruf erfolgreich gestartet:', response.data);
+        
+        // UI-Statusanzeige aktualisieren
         setCallStatus('ringing');
         setCallStartTime(new Date());
         
-        // Füge zur Call-Historie hinzu
+        // Anruf zur Historie hinzufügen
         const newCall = {
-          id: Math.random().toString(36).substring(2, 15),
+          id: response.data.callId || Math.random().toString(36).substring(2, 15),
           phoneNumber: formattedNumber,
           userId: aircallConfig.userId,
           numberId: aircallConfig.numberId,
           startTime: new Date(),
-          status: 'started'
+          status: 'started',
+          apiResponse: response.data
         };
         setCallHistory(prev => [newCall, ...prev]);
         
-        // Zeige Erfolgsmeldung
+        // Erfolgsmeldung anzeigen
         setShowSuccessMessage(true);
         setTimeout(() => setShowSuccessMessage(false), 3000);
         
-        // Leere das Telefonnummernfeld
+        // Eingabefeld zurücksetzen
         setPhoneNumber('');
       } else {
-        throw new Error(`Unerwartete Antwort vom Server: ${response.status}`);
+        console.warn('⚠️ Unerwartete Antwort vom Server:', response);
+        throw new Error(
+          response.data.message || 
+          `Unerwartete Antwort vom Server: ${response.status}`
+        );
       }
     } catch (error) {
-      console.error('Fehler beim Anruf:', error);
-      // Detailliertere Fehlerdiagnose
+      console.error('🔴 Fehler beim Anruf:', error);
+      
+      // Detaillierte Fehlerdiagnose für besseres Debugging
       if (error.response) {
-        // Der Server hat geantwortet, aber mit Fehler
-        console.error('Server Antwort mit Fehler:', {
+        // Der Server hat geantwortet, aber mit Fehlercode
+        console.error('Server-Antwort mit Fehler:', {
           status: error.response.status,
           data: error.response.data,
           headers: error.response.headers
         });
-        setError(`Serverfehler: ${error.response.status} - ${error.response.data?.message || 'Unbekannter Fehler'}`);
+        
+        // Benutzerdefinierte Fehlermeldung basierend auf Serverantwort
+        let errorMessage = 'Fehler beim Starten des Anrufs';
+        
+        if (error.response.data && error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.response.data && error.response.data.error) {
+          const errorData = error.response.data.error;
+          if (typeof errorData === 'object') {
+            // Erweiterte Fehlerstruktur für mehrere Versuche
+            errorMessage = 'Alle Verbindungsversuche zu Aircall fehlgeschlagen.';
+          } else {
+            errorMessage = String(errorData);
+          }
+        }
+        
+        setError(`Server-Fehler: ${errorMessage}`);
       } else if (error.request) {
-        // Die Anfrage wurde gesendet, aber keine Antwort erhalten
-        console.error('Keine Antwort vom Server erhalten');
-        setError('Keine Antwort vom Server erhalten. Bitte überprüfen Sie Ihre Netzwerkverbindung oder kontaktieren Sie den Administrator.');
+        // Anfrage gesendet, aber keine Antwort erhalten
+        console.error('Keine Antwort vom Server erhalten:', error.request);
+        setError('Keine Antwort vom Server erhalten. Bitte überprüfen Sie Ihre Internetverbindung oder kontaktieren Sie den Administrator.');
       } else {
-        // Fehler bei der Einrichtung der Anfrage
+        // Fehler beim Einrichten der Anfrage
         console.error('Fehler beim Einrichten der Anfrage:', error.message);
-        setError(`Anfrage konnte nicht gesendet werden: ${error.message}`);
+        setError(`Fehler beim Senden der Anfrage: ${error.message}`);
       }
       
+      // UI-Status aktualisieren
       setCallStatus('failed');
+      
+      // Anruf zur Historie hinzufügen (als fehlgeschlagen)
+      const failedCall = {
+        id: Math.random().toString(36).substring(2, 15),
+        phoneNumber: formatE164Number(phoneNumber) || phoneNumber,
+        userId: aircallConfig.userId,
+        numberId: aircallConfig.numberId,
+        startTime: new Date(),
+        status: 'failed',
+        error: error.message || 'Unbekannter Fehler'
+      };
+      setCallHistory(prev => [failedCall, ...prev]);
     } finally {
-      // Auf jeden Fall Ladestatus zurücksetzen
+      // Immer den Ladestatus zurücksetzen, egal ob Erfolg oder Fehler
       setLoading(false);
     }
   };
   
   /**
-   * Formatiere eine Telefonnummer im E.164-Format
+   * Formatiere eine Telefonnummer ins E.164-Format
+   * E.164 ist das international standardisierte Format für Telefonnummern:
+   * - beginnt immer mit +
+   * - gefolgt von Ländervorwahl (Deutschland 49)
+   * - dann die Rufnummer ohne führende 0
+   * - keine Klammern, Bindestriche oder Leerzeichen
+   * 
+   * Beispiele:
+   * - +49123456789 (deutsches Festnetz)
+   * - +491701234567 (deutsche Mobilnummer)
    */
   const formatE164Number = (number) => {
+    if (!number) return null;
+    
+    // Entferne alle Leerzeichen, Klammern, Bindestriche, etc.
+    const digitsOnly = number.replace(/\s+/g, '');
+    
     // Prüfe ob die Nummer bereits korrekt mit + beginnt
-    if (number.startsWith('+')) {
+    if (digitsOnly.startsWith('+')) {
       // Entferne alle Nicht-Ziffern außer dem führenden +
-      let cleaned = '+' + number.substring(1).replace(/\D/g, '');
+      let cleaned = '+' + digitsOnly.substring(1).replace(/\D/g, '');
       
-      // Einfache Validierung für E.164 Format
-      const e164Regex = /^\+[1-9]\d{1,14}$/;
+      // Validiere E.164 Format: + gefolgt von 7-15 Ziffern
+      const e164Regex = /^\+[1-9]\d{6,14}$/;
       return e164Regex.test(cleaned) ? cleaned : null;
     }
     
-    // Entferne alle Nicht-Ziffern
-    let cleaned = number.replace(/\D/g, '');
+    // Behandle Nummern ohne +
+    let cleaned = digitsOnly.replace(/\D/g, '');
     
-    // Wenn Nummer mit 0 beginnt, ersetze sie mit 49
+    // Deutsche Nummern: Mit 0 beginnend -> durch +49 ersetzen
     if (cleaned.startsWith('0')) {
       cleaned = '49' + cleaned.substring(1);
+    } 
+    // Wenn keine 0, aber vermutlich deutsche Nummer, dann 49 voranstellen
+    else if (!cleaned.startsWith('49') && cleaned.length <= 11) {
+      cleaned = '49' + cleaned;
     }
     
     // Füge + hinzu
     cleaned = '+' + cleaned;
     
-    // Einfache Validierung für E.164 Format
-    const e164Regex = /^\+[1-9]\d{1,14}$/;
-    return e164Regex.test(cleaned) ? cleaned : null;
+    // Finale Validierung für E.164 Format
+    const e164Regex = /^\+[1-9]\d{6,14}$/;
+    if (e164Regex.test(cleaned)) {
+      console.log(`✅ Nummer ${number} erfolgreich zu E.164 Format konvertiert: ${cleaned}`);
+      return cleaned;
+    } else {
+      console.warn(`❌ Konnte Nummer ${number} nicht ins E.164 Format konvertieren`);
+      return null;
+    }
   };
   
   /**
