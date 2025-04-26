@@ -25,7 +25,7 @@ const aircallService = {
       }
 
       // Get Aircall API key from environment variables
-      const aircallApiKey = process.env.AIRCALL_API_KEY;
+      const aircallApiKey = process.env.AIRCALL_API_KEY || '741a32c4ab34d47a2d2dd929efbfb925:090aaff4ece9c050715ef58bd38d149d';
       
       if (!aircallApiKey) {
         throw new Error('Aircall API key not configured');
@@ -91,7 +91,7 @@ const aircallService = {
    */
   getCallDetails: async (callId) => {
     try {
-      const aircallApiKey = process.env.AIRCALL_API_KEY;
+      const aircallApiKey = process.env.AIRCALL_API_KEY || '741a32c4ab34d47a2d2dd929efbfb925:090aaff4ece9c050715ef58bd38d149d';
       
       if (!aircallApiKey) {
         throw new Error('Aircall API key not configured');
