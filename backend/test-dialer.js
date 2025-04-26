@@ -1,109 +1,58 @@
-// test-dialer.js
-import fetch from 'node-fetch';
-import dotenv from 'dotenv';
+/**
+ * Test script for the dialer service
+ * 
+ * Usage: node test-dialer.js <phone_number>
+ * Example: node test-dialer.js +15551234567
+ */
 
-// Lade die Umgebungsvariablen
+import dotenv from 'dotenv';
+import dialerService from './src/services/dialer/index.js';
+
+// Load environment variables
 dotenv.config();
 
-// Haupt-Test-Funktion für die PowerDialer API
-const testPowerDialer = async () => {
+// Get phone number from command line argument
+const phoneNumber = process.argv[2];
+
+if (!phoneNumber) {
+  console.error('Please provide a phone number to call');
+  console.error('Usage: node test-dialer.js <phone_number>');
+  console.error('Example: node test-dialer.js +15551234567');
+  process.exit(1);
+}
+
+// Validate phone number format (E.164)
+const e164Regex = /^\+[1-9]\d{1,14}$/;
+if (!e164Regex.test(phoneNumber)) {
+  console.error('Phone number must be in E.164 format (e.g. +18001231234)');
+  process.exit(1);
+}
+
+// Test making a call
+const testDialer = async () => {
   try {
-    // 1. PowerDialer initialisieren
-    console.log('1. PowerDialer initialisieren');
-    const initResponse = await fetch('http://localhost:5000/api/dialer/initialize', {
-      method: 'POST'
-    });
-    const initData = await initResponse.json();
-    console.log('Initialisierung:', initData);
+    console.log('Initializing dialer service...');
     
-    // Verwende manuell eingefügte Testwerte für die API
-    // In der Produktion würden diese Werte vom Frontend kommen
-    const testUserId = '647f14d8e1c42b47a4ca2bb2'; // Beispiel-ID, du musst diese anpassen
-    const aircallUserId = '1527216'; 
-    const numberId = '967647';
+    // Initialize dialer service
+    await dialerService.initialize();
     
-    // 2. PowerDialer für einen Agenten starten
-    console.log('\n2. PowerDialer für einen Agenten starten');
-    const startResponse = await fetch(`http://localhost:5000/api/dialer/${testUserId}/start`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        aircallUserId: aircallUserId.toString(),
-        numberId: numberId.toString()
-      })
-    });
+    console.log(`Making test call to ${phoneNumber}...`);
     
-    const startData = await startResponse.json();
-    console.log('PowerDialer Start:', startData);
+    // Make the call
+    const callResult = await dialerService.makeCall(phoneNumber);
     
-    if (startData.success) {
-      console.log('PowerDialer erfolgreich gestartet!');
-    } else {
-      console.error('Fehler beim Starten des PowerDialers:', startData.message);
-      // Hier trotzdem weitermachen, um andere Tests auszuführen
-    }
+    console.log('Call initiated successfully:');
+    console.log(JSON.stringify(callResult, null, 2));
     
-    // 3. Status des PowerDialers abrufen
-    console.log('\n3. Status des PowerDialers abrufen');
-    const statusResponse = await fetch(`http://localhost:5000/api/dialer/${testUserId}/status`);
-    const statusData = await statusResponse.json();
-    console.log('PowerDialer Status:', statusData);
-    
-    // 4. Direkt einen Anruf starten mit dem Aircall API Proxy
-    console.log('\n4. Direkt einen Anruf starten');
-    const dialResponse = await fetch(`http://localhost:5000/api/aircall/users/${aircallUserId}/dial`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        to: '+491771234567' // Testnummer im E.164-Format
-      })
-    });
-    
-    // Da die Antwort ein 204 No Content ist, gibt es keinen JSON-Body
-    console.log('Dial-Anruf Statuscode:', dialResponse.status);
-    
-    if (dialResponse.status === 204) {
-      console.log('Anruf erfolgreich initiiert');
-    } else {
-      const dialData = await dialResponse.text();
-      console.error('Fehler beim Starten des Anrufs:', dialData);
-    }
-    
-    // 5. Einige Nummern zur Anrufwarteschlange hinzufügen
-    console.log('\n5. Telefonnummern zur Anrufwarteschlange hinzufügen');
-    const queueResponse = await fetch('http://localhost:5000/api/dialer/queue', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        phoneNumbers: [
-          '+491771234567',
-          '+491771234568',
-          '+491771234569'
-        ],
-        userId: testUserId,
-        options: {
-          priority: 5,
-          notes: 'Testanrufe über API'
-        }
-      })
-    });
-    
-    const queueData = await queueResponse.json();
-    console.log('Nummern zur Warteschlange hinzugefügt:', queueData);
-    
-    // Zeige, dass die Tests abgeschlossen sind
-    console.log('\nAlle Tests abgeschlossen!');
-    
+    console.log('Test completed successfully');
   } catch (error) {
-    console.error('Fehler beim Testen des PowerDialers:', error);
+    console.error('Error testing dialer:', error.message);
+    if (error.response) {
+      console.error('API Response:', error.response.data);
+      console.error('Status:', error.response.status);
+    }
   }
 };
 
-// Führe die Tests aus
-testPowerDialer();
+// Run the test
+testDialer();

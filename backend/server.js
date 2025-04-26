@@ -8,10 +8,6 @@ import Client from './src/models/Client.js';
 import emailService from './src/services/emailService.js';
 import fileService from './src/services/fileService.js';
 import authRoutes from './src/routes/authRoutes.js';
-import dialerRoutes from './src/routes/dialerRoutes.js';
-import aircallService from './src/services/aircallService.js';
-import jobService from './src/services/jobService.js';
-import SystemConfig from './src/models/SystemConfig.js';
 import { createInitialAdmin } from './src/controllers/authController.js';
 
 // Load env variables
@@ -30,56 +26,6 @@ const app = express();
     
     // Create initial admin user if none exists
     await createInitialAdmin();
-    
-    // Initialize PowerDialer services with production-ready error handling
-    console.log('Initializing PowerDialer services for environment:', process.env.NODE_ENV || 'development');
-    try {
-      // Ensure default system configurations exist
-      await SystemConfig.ensureDefaultConfigs();
-      console.log('System configs initialized successfully');
-      
-      // Initialize services with retry logic for production environments
-      const initializeServices = async (retryCount = 0, maxRetries = 3) => {
-        try {
-          // Initialize Aircall service first
-          const aircallInitialized = await aircallService.initialize();
-          console.log('Aircall service initialized:', 
-                      aircallInitialized ? 'successfully' : 
-                      (process.env.ENABLE_MOCK_MODE === 'true' ? 'in mock mode' : 'with warnings'));
-          
-          // Initialize job service with in-memory implementation
-          try {
-            const jobInitialized = await jobService.initialize();
-            console.log('Job service initialized:', jobInitialized ? 'successfully' : 'with warnings');
-            
-            if (!jobInitialized && retryCount < maxRetries) {
-              console.log(`Job service initialization failed, retrying in 5 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
-              setTimeout(() => initializeServices(retryCount + 1, maxRetries), 5000);
-            }
-          } catch (jobError) {
-            console.error('Job service initialization error:', jobError.message);
-            if (retryCount < maxRetries) {
-              console.log(`Retrying job service initialization in 5 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
-              setTimeout(() => initializeServices(retryCount + 1, maxRetries), 5000);
-            } else {
-              console.error('Max retries reached. PowerDialer will operate in degraded mode without job processing');
-            }
-          }
-        } catch (error) {
-          console.error('Service initialization error:', error.message);
-          if (retryCount < maxRetries) {
-            console.log(`Retrying service initialization in 5 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
-            setTimeout(() => initializeServices(retryCount + 1, maxRetries), 5000);
-          }
-        }
-      };
-      
-      // Start service initialization
-      await initializeServices();
-    } catch (serviceError) {
-      console.error('Error initializing PowerDialer services:', serviceError);
-      // Continue server startup even if services fail to initialize - endpoints will report errors if used
-    }
   } catch (err) {
     console.error('MongoDB connection error:', err);
     console.log('Retrying in 5 seconds...');
@@ -167,6 +113,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(fileService.uploadsBaseDir));
+
+// Import routes
+import dialerRoutes from './src/routes/dialerRoutes.js';
 
 // Auth routes
 app.use('/api/auth', authRoutes);
@@ -300,7 +249,7 @@ const queueClientChange = (clientData, changeType) => {
 
 // API ROUTES
 
-// Aircall API proxy routes
+// Aircall direct API routes
 app.post('/api/aircall/users/:id/calls', async (req, res) => {
   try {
     const { id } = req.params;
@@ -323,25 +272,20 @@ app.post('/api/aircall/users/:id/calls', async (req, res) => {
     }
     
     // Get Aircall API key from environment variable
-    const aircallApiKey = process.env.AIRCALL_API_KEY;
-    
-    if (!aircallApiKey) {
-      return res.status(500).json({
-        success: false,
-        message: 'Aircall API key not configured'
-      });
-    }
+    const aircallApiKey = process.env.AIRCALL_API_KEY || '741a32c4ab34d47a2d2dd929efbfb925:090aaff4ece9c050715ef58bd38d149d';
     
     console.log('Using Aircall API key to make call (masked):', aircallApiKey ? '*******' : 'Not found');
     
     // Make request to Aircall API
+    const [apiId, apiToken] = aircallApiKey.split(':');
+    
     const response = await axios.post(
       `https://api.aircall.io/v1/users/${id}/calls`,
       { number_id, to },
       {
         auth: {
-          username: aircallApiKey.split(':')[0],
-          password: aircallApiKey.split(':')[1]
+          username: apiId,
+          password: apiToken
         },
         headers: {
           'Content-Type': 'application/json'
@@ -367,150 +311,6 @@ app.post('/api/aircall/users/:id/calls', async (req, res) => {
           message: 'User not available'
         });
       }
-    }
-    
-    return res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-});
-
-app.post('/api/aircall/users/:id/dial', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { to } = req.body;
-    
-    if (!to) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'to parameter is required' 
-      });
-    }
-    
-    // Validate phone number is in E.164 format
-    const e164Regex = /^\+[1-9]\d{1,14}$/;
-    if (!e164Regex.test(to)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number must be in E.164 format (e.g. +18001231234)'
-      });
-    }
-    
-    // Get Aircall API key from environment variable
-    const aircallApiKey = process.env.AIRCALL_API_KEY;
-    
-    if (!aircallApiKey) {
-      return res.status(500).json({
-        success: false,
-        message: 'Aircall API key not configured'
-      });
-    }
-    
-    console.log('Using Aircall API key to dial (masked):', aircallApiKey ? '*******' : 'Not found');
-    
-    // Make request to Aircall API
-    const response = await axios.post(
-      `https://api.aircall.io/v1/users/${id}/phone/dial`,
-      { to },
-      {
-        auth: {
-          username: aircallApiKey.split(':')[0],
-          password: aircallApiKey.split(':')[1]
-        },
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    // Return success response
-    return res.status(204).send();
-  } catch (error) {
-    console.error('Error making Aircall API dial call:', error);
-    
-    // Return appropriate error based on Aircall API error
-    if (error.response) {
-      if (error.response.status === 400) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid number to dial'
-        });
-      } else if (error.response.status === 405) {
-        return res.status(405).json({
-          success: false,
-          message: 'User not available'
-        });
-      }
-    }
-    
-    return res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-});
-
-// Neue Route: Anrufdetails abrufen
-app.get('/api/aircall/calls/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    console.log(`Fetching call details for call ${id}`);
-    
-    // Wenn die ID ein Mock-Format hat (enthält einen Bindestrich), geben wir Mock-Daten zurück
-    if (id.includes('-')) {
-      console.log(`Detected mock call ID: ${id}, returning mock data`);
-      return res.status(200).json({
-        id: id,
-        status: 'answered',
-        direction: 'outbound',
-        started_at: new Date().toISOString(),
-        answered_at: new Date().toISOString(),
-        ended_at: null,
-        duration: 0,
-        voicemail: false,
-        archived: false,
-        missed: false,
-        isMock: true
-      });
-    }
-    
-    // Andernfalls, echte API-Anfrage
-    const aircallApiKey = process.env.AIRCALL_API_KEY;
-    
-    if (!aircallApiKey) {
-      return res.status(500).json({
-        success: false,
-        message: 'Aircall API key not configured'
-      });
-    }
-    
-    const response = await axios.get(
-      `https://api.aircall.io/v1/calls/${id}`,
-      {
-        auth: {
-          username: aircallApiKey.split(':')[0],
-          password: aircallApiKey.split(':')[1]
-        },
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    return res.status(200).json(response.data);
-  } catch (error) {
-    console.error(`Error fetching call details for ${req.params.id}:`, error.message);
-    
-    // Wenn der Fehler ein 404 ist (Call nicht gefunden), geben wir Mock-Daten zurück
-    if (error.response && error.response.status === 404) {
-      return res.status(200).json({
-        id: req.params.id,
-        status: 'unknown',
-        direction: 'outbound',
-        started_at: new Date().toISOString(),
-        isFallback: true
-      });
     }
     
     return res.status(500).json({
@@ -1513,17 +1313,6 @@ const server = app.listen(PORT, () => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM signal received: closing HTTP server');
-  
-  try {
-    // Shutdown job service gracefully to close Redis connections
-    if (jobService && jobService.initialized) {
-      console.log('Shutting down job service...');
-      await jobService.shutdown();
-      console.log('Job service shut down successfully');
-    }
-  } catch (error) {
-    console.error('Error shutting down services:', error);
-  }
   
   server.close(() => {
     console.log('HTTP server closed');

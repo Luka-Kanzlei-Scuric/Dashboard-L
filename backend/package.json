@@ -6,8 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js",
-    "setup-powerdialer": "node setup-powerdialer.js"
+    "dev": "node --watch server.js"
   },
   "dependencies": {
     "axios": "^1.8.4",
