@@ -88,7 +88,8 @@ const NewPowerDialerPage = () => {
       console.log('🟢 Anruf-Antwort vom Server:', response.status, response.data);
       
       // 5. Erfolgreiche Antwort verarbeiten
-      if (response.status === 200 && response.data.success) {
+      // Jede 200er Antwort vom Server gilt als erfolgreicher Anruf
+      if (response.status === 200) {
         console.log('🟢 Anruf erfolgreich gestartet:', response.data);
         
         // UI-Statusanzeige aktualisieren
@@ -97,13 +98,13 @@ const NewPowerDialerPage = () => {
         
         // Anruf zur Historie hinzufügen
         const newCall = {
-          id: response.data.callId || Math.random().toString(36).substring(2, 15),
+          id: response.data?.callId || Math.random().toString(36).substring(2, 15),
           phoneNumber: formattedNumber,
           userId: aircallConfig.userId,
           numberId: aircallConfig.numberId,
           startTime: new Date(),
           status: 'started',
-          apiResponse: response.data
+          apiResponse: response.data || { status: 'success' }
         };
         setCallHistory(prev => [newCall, ...prev]);
         
@@ -116,7 +117,7 @@ const NewPowerDialerPage = () => {
       } else {
         console.warn('⚠️ Unerwartete Antwort vom Server:', response);
         throw new Error(
-          response.data.message || 
+          (response.data && response.data.message) || 
           `Unerwartete Antwort vom Server: ${response.status}`
         );
       }
