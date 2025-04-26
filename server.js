@@ -258,6 +258,69 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// DIREKTER AIRCALL ENDPUNKT - Vereinfachte Implementation
+app.post('/api/direct-aircall', async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Telefonnummer ist erforderlich'
+      });
+    }
+    
+    console.log(`Direkte Aircall-Anfrage für Nummer: ${phoneNumber}`);
+    
+    // Aircall API Konfiguration
+    const AIRCALL_API_KEY = '741a32c4ab34d47a2d2dd929efbfb925:090aaff4ece9c050715ef58bd38d149d';
+    const AIRCALL_USER_ID = '1527216';
+    const AIRCALL_NUMBER_ID = '967647';
+    
+    const [apiId, apiToken] = AIRCALL_API_KEY.split(':');
+    
+    try {
+      // Direkter Anruf über Aircall API
+      const response = await axios({
+        method: 'post',
+        url: `https://api.aircall.io/v1/users/${AIRCALL_USER_ID}/calls`,
+        data: {
+          number_id: AIRCALL_NUMBER_ID,
+          to: phoneNumber
+        },
+        auth: {
+          username: apiId,
+          password: apiToken
+        },
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Aircall API Response:', response.status);
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Anruf erfolgreich initiiert',
+        callId: `call-${Date.now()}`
+      });
+    } catch (aircallError) {
+      console.error('Fehler bei Aircall API:', aircallError.response?.data || aircallError.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Fehler beim Starten des Anrufs',
+        error: aircallError.response?.data || aircallError.message
+      });
+    }
+  } catch (error) {
+    console.error('Server Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Serverfehler'
+    });
+  }
+});
+
 // Test make.com webhook endpoint
 app.get('/api/test-make-webhook', async (req, res) => {
   try {
