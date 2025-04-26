@@ -1,5 +1,5 @@
 import express from 'express';
-import { protect } from '../middleware/authMiddleware.js';
+import { auth } from '../middleware/authMiddleware.js';
 import { 
   makeCall, 
   getCallHistory, 
@@ -17,7 +17,7 @@ import {
 const router = express.Router();
 
 // Protect all routes
-router.use(protect);
+router.use(auth);
 
 // Dialer status and control
 router.get('/status/:userId', getDialerStatus);
