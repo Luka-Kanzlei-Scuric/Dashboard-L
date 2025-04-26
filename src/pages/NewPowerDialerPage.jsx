@@ -69,10 +69,11 @@ const NewPowerDialerPage = () => {
       
       console.log(`Starte direkten Anruf an ${formattedNumber}`);
       
-      // Direkter Anruf über Aircall API-Proxy
-      const response = await axios.post(`/api/aircall/users/${aircallConfig.userId}/calls`, {
-        number_id: aircallConfig.numberId,
-        to: formattedNumber
+      // Direkter Anruf über Dialer API
+      const response = await axios.post(`/api/dialer/call`, {
+        phoneNumber: formattedNumber,
+        userId: aircallConfig.userId,
+        numberId: aircallConfig.numberId
       });
       
       console.log('Anruf-Antwort:', response);

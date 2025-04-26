@@ -362,11 +362,12 @@ const PowerDialerPage = () => {
       
       console.log(`📱 Starte Anruf an ${number}...`);
       
-      // Hier direkt die Anfrage ans Backend stellen, anstatt über aircallService
+      // Hier die Anfrage ans Backend stellen über Dialer API
       try {
-        await axios.post(`/api/aircall/users/${aircallConfig.userId}/calls`, {
-          number_id: aircallConfig.numberId,
-          to: number
+        await axios.post(`/api/dialer/call`, {
+          phoneNumber: number,
+          userId: aircallConfig.userId,
+          numberId: aircallConfig.numberId
         });
         
         console.log("✅ Anruf gestartet");
