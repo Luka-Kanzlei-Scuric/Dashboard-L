@@ -45,9 +45,13 @@ function App() {
             <Route path="/backoffice" element={<BackofficeLayout />}>
               <Route index element={<BackofficeOverview />} />
               <Route path="clients" element={<BackofficeOverview />} />
-              <Route path="client/:id" element={<ClientDetailPage />} />
               <Route path="documents" element={<div>Dokumente</div>} />
               <Route path="*" element={<NotFoundPage />} />
+            </Route>
+            
+            {/* Original client detail route to ensure backward compatibility */}
+            <Route path="/client/:id" element={<BackofficeLayout />}>
+              <Route index element={<ClientDetailPage />} />
             </Route>
             
             {/* Sales Dashboard */}

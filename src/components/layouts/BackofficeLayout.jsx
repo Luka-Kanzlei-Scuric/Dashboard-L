@@ -84,6 +84,13 @@ const BackofficeLayout = () => {
             title="Mandanten" 
             sidebarOpen={sidebarOpen} 
           />
+          {/* Dieser Route ist absichtlich auskommentiert, da wir die alten Client-URLs für Kompatibilität beibehalten */}
+          {/* <NavItem 
+            to="/backoffice/client/:id" 
+            icon={<UserIcon className="w-6 h-6" />} 
+            title="Mandanten Details" 
+            sidebarOpen={sidebarOpen} 
+          /> */}
           <NavItem 
             to="/backoffice/documents" 
             icon={<DocumentIcon className="w-6 h-6" />} 
