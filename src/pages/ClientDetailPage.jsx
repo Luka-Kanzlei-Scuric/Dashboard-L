@@ -1184,7 +1184,7 @@ const ClientDetailPage = () => {
       <div className="flex flex-col mb-8 pt-6">
         <div className="flex items-center mb-2">
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/backoffice')}
             className="mr-6 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-300"
             aria-label="Zurück zur Übersicht"
           >
