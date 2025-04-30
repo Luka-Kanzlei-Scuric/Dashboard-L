@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { MagnifyingGlassIcon, BellIcon, ArrowRightOnRectangleIcon, UserIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../auth/context/AuthContext';
 
-const TopBar = ({ sidebarOpen, setSidebarOpen }) => {
+const TopBar = ({ sidebarOpen, setSidebarOpen, dashboardName = '' }) => {
   const { user, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -40,6 +40,12 @@ const TopBar = ({ sidebarOpen, setSidebarOpen }) => {
 
   return (
     <header className="sticky top-0 z-20 flex items-center h-16 px-6 bg-white shadow-sm">
+      {dashboardName && (
+        <div className="mr-6 hidden md:block">
+          <h2 className="text-lg font-semibold text-gray-800">{dashboardName} Dashboard</h2>
+        </div>
+      )}
+      
       <div className="relative flex-1 max-w-md">
         <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
           <MagnifyingGlassIcon className="w-5 h-5 text-neutral-medium" />
