@@ -36,16 +36,49 @@ function isInSalesSection(pathname) {
 
 const DashboardLayout = () => {
   const location = useLocation();
-  // We don't use activeTab anymore since the Circle icon is always active
-  const [expandedSales, setExpandedSales] = useState(isInSalesSection(location.pathname));
+  // Use this to track the current section for highlighting in the sidebar
+  const [currentTab, setCurrentTab] = useState(getInitialActiveTab(location.pathname));
+  // Track if sales menu is expanded
+  const [expandedSales, setExpandedSales] = useState(false);
   const navigate = useNavigate();
   const { logout } = useAuth();
+  
+  // Update current tab when location changes
+  React.useEffect(() => {
+    setCurrentTab(getInitialActiveTab(location.pathname));
+    // If we're in the sales section, expand the sales menu
+    if (location.pathname.includes('/sales')) {
+      setExpandedSales(true);
+    }
+  }, [location.pathname]);
 
   // Handle tab changes with navigation
   const handleTabChange = (tab) => {
-    // Always maintain the current tab state but navigate to the requested page
-    // We no longer update activeTab to keep the Circle icon always highlighted
+    // Update the current tab and navigate
+    setCurrentTab(tab);
     
+    // Handle sales tab special case - toggle expansion
+    if (tab === 'sales') {
+      if (!location.pathname.includes('/sales')) {
+        // If we're not already in sales, expand it and navigate
+        setExpandedSales(true);
+        navigate('/sales');
+      } else {
+        // If we're already in sales, just toggle the expansion
+        setExpandedSales(!expandedSales);
+      }
+      return;
+    }
+    
+    // For power-dialer, make sure sales menu is expanded
+    if (tab === 'power-dialer') {
+      setExpandedSales(true);
+    } else if (!tab.includes('sales')) {
+      // For non-sales tabs, collapse the sales menu
+      setExpandedSales(false);
+    }
+    
+    // Navigate based on the tab
     switch(tab) {
       case 'mandanten':
         navigate('/backoffice/clients');
@@ -55,9 +88,6 @@ const DashboardLayout = () => {
         break;
       case 'backoffice':
         navigate('/backoffice');
-        break;
-      case 'sales':
-        navigate('/sales');
         break;
       case 'power-dialer':
         navigate('/sales/power-dialer');
@@ -124,7 +154,7 @@ const DashboardLayout = () => {
           {/* Main Tabs */}
           <div className="mb-6 space-y-1">
             <div 
-              className="flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200" 
+              className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${currentTab === 'mandanten' ? 'bg-gray-200' : ''}`} 
               onClick={() => handleTabChange('mandanten')}
             >
               <div className="flex items-center">
@@ -133,7 +163,7 @@ const DashboardLayout = () => {
               </div>
             </div>
             <div 
-              className="flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200" 
+              className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${currentTab === 'chat' ? 'bg-gray-200' : ''}`} 
               onClick={() => handleTabChange('chat')}
             >
               <div className="flex items-center">
@@ -148,7 +178,7 @@ const DashboardLayout = () => {
             <h2 className="text-gray-400 text-sm mb-2">Abteilung</h2>
             <div className="space-y-1">
               <div 
-                className="flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200" 
+                className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${currentTab === 'backoffice' ? 'bg-gray-200' : ''}`} 
                 onClick={() => handleTabChange('backoffice')}
               >
                 <div className="flex items-center">
@@ -160,11 +190,8 @@ const DashboardLayout = () => {
               {/* Sales with subtabs */}
               <div>
                 <div 
-                  className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${expandedSales ? 'bg-gray-200' : ''}`} 
-                  onClick={() => {
-                    setExpandedSales(!expandedSales);
-                    handleTabChange('sales');
-                  }}
+                  className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${currentTab === 'sales' ? 'bg-gray-200' : ''}`} 
+                  onClick={() => handleTabChange('sales')}
                 >
                   <div className="flex items-center">
                     <div className="relative mr-3">
@@ -192,7 +219,7 @@ const DashboardLayout = () => {
                     {/* Subtab content */}
                     <div className="pl-4">
                       <div 
-                        className="flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200" 
+                        className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${currentTab === 'power-dialer' ? 'bg-gray-200' : ''}`} 
                         onClick={(e) => {
                           e.stopPropagation();
                           handleTabChange('power-dialer');
