@@ -4,18 +4,18 @@ import { BrowserRouter, useNavigate } from 'react-router-dom';
 import App from './App';
 import './index.css';
 
-// Komponente für Weiterleitungshandling von 404-Seite
+// Redirect handler component for 404 redirects
 const RedirectHandler = ({ children }) => {
   const navigate = useNavigate();
   
   useEffect(() => {
-    // Prüfe, ob eine Weiterleitung aus der 404-Seite vorliegt
+    // Check if there's a redirect stored from 404 page
     const redirect = sessionStorage.getItem('redirect');
     if (redirect) {
-      // Entferne die gespeicherte Weiterleitung
+      // Remove the stored redirect
       sessionStorage.removeItem('redirect');
       
-      // Navigiere zum gespeicherten Pfad
+      // Navigate to the stored path
       console.log('Redirecting to', redirect);
       navigate(redirect);
     }
