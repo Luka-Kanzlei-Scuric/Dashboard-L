@@ -17,7 +17,7 @@ dotenv.config();
 const app = express();
 
 // Connect to database with retry mechanism
-(async function connectWithRetry() {
+(async function connectWithRetry(retryCount = 0, maxRetries = 5) {
   console.log('Attempting to connect to MongoDB...');
   
   try {
@@ -28,20 +28,22 @@ const app = express();
     await createInitialAdmin();
   } catch (err) {
     console.error('MongoDB connection error:', err);
-    console.log('Retrying in 5 seconds...');
-    setTimeout(connectWithRetry, 5000);
+    
+    if (retryCount < maxRetries) {
+      const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 30000); // Exponential backoff with max 30s
+      console.log(`Retry attempt ${retryCount + 1}/${maxRetries} in ${retryDelay/1000} seconds...`);
+      setTimeout(() => connectWithRetry(retryCount + 1, maxRetries), retryDelay);
+    } else {
+      console.error(`Failed to connect to MongoDB after ${maxRetries} attempts. Exiting.`);
+      process.exit(1);
+    }
   }
 })();
 
-// CORS configuration - Always allow dashboard domain in any environment
+// CORS configuration - Define allowed origins based on environment
 const allowedOrigins = [
   'https://dashboard-l.onrender.com',
-  'https://dashboard-l.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174'
+  'https://dashboard-l.vercel.app'
 ];
 
 // Add origins from environment variable if available
@@ -49,29 +51,44 @@ if (process.env.CORS_ORIGIN) {
   allowedOrigins.push(...process.env.CORS_ORIGIN.split(','));
 }
 
-console.log('Allowed CORS origins:', allowedOrigins);
+// Ensure development URLs are always available in non-production environments
+if (process.env.NODE_ENV !== 'production') {
+  const devOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174'
+  ];
+  
+  // Add any dev origins that aren't already in the list
+  devOrigins.forEach(origin => {
+    if (!allowedOrigins.includes(origin)) {
+      allowedOrigins.push(origin);
+    }
+  });
+}
+
+// Log CORS config only in development mode
+if (process.env.NODE_ENV !== 'production') {
+  console.log('Allowed CORS origins:', allowedOrigins);
+}
 
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, curl, etc)
     if (!origin) {
-      console.log('CORS: Request with no origin allowed');
       return callback(null, true);
     }
     
-    // Immer alle Origins erlauben für Debugging-Zwecke
-    console.log('CORS: Request from origin:', origin);
-    callback(null, true);
-    
-    // Ursprüngliche Logik auskommentiert
-    /*
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    // Check if the origin is in our allowed list
+    // In development mode, we'll allow all origins for easier testing
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
       console.log(`CORS blocked origin: ${origin}`);
-      callback(null, true); // Temporarily allow all origins while debugging
+      callback(new Error('Not allowed by CORS'));
     }
-    */
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
@@ -80,11 +97,13 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'Content-Length', 'X-Requested-With', 'Accept', 'Cache-Control', 'Pragma', 'x-auth-token', 'X-Random']
 };
 
-// Debug CORS settings
-console.log('CORS settings:', {
-  environment: process.env.NODE_ENV || 'development',
-  allowedOrigins
-});
+// Log CORS settings in development
+if (process.env.NODE_ENV !== 'production') {
+  console.log('CORS settings:', {
+    environment: process.env.NODE_ENV || 'development',
+    allowedOrigins
+  });
+}
 
 // Special preflight handler - respond to all OPTIONS requests immediately
 app.use((req, res, next) => {
