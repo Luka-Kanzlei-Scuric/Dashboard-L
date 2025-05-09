@@ -7,6 +7,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Keep the old color system for compatibility with existing components
         primary: {
           DEFAULT: '#1D1D1F',
           light: '#3a3a3c',
@@ -20,6 +21,31 @@ module.exports = {
           light: '#E5E5E5',
           medium: '#86868B',
           dark: '#424245',
+        },
+        // Add zinc color palette for the new design
+        zinc: {
+          900: '#18181B',
+          800: '#27272A',
+          700: '#3F3F46',
+          600: '#52525B',
+          500: '#71717A',
+          400: '#A1A1AA',
+          300: '#D4D4D8',
+          200: '#E4E4E7',
+          100: '#F4F4F5',
+          50: '#FAFAFA',
+        },
+        gray: {
+          900: '#1A1A1A',
+          800: '#2D2D2D',
+          700: '#4A4A4A',
+          600: '#6B6B6B',
+          500: '#8C8C8C',
+          400: '#ADADAD',
+          300: '#D1D1D1',
+          200: '#E5E5E5',
+          100: '#F2F2F2',
+          50: '#F9F9F9',
         }
       },
       fontFamily: {

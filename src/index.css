@@ -10,29 +10,12 @@
   }
   
   body {
-    @apply text-primary;
+    @apply text-gray-700;
     background-color: #F5F5F7;
   }
 }
 
-/* Sidebar Styles */
-.sidebar-icon {
-  @apply relative flex items-center justify-center h-12 w-12 mt-2 mb-2 mx-auto shadow-lg 
-  bg-white text-primary rounded-xl hover:bg-secondary hover:text-white
-  transition-all duration-300 ease-linear cursor-pointer;
-}
-
-.sidebar-tooltip {
-  @apply absolute w-auto p-2 m-2 min-w-max left-14 rounded-md shadow-md
-  text-white bg-primary
-  text-xs font-bold transition-all duration-100 scale-0 origin-left;
-}
-
-.sidebar-hr {
-  @apply bg-neutral-light dark:bg-neutral-dark h-px my-2 mx-2;
-}
-
-/* Apple-style animations */
+/* Animation classes */
 @keyframes fadeIn {
   from {
     opacity: 0;
