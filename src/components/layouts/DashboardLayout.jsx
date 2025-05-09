@@ -20,27 +20,26 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../auth/context/AuthContext';
 
+// Helper function to determine initial active tab based on URL
+function getInitialActiveTab(pathname) {
+  if (pathname.includes('/backoffice')) return 'backoffice';
+  if (pathname.includes('/sales/power-dialer')) return 'power-dialer';
+  if (pathname.includes('/sales')) return 'sales';
+  if (pathname.includes('/client')) return 'mandanten';
+  return 'all';
+}
+
+// Helper function to check if we're in the sales section
+function isInSalesSection(pathname) {
+  return pathname.includes('/sales');
+}
+
 const DashboardLayout = () => {
-  const [activeTab, setActiveTab] = useState(getInitialActiveTab());
-  const [expandedSales, setExpandedSales] = useState(isInSalesSection());
-  const navigate = useNavigate();
   const location = useLocation();
+  const [activeTab, setActiveTab] = useState(getInitialActiveTab(location.pathname));
+  const [expandedSales, setExpandedSales] = useState(isInSalesSection(location.pathname));
+  const navigate = useNavigate();
   const { logout } = useAuth();
-
-  // Helper function to determine initial active tab based on URL
-  function getInitialActiveTab() {
-    const path = location.pathname;
-    if (path.includes('/backoffice')) return 'backoffice';
-    if (path.includes('/sales/power-dialer')) return 'power-dialer';
-    if (path.includes('/sales')) return 'sales';
-    if (path.includes('/client')) return 'mandanten';
-    return 'all';
-  }
-
-  // Helper function to check if we're in the sales section
-  function isInSalesSection() {
-    return location.pathname.includes('/sales');
-  }
 
   // Handle tab changes with navigation
   const handleTabChange = (tab) => {
