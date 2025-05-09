@@ -11,12 +11,19 @@ const AIRCALL_USER_ID = '1527216';
 const AIRCALL_NUMBER_ID = '967647';
 const AIRCALL_API_KEY = process.env.AIRCALL_API_KEY || '741a32c4ab34d47a2d2dd929efbfb925:090aaff4ece9c050715ef58bd38d149d';
 
+// SipGate API credentials from environment variables
+const SIPGATE_TOKEN_ID = process.env.SIPGATE_TOKEN_ID;
+const SIPGATE_TOKEN = process.env.SIPGATE_TOKEN;
+const SIPGATE_DEVICE_ID = process.env.SIPGATE_DEVICE_ID;
+const SIPGATE_CALLER_ID = process.env.SIPGATE_CALLER_ID;
+const SIPGATE_BASE_URL = 'https://api.sipgate.com/v2';
+
 // In-memory storage for active users and call queue
 let activeUsers = {};
 let callQueue = [];
 
 /**
- * Make a call to a phone number
+ * Make a call to a phone number using Aircall API
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -41,7 +48,7 @@ export const makeCall = async (req, res) => {
     }
     
     // Get user ID from authenticated user
-    const userId = req.user.id || '123456789';
+    const userId = req.user?.id || '123456789';
     
     console.log(`User ${userId} initiating call to ${phoneNumber}`);
     
@@ -121,6 +128,133 @@ export const makeCall = async (req, res) => {
     res.status(error.status || 500).json({
       success: false,
       message: error.message || 'Error initiating call'
+    });
+  }
+};
+
+/**
+ * Make a call using SipGate API
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const makeSipgateCall = async (req, res) => {
+  try {
+    const { phoneNumber, clientId } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number is required'
+      });
+    }
+    
+    // Validate phone number format (E.164)
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+    if (!e164Regex.test(phoneNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number must be in E.164 format (e.g. +49123456789)'
+      });
+    }
+    
+    // Checking SipGate API credentials
+    if (!SIPGATE_TOKEN_ID || !SIPGATE_TOKEN) {
+      return res.status(500).json({
+        success: false,
+        message: 'SipGate API credentials not configured'
+      });
+    }
+    
+    if (!SIPGATE_DEVICE_ID) {
+      return res.status(500).json({
+        success: false,
+        message: 'SipGate device ID not configured'
+      });
+    }
+    
+    // Get user ID from authenticated user or use default
+    const userId = req.user?.id || '123456789';
+    
+    console.log(`User ${userId} initiating SipGate call to ${phoneNumber}`);
+    
+    // Prepare SipGate API request
+    const requestBody = {
+      deviceId: SIPGATE_DEVICE_ID,
+      callerId: SIPGATE_CALLER_ID || phoneNumber,
+      caller: SIPGATE_DEVICE_ID, // The web phone extension making the call (e.g., 'e0')
+      callee: phoneNumber, // The number to call
+    };
+    
+    // Make SipGate API call
+    try {
+      const response = await axios({
+        method: 'POST',
+        url: `${SIPGATE_BASE_URL}/sessions/calls`,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        auth: {
+          username: SIPGATE_TOKEN_ID,
+          password: SIPGATE_TOKEN,
+        },
+        data: requestBody,
+      });
+      
+      console.log('SipGate API response:', response.status, response.data);
+      
+      // Generate call ID
+      const callId = `sipgate-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      
+      // Create call record
+      const callRecord = new CallRecord({
+        userId,
+        clientId: clientId || null,
+        phoneNumber,
+        callerId: SIPGATE_CALLER_ID || phoneNumber,
+        deviceId: SIPGATE_DEVICE_ID,
+        sipgateCallId: response.data?.sessionId || callId, // Store the SipGate session ID if available
+        status: 'initiated',
+        startTime: new Date(),
+        provider: 'sipgate'
+      });
+      
+      await callRecord.save();
+      
+      // Return success with call details
+      return res.status(200).json({
+        success: true,
+        message: 'Call initiated successfully via SipGate',
+        callId: response.data?.sessionId || callId,
+        call: {
+          id: callRecord._id,
+          phoneNumber,
+          status: 'initiated',
+          startTime: callRecord.startTime
+        }
+      });
+      
+    } catch (sipgateError) {
+      console.error('Error making SipGate API call:', sipgateError);
+      
+      // Return detailed error for debugging
+      return res.status(500).json({
+        success: false,
+        message: 'Error making SipGate API call',
+        error: sipgateError.message,
+        response: sipgateError.response ? {
+          status: sipgateError.response.status,
+          data: sipgateError.response.data
+        } : null
+      });
+    }
+  } catch (error) {
+    console.error('Error making SipGate call:', error);
+    
+    // Return appropriate error response
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Error initiating SipGate call'
     });
   }
 };

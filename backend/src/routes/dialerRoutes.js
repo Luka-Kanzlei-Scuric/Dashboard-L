@@ -2,6 +2,7 @@ import express from 'express';
 import { auth } from '../middleware/authMiddleware.js';
 import { 
   makeCall, 
+  makeSipgateCall,
   getCallHistory, 
   getCallDetails, 
   updateCallNotes,
@@ -27,6 +28,7 @@ router.post('/pause/:userId', pauseDialer);
 
 // Call management
 router.post('/call', makeCall);
+router.post('/sipgate-call', makeSipgateCall);
 router.get('/call/:id', getCallDetails);
 router.put('/call/:id/notes', updateCallNotes);
 

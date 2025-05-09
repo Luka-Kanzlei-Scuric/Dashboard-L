@@ -445,6 +445,59 @@ class DialerService {
       };
     }
   }
+  
+  /**
+   * Initiiere einen direkten Anruf über die SipGate API
+   * @param {string} phoneNumber - Die anzurufende Telefonnummer im E.164 Format
+   * @param {Object} options - Zusätzliche Optionen für den Anruf
+   * @returns {Promise<Object>} Erfolg/Misserfolg und Anrufdetails
+   */
+  async makeSipgateCall(phoneNumber, options = {}) {
+    try {
+      console.log(`Initiating SipGate call to ${phoneNumber}`, options);
+      
+      const endpoint = '/api/dialer/sipgate-call';
+      
+      // Make API call to the backend endpoint
+      const response = await api.post(endpoint, {
+        phoneNumber,
+        ...options
+      });
+      
+      return {
+        success: true,
+        message: 'Call initiated successfully',
+        callId: response.data.callId,
+        call: response.data.call
+      };
+    } catch (error) {
+      console.error('Error making SipGate call:', error);
+      
+      // Format error response
+      let errorMessage = 'Failed to initiate call';
+      
+      if (error.response) {
+        // We have a server response with error
+        if (error.response.data && error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else {
+          errorMessage = `Server error: ${error.response.status}`;
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = 'No response from server. Please check your network connection.';
+      } else {
+        // Something else caused the error
+        errorMessage = error.message;
+      }
+      
+      return {
+        success: false,
+        message: errorMessage,
+        error: error.message
+      };
+    }
+  }
 
   /**
    * Aktualisiert ein Queue-Element

@@ -9,6 +9,52 @@ Dieses Projekt wurde in zwei Teile aufgeteilt:
 1. **Frontend (dieses Repository)** - React-Anwendung mit Tailwind CSS
 2. **Backend (im /backend Verzeichnis)** - Express API-Server mit MongoDB-Integration
 
+## SipGate Dialer Integration
+
+Der Power Dialer unterstützt jetzt auch SipGate als Telefonie-Anbieter neben Aircall.
+
+### Konfiguration für SipGate
+
+Um die SipGate-Integration zu nutzen, müssen Sie folgende Umgebungsvariablen in der `.env`-Datei im Backend-Verzeichnis konfigurieren:
+
+```
+# SipGate API Configuration
+SIPGATE_TOKEN_ID=your_sipgate_token_id
+SIPGATE_TOKEN=your_sipgate_token
+SIPGATE_DEVICE_ID=e0  # Web phone extension (e.g. 'e0', 'x0', 'y0')
+SIPGATE_CALLER_ID=+491234567890  # Your SipGate phone number for outgoing calls
+```
+
+### Web Phone Extension ermitteln
+
+Die SIPGATE_DEVICE_ID ist Ihre Web Phone Extension bei SipGate. Diese können Sie wie folgt herausfinden:
+
+1. Loggen Sie sich in Ihrem [sipgate-Account](https://app.sipgate.com/login) ein
+2. Gehen Sie über die Seitenleiste zum Tab **Telefone** (_Phones_)
+3. Klicken Sie auf das Gerät, für das Sie die Web Phone Extension benötigen
+4. Die URL dieser Seite sollte das folgende Format haben: `https://app.sipgate.com/{...}/devices/{deviceId}`, wobei `{deviceId}` Ihre Web Phone Extension ist
+
+Abhängig von Ihren Anforderungen können Sie verschiedene Telefon-Typen verwenden:
+
+| Telefon-Typ     | Buchstabe |
+| --------------- | --------- |
+| VoIP-Telefon    | e         |
+| Externes Telefon| x         |
+| Mobiltelefon    | y         |
+
+### API-Zugriff einrichten
+
+Um die SipGate API nutzen zu können, müssen Sie ein Token mit dem Bereich `sessions:calls:write` erstellen:
+
+1. Gehen Sie zu [console.sipgate.com](https://console.sipgate.com/)
+2. Navigieren Sie zu "Personal Access Tokens"
+3. Erstellen Sie ein neues Token mit dem Bereich `sessions:calls:write`
+4. Speichern Sie die Token-ID und das Token in Ihrer `.env`-Datei
+
+### Verwendung im Frontend
+
+Die Komponente `SipgateDialer` ist im Frontend implementiert und kann auf der Seite "Einfacher Dialer" verwendet werden. Diese Komponente ermöglicht es, direkte Anrufe über die SipGate API zu tätigen.
+
 ## Features
 
 - Elegante, minimalistische UI im Apple-Design

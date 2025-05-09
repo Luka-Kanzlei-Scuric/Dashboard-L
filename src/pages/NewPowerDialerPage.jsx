@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import dialerService from '../services/dialerService';
 import axios from 'axios';
+import SipgateDialer from '../components/SipgateDialer';
 
 /**
  * SimpleDialerPage - Einfache direkte Anruffunktion über Aircall API
@@ -358,9 +359,10 @@ const NewPowerDialerPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Linke Spalte: Anruf-Eingabe */}
           <div className="md:col-span-2">
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            {/* Aircall Dialer */}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
               <div className="p-4 border-b border-gray-100">
-                <h2 className="text-base font-medium text-gray-700">Telefonnummer wählen</h2>
+                <h2 className="text-base font-medium text-gray-700">Aircall Dialer</h2>
               </div>
               <div className="p-6">
                 <form onSubmit={makeDirectCall} className="space-y-4">
@@ -451,6 +453,41 @@ const NewPowerDialerPage = () => {
                 </form>
               </div>
             </div>
+            
+            {/* SipGate Dialer */}
+            <SipgateDialer 
+              onCallInitiated={(callData) => {
+                console.log('SipGate call initiated:', callData);
+                
+                // Add the call to the history
+                setCallHistory(prev => [{
+                  id: callData.callId || `sipgate-${Date.now()}`,
+                  phoneNumber: callData.phoneNumber,
+                  userId: 'sipgate',
+                  numberId: 'sipgate',
+                  startTime: new Date(),
+                  status: 'started',
+                  provider: 'sipgate'
+                }, ...prev]);
+                
+                // Simulate call status updates
+                setCallStatus('ringing');
+                setCallStartTime(new Date());
+                
+                // After 3 seconds, change to 'connected'
+                setTimeout(() => {
+                  setCallStatus('connected');
+                  
+                  // After another 10 seconds, change to 'completed'
+                  setTimeout(() => {
+                    setCallStatus('completed');
+                    setCallHistory(prev => prev.map((call, index) => 
+                      index === 0 ? { ...call, status: 'completed', duration: 13 } : call
+                    ));
+                  }, 10000);
+                }, 3000);
+              }}
+            />
             
             {/* Anruf-Historie */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden mt-6">
