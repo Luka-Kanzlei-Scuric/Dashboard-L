@@ -19,6 +19,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:local": "vite --mode development",
     "build": "vite build",
     "serve": "vite preview",
     "start": "node server.js",
