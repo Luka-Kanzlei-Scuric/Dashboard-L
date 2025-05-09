@@ -12,7 +12,9 @@ import {
   pauseDialer,
   getCallQueue,
   addToQueue,
-  removeFromQueue
+  removeFromQueue,
+  getTelefonieSettings,
+  updateTelefonieSettings
 } from '../controllers/dialerController.js';
 
 const router = express.Router();
@@ -39,5 +41,9 @@ router.get('/history', getCallHistory);
 router.get('/queue/:userId?', getCallQueue);
 router.post('/queue', addToQueue);
 router.delete('/queue/:id', removeFromQueue);
+
+// Telefonie settings
+router.get('/settings/telefonie', getTelefonieSettings);
+router.post('/settings/telefonie', updateTelefonieSettings);
 
 export default router;

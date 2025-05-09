@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../auth/context/AuthContext';
 import { 
-  UserIcon, LockClosedIcon, CheckIcon, ExclamationCircleIcon 
+  UserIcon, LockClosedIcon, CheckIcon, ExclamationCircleIcon, PhoneIcon
 } from '@heroicons/react/24/outline';
+import axios from 'axios';
 
 const SettingsPage = () => {
   const { user, updateProfile, changePassword } = useAuth();
@@ -20,11 +21,24 @@ const SettingsPage = () => {
     confirmPassword: ''
   });
   
+  // Telefonie-Einstellungen
+  const [telefonieForm, setTelefonieForm] = useState({
+    provider: 'sipgate', // 'sipgate' oder 'aircall'
+    sipgateTokenId: '',
+    sipgateToken: '',
+    sipgateDeviceId: '',
+    sipgateCallerId: '',
+    aircallUserId: '1527216',
+    aircallNumberId: '967647'
+  });
+  
   // Form states
   const [profileLoading, setProfileLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [telefonieLoading, setTelefonieLoading] = useState(false);
   const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
   const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
+  const [telefonieMessage, setTelefonieMessage] = useState({ type: '', text: '' });
   
   // Handle profile form changes
   const handleProfileChange = (e) => {
@@ -41,6 +55,43 @@ const SettingsPage = () => {
       [e.target.name]: e.target.value
     });
   };
+  
+  // Handle telefonie form changes
+  const handleTelefonieChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setTelefonieForm({
+      ...telefonieForm,
+      [name]: type === 'checkbox' ? checked : value
+    });
+  };
+  
+  // Lade die aktuellen Telefonie-Einstellungen
+  useEffect(() => {
+    const fetchTelefonieSettings = async () => {
+      try {
+        // Direkt die Dialer-API für Telefonie-Einstellungen verwenden
+        const endpoint = '/api/dialer/settings/telefonie';
+        console.log(`Lade Telefonie-Einstellungen von: ${endpoint}`);
+        
+        const response = await axios.get(endpoint);
+        if (response.data.success) {
+          setTelefonieForm({
+            provider: response.data.provider || 'sipgate',
+            sipgateTokenId: response.data.sipgateTokenId || '',
+            sipgateToken: response.data.sipgateToken || '',
+            sipgateDeviceId: response.data.sipgateDeviceId || '',
+            sipgateCallerId: response.data.sipgateCallerId || '',
+            aircallUserId: response.data.aircallUserId || '1527216',
+            aircallNumberId: response.data.aircallNumberId || '967647'
+          });
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der Telefonie-Einstellungen:', error);
+      }
+    };
+    
+    fetchTelefonieSettings();
+  }, []);
   
   // Submit profile update
   const handleProfileSubmit = async (e) => {
@@ -151,6 +202,41 @@ const SettingsPage = () => {
       });
     } finally {
       setPasswordLoading(false);
+    }
+  };
+  
+  // Submit telefonie settings
+  const handleTelefonieSubmit = async (e) => {
+    e.preventDefault();
+    setTelefonieLoading(true);
+    setTelefonieMessage({ type: '', text: '' });
+    
+    try {
+      // API-Anfrage zum Speichern der Telefonie-Einstellungen
+      const endpoint = '/api/dialer/settings/telefonie';
+      console.log(`Speichere Telefonie-Einstellungen an: ${endpoint}`, telefonieForm);
+      
+      const response = await axios.post(endpoint, telefonieForm);
+      
+      if (response.data.success) {
+        setTelefonieMessage({ 
+          type: 'success', 
+          text: 'Telefonie-Einstellungen erfolgreich aktualisiert' 
+        });
+      } else {
+        setTelefonieMessage({ 
+          type: 'error', 
+          text: response.data.message || 'Fehler beim Aktualisieren der Telefonie-Einstellungen' 
+        });
+      }
+    } catch (error) {
+      console.error('Fehler beim Speichern der Telefonie-Einstellungen:', error);
+      setTelefonieMessage({ 
+        type: 'error', 
+        text: error.response?.data?.message || 'Fehler beim Aktualisieren der Telefonie-Einstellungen' 
+      });
+    } finally {
+      setTelefonieLoading(false);
     }
   };
   
@@ -334,6 +420,194 @@ const SettingsPage = () => {
                       </div>
                     ) : (
                       'Passwort ändern'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        {/* Telefonie Settings */}
+        <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center">
+              <PhoneIcon className="h-5 w-5 text-blue-900 mr-2" />
+              <h2 className="text-xl font-semibold text-gray-800">Telefonie</h2>
+            </div>
+          </div>
+          
+          <div className="p-6">
+            {telefonieMessage.text && (
+              <div 
+                className={`mb-6 p-4 rounded-md ${
+                  telefonieMessage.type === 'success' 
+                    ? 'bg-green-50 text-green-700 border border-green-200' 
+                    : 'bg-red-50 text-red-700 border border-red-200'
+                }`}
+              >
+                <div className="flex items-center">
+                  {telefonieMessage.type === 'success' ? (
+                    <CheckIcon className="h-5 w-5 mr-2" />
+                  ) : (
+                    <ExclamationCircleIcon className="h-5 w-5 mr-2" />
+                  )}
+                  {telefonieMessage.text}
+                </div>
+              </div>
+            )}
+            
+            <form onSubmit={handleTelefonieSubmit}>
+              <div className="space-y-6">
+                {/* Provider Auswahl */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Telefonie-Provider
+                  </label>
+                  <div className="flex space-x-4 mt-2">
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        name="provider"
+                        value="sipgate"
+                        checked={telefonieForm.provider === 'sipgate'}
+                        onChange={handleTelefonieChange}
+                        className="h-4 w-4 text-blue-900 focus:ring-blue-900 border-gray-300"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">SipGate</span>
+                    </label>
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        name="provider"
+                        value="aircall"
+                        checked={telefonieForm.provider === 'aircall'}
+                        onChange={handleTelefonieChange}
+                        className="h-4 w-4 text-blue-900 focus:ring-blue-900 border-gray-300"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">AirCall</span>
+                    </label>
+                  </div>
+                </div>
+                
+                {/* SipGate Einstellungen */}
+                {telefonieForm.provider === 'sipgate' && (
+                  <div className="space-y-4 border-t pt-4">
+                    <h3 className="text-sm font-medium text-gray-700">SipGate Einstellungen</h3>
+                    
+                    <div>
+                      <label htmlFor="sipgateTokenId" className="block text-sm font-medium text-gray-700 mb-1">
+                        Token ID
+                      </label>
+                      <input
+                        id="sipgateTokenId"
+                        name="sipgateTokenId"
+                        type="text"
+                        value={telefonieForm.sipgateTokenId}
+                        onChange={handleTelefonieChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                        placeholder="SipGate Token ID"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="sipgateToken" className="block text-sm font-medium text-gray-700 mb-1">
+                        Token
+                      </label>
+                      <input
+                        id="sipgateToken"
+                        name="sipgateToken"
+                        type="password"
+                        value={telefonieForm.sipgateToken}
+                        onChange={handleTelefonieChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                        placeholder="SipGate Token"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="sipgateDeviceId" className="block text-sm font-medium text-gray-700 mb-1">
+                        Device ID
+                      </label>
+                      <input
+                        id="sipgateDeviceId"
+                        name="sipgateDeviceId"
+                        type="text"
+                        value={telefonieForm.sipgateDeviceId}
+                        onChange={handleTelefonieChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                        placeholder="SipGate Device ID"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="sipgateCallerId" className="block text-sm font-medium text-gray-700 mb-1">
+                        Caller ID
+                      </label>
+                      <input
+                        id="sipgateCallerId"
+                        name="sipgateCallerId"
+                        type="text"
+                        value={telefonieForm.sipgateCallerId}
+                        onChange={handleTelefonieChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                        placeholder="SipGate Caller ID"
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {/* AirCall Einstellungen */}
+                {telefonieForm.provider === 'aircall' && (
+                  <div className="space-y-4 border-t pt-4">
+                    <h3 className="text-sm font-medium text-gray-700">AirCall Einstellungen</h3>
+                    
+                    <div>
+                      <label htmlFor="aircallUserId" className="block text-sm font-medium text-gray-700 mb-1">
+                        AirCall User ID
+                      </label>
+                      <input
+                        id="aircallUserId"
+                        name="aircallUserId"
+                        type="text"
+                        value={telefonieForm.aircallUserId}
+                        onChange={handleTelefonieChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                        placeholder="AirCall User ID"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="aircallNumberId" className="block text-sm font-medium text-gray-700 mb-1">
+                        AirCall Number ID
+                      </label>
+                      <input
+                        id="aircallNumberId"
+                        name="aircallNumberId"
+                        type="text"
+                        value={telefonieForm.aircallNumberId}
+                        onChange={handleTelefonieChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                        placeholder="AirCall Number ID"
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                <div>
+                  <button
+                    type="submit"
+                    disabled={telefonieLoading}
+                    className={`w-full py-2 px-4 bg-blue-900 text-white font-medium rounded-md hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:ring-offset-2 ${
+                      telefonieLoading ? 'opacity-70 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {telefonieLoading ? (
+                      <div className="flex items-center justify-center">
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Speichern...
+                      </div>
+                    ) : (
+                      'Telefonie-Einstellungen speichern'
                     )}
                   </button>
                 </div>

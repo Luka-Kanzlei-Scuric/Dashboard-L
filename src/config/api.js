@@ -24,7 +24,8 @@ export const DIALER_ENDPOINTS = {
   agents: '/dialer/agents',
   config: '/dialer/config',
   initialize: '/dialer/initialize',
-  webhook: '/dialer/webhook'
+  webhook: '/dialer/webhook',
+  telefonieSettings: '/dialer/settings/telefonie'
 };
 
 // Remove duplicates

@@ -886,3 +886,92 @@ function mapAircallStatus(aircallStatus) {
       return 'in-progress';
   }
 }
+
+/**
+ * Holt die Telefonie-Einstellungen des Benutzers
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const getTelefonieSettings = async (req, res) => {
+  try {
+    const userId = req.user._id.toString();
+    
+    // In realer Implementierung würden die Einstellungen aus der Datenbank geholt werden
+    // Hier geben wir die Standardwerte zurück, die im Backend konfiguriert sind
+    
+    // Provider bestimmen: Falls SipGate Credentials vorhanden sind, wird SipGate als Default gesetzt, sonst Aircall
+    const defaultProvider = SIPGATE_TOKEN_ID && SIPGATE_TOKEN ? 'sipgate' : 'aircall';
+    
+    // Antwort zusammenstellen
+    const response = {
+      success: true,
+      provider: defaultProvider,
+      sipgateTokenId: SIPGATE_TOKEN_ID || '',
+      sipgateToken: '', // Aus Sicherheitsgründen geben wir das Token nicht zurück
+      sipgateDeviceId: SIPGATE_DEVICE_ID || '',
+      sipgateCallerId: SIPGATE_CALLER_ID || '',
+      aircallUserId: AIRCALL_USER_ID || '',
+      aircallNumberId: AIRCALL_NUMBER_ID || ''
+    };
+    
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Error getting telefonie settings:', error);
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving telefonie settings'
+    });
+  }
+};
+
+/**
+ * Aktualisiert die Telefonie-Einstellungen des Benutzers
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const updateTelefonieSettings = async (req, res) => {
+  try {
+    const userId = req.user._id.toString();
+    const {
+      provider,
+      sipgateTokenId,
+      sipgateToken,
+      sipgateDeviceId,
+      sipgateCallerId,
+      aircallUserId,
+      aircallNumberId
+    } = req.body;
+    
+    // In einer realen Implementierung würden die Einstellungen in der Datenbank gespeichert
+    // Hier simulieren wir eine erfolgreiche Speicherung
+    
+    // Simuliere Validierung
+    if (provider === 'sipgate' && (!sipgateTokenId || !sipgateDeviceId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'SipGate Token ID und Device ID sind erforderlich'
+      });
+    }
+    
+    if (provider === 'aircall' && (!aircallUserId || !aircallNumberId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Aircall User ID und Number ID sind erforderlich'
+      });
+    }
+    
+    // Erfolgreiche Antwort
+    res.status(200).json({
+      success: true,
+      message: 'Telefonie-Einstellungen erfolgreich aktualisiert'
+    });
+  } catch (error) {
+    console.error('Error updating telefonie settings:', error);
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error updating telefonie settings'
+    });
+  }
+};

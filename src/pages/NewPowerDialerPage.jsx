@@ -8,7 +8,8 @@ import {
   CheckCircleIcon,
   XMarkIcon,
   ExclamationCircleIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  AdjustmentsHorizontalIcon
 } from '@heroicons/react/24/outline';
 import dialerService from '../services/dialerService';
 import axios from 'axios';
@@ -38,6 +39,50 @@ const NewPowerDialerPage = () => {
   // UI-State
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [callHistory, setCallHistory] = useState([]);
+  
+  // Telefonie-Provider-Einstellungen
+  const [telefonieSettings, setTelefonieSettings] = useState({
+    provider: 'sipgate', // 'sipgate' oder 'aircall'
+    sipgateTokenId: '',
+    sipgateToken: '',
+    sipgateDeviceId: '',
+    sipgateCallerId: '',
+    aircallUserId: '1527216',
+    aircallNumberId: '967647'
+  });
+  
+  // Lade die Telefonie-Einstellungen beim Seitenaufruf
+  useEffect(() => {
+    const fetchTelefonieSettings = async () => {
+      try {
+        const endpoint = '/api/dialer/settings/telefonie';
+        console.log(`Lade Telefonie-Einstellungen von: ${endpoint}`);
+        
+        const response = await axios.get(endpoint);
+        if (response.data.success) {
+          setTelefonieSettings({
+            provider: response.data.provider || 'sipgate',
+            sipgateTokenId: response.data.sipgateTokenId || '',
+            sipgateToken: response.data.sipgateToken || '',
+            sipgateDeviceId: response.data.sipgateDeviceId || '',
+            sipgateCallerId: response.data.sipgateCallerId || '',
+            aircallUserId: response.data.aircallUserId || '1527216',
+            aircallNumberId: response.data.aircallNumberId || '967647'
+          });
+          
+          // Aktualisiere die AirCall-Konfiguration
+          setAircallConfig({
+            userId: response.data.aircallUserId || '1527216',
+            numberId: response.data.aircallNumberId || '967647'
+          });
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der Telefonie-Einstellungen:', error);
+      }
+    };
+    
+    fetchTelefonieSettings();
+  }, []);
   
   /**
    * Direkte Anruf-Funktion über die Aircall API
@@ -359,135 +404,178 @@ const NewPowerDialerPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Linke Spalte: Anruf-Eingabe */}
           <div className="md:col-span-2">
-            {/* Aircall Dialer */}
+            {/* Provider-Auswahl */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
-              <div className="p-4 border-b border-gray-100">
-                <h2 className="text-base font-medium text-gray-700">Aircall Dialer</h2>
+              <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+                <h2 className="text-base font-medium text-gray-700">Telefonie Provider</h2>
+                <a 
+                  href="/settings" 
+                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                >
+                  <AdjustmentsHorizontalIcon className="w-4 h-4 mr-1" />
+                  Einstellungen
+                </a>
               </div>
-              <div className="p-6">
-                <form onSubmit={makeDirectCall} className="space-y-4">
-                  <div>
-                    <label htmlFor="phoneNumber" className="block text-sm text-gray-600 mb-1">
-                      Telefonnummer
-                    </label>
+              <div className="p-4">
+                <div className="flex space-x-4 mt-2">
+                  <label className="inline-flex items-center">
                     <input
-                      type="text"
-                      id="phoneNumber"
-                      value={phoneNumber}
-                      onChange={handlePhoneNumberChange}
-                      placeholder="+49 123 456789"
-                      className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-                      disabled={loading || callStatus === 'ringing' || callStatus === 'connected'}
+                      type="radio"
+                      name="provider"
+                      value="sipgate"
+                      checked={telefonieSettings.provider === 'sipgate'}
+                      onChange={(e) => setTelefonieSettings(prev => ({...prev, provider: e.target.value}))}
+                      className="h-4 w-4 text-blue-900 focus:ring-blue-900 border-gray-300"
                     />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Format: +49... (oder beginne mit 0 für deutsche Nummern)
-                    </p>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="aircallUserId" className="block text-sm text-gray-600 mb-1">
-                        Aircall User ID
-                      </label>
-                      <input
-                        type="text"
-                        id="aircallUserId"
-                        name="userId"
-                        value={aircallConfig.userId}
-                        onChange={handleConfigChange}
-                        placeholder="Aircall User ID"
-                        className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-                        disabled={loading || callStatus === 'ringing' || callStatus === 'connected'}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="numberId" className="block text-sm text-gray-600 mb-1">
-                        Aircall Number ID
-                      </label>
-                      <input
-                        type="text"
-                        id="numberId"
-                        name="numberId"
-                        value={aircallConfig.numberId}
-                        onChange={handleConfigChange}
-                        placeholder="Aircall Number ID"
-                        className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
-                        disabled={loading || callStatus === 'ringing' || callStatus === 'connected'}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={loading || callStatus === 'ringing' || callStatus === 'connected' || !phoneNumber}
-                      className={`px-5 py-3 rounded-lg flex items-center ${
-                        loading || callStatus === 'ringing' || callStatus === 'connected' || !phoneNumber
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-green-50 text-green-600 hover:bg-green-100'
-                      }`}
-                    >
-                      {loading ? (
-                        <>
-                          <ArrowPathIcon className="w-5 h-5 mr-2 animate-spin" />
-                          Wird verarbeitet...
-                        </>
-                      ) : callStatus === 'ringing' ? (
-                        <>
-                          <PhoneIcon className="w-5 h-5 mr-2 animate-pulse" />
-                          Anruf wird gestartet...
-                        </>
-                      ) : callStatus === 'connected' ? (
-                        <>
-                          <PhoneIcon className="w-5 h-5 mr-2" />
-                          Gespräch läuft...
-                        </>
-                      ) : (
-                        <>
-                          <PhoneIcon className="w-5 h-5 mr-2" />
-                          Anrufen
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
+                    <span className="ml-2 text-sm text-gray-700">SipGate</span>
+                  </label>
+                  <label className="inline-flex items-center">
+                    <input
+                      type="radio"
+                      name="provider"
+                      value="aircall"
+                      checked={telefonieSettings.provider === 'aircall'}
+                      onChange={(e) => setTelefonieSettings(prev => ({...prev, provider: e.target.value}))}
+                      className="h-4 w-4 text-blue-900 focus:ring-blue-900 border-gray-300"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">AirCall</span>
+                  </label>
+                </div>
               </div>
             </div>
             
-            {/* SipGate Dialer */}
-            <SipgateDialer 
-              onCallInitiated={(callData) => {
-                console.log('SipGate call initiated:', callData);
-                
-                // Add the call to the history
-                setCallHistory(prev => [{
-                  id: callData.callId || `sipgate-${Date.now()}`,
-                  phoneNumber: callData.phoneNumber,
-                  userId: 'sipgate',
-                  numberId: 'sipgate',
-                  startTime: new Date(),
-                  status: 'started',
-                  provider: 'sipgate'
-                }, ...prev]);
-                
-                // Simulate call status updates
-                setCallStatus('ringing');
-                setCallStartTime(new Date());
-                
-                // After 3 seconds, change to 'connected'
-                setTimeout(() => {
-                  setCallStatus('connected');
+            {/* Aktiver Dialer basierend auf Provider-Einstellung */}
+            {telefonieSettings.provider === 'aircall' ? (
+              /* Aircall Dialer */
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+                <div className="p-4 border-b border-gray-100">
+                  <h2 className="text-base font-medium text-gray-700">Aircall Dialer</h2>
+                </div>
+                <div className="p-6">
+                  <form onSubmit={makeDirectCall} className="space-y-4">
+                    <div>
+                      <label htmlFor="phoneNumber" className="block text-sm text-gray-600 mb-1">
+                        Telefonnummer
+                      </label>
+                      <input
+                        type="text"
+                        id="phoneNumber"
+                        value={phoneNumber}
+                        onChange={handlePhoneNumberChange}
+                        placeholder="+49 123 456789"
+                        className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                        disabled={loading || callStatus === 'ringing' || callStatus === 'connected'}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Format: +49... (oder beginne mit 0 für deutsche Nummern)
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="aircallUserId" className="block text-sm text-gray-600 mb-1">
+                          Aircall User ID
+                        </label>
+                        <input
+                          type="text"
+                          id="aircallUserId"
+                          name="userId"
+                          value={aircallConfig.userId}
+                          onChange={handleConfigChange}
+                          placeholder="Aircall User ID"
+                          className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                          disabled={loading || callStatus === 'ringing' || callStatus === 'connected'}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="numberId" className="block text-sm text-gray-600 mb-1">
+                          Aircall Number ID
+                        </label>
+                        <input
+                          type="text"
+                          id="numberId"
+                          name="numberId"
+                          value={aircallConfig.numberId}
+                          onChange={handleConfigChange}
+                          placeholder="Aircall Number ID"
+                          className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+                          disabled={loading || callStatus === 'ringing' || callStatus === 'connected'}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={loading || callStatus === 'ringing' || callStatus === 'connected' || !phoneNumber}
+                        className={`px-5 py-3 rounded-lg flex items-center ${
+                          loading || callStatus === 'ringing' || callStatus === 'connected' || !phoneNumber
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-green-50 text-green-600 hover:bg-green-100'
+                        }`}
+                      >
+                        {loading ? (
+                          <>
+                            <ArrowPathIcon className="w-5 h-5 mr-2 animate-spin" />
+                            Wird verarbeitet...
+                          </>
+                        ) : callStatus === 'ringing' ? (
+                          <>
+                            <PhoneIcon className="w-5 h-5 mr-2 animate-pulse" />
+                            Anruf wird gestartet...
+                          </>
+                        ) : callStatus === 'connected' ? (
+                          <>
+                            <PhoneIcon className="w-5 h-5 mr-2" />
+                            Gespräch läuft...
+                          </>
+                        ) : (
+                          <>
+                            <PhoneIcon className="w-5 h-5 mr-2" />
+                            Anrufen
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            ) : (
+              /* SipGate Dialer */
+              <SipgateDialer 
+                onCallInitiated={(callData) => {
+                  console.log('SipGate call initiated:', callData);
                   
-                  // After another 10 seconds, change to 'completed'
+                  // Add the call to the history
+                  setCallHistory(prev => [{
+                    id: callData.callId || `sipgate-${Date.now()}`,
+                    phoneNumber: callData.phoneNumber,
+                    userId: 'sipgate',
+                    numberId: 'sipgate',
+                    startTime: new Date(),
+                    status: 'started',
+                    provider: 'sipgate'
+                  }, ...prev]);
+                  
+                  // Simulate call status updates
+                  setCallStatus('ringing');
+                  setCallStartTime(new Date());
+                  
+                  // After 3 seconds, change to 'connected'
                   setTimeout(() => {
-                    setCallStatus('completed');
-                    setCallHistory(prev => prev.map((call, index) => 
-                      index === 0 ? { ...call, status: 'completed', duration: 13 } : call
-                    ));
-                  }, 10000);
-                }, 3000);
-              }}
-            />
+                    setCallStatus('connected');
+                    
+                    // After another 10 seconds, change to 'completed'
+                    setTimeout(() => {
+                      setCallStatus('completed');
+                      setCallHistory(prev => prev.map((call, index) => 
+                        index === 0 ? { ...call, status: 'completed', duration: 13 } : call
+                      ));
+                    }, 10000);
+                  }, 3000);
+                }}
+              />
+            )}
             
             {/* Anruf-Historie */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden mt-6">
@@ -645,9 +733,21 @@ const NewPowerDialerPage = () => {
             <div className="bg-blue-50 rounded-xl p-4 mt-6">
               <h3 className="text-sm font-medium text-blue-700 mb-2">Hinweis</h3>
               <p className="text-xs text-blue-600">
-                Diese einfache Anruffunktion verwendet die Aircall API, um direkte Anrufe zu tätigen.
-                Die Anrufe werden über die hinterlegte Aircall-Nummer durchgeführt und an Ihren
-                Aircall-Account weitergeleitet.
+                {telefonieSettings.provider === 'aircall' ? (
+                  <>
+                    Diese Anruffunktion verwendet die Aircall API, um direkte Anrufe zu tätigen.
+                    Die Anrufe werden über die hinterlegte Aircall-Nummer durchgeführt und an Ihren
+                    Aircall-Account weitergeleitet.
+                  </>
+                ) : (
+                  <>
+                    Diese Anruffunktion verwendet die SipGate API, um direkte Anrufe zu tätigen.
+                    SipGate ruft zuerst Sie an und verbindet dann mit der angegebenen Nummer.
+                  </>
+                )}
+              </p>
+              <p className="text-xs text-blue-600 mt-2">
+                Sie können den Telefonie-Provider in den Einstellungen oder über die Auswahl oben ändern.
               </p>
             </div>
           </div>
