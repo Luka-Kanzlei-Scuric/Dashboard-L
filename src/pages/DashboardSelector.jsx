@@ -10,8 +10,9 @@ const DashboardSelector = () => {
 
   // Automatically redirect to the sales dashboard on component mount
   useEffect(() => {
-    navigate('/sales');
-  }, [navigate]);
+    // Use window.location.href for a full page refresh instead of navigate()
+    window.location.href = '/sales';
+  }, []);
 
   // This component will not render anything as it will immediately redirect
   return (

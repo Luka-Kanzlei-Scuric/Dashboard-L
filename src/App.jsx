@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { ClientProvider } from './context/ClientContext';
 import { AuthProvider } from './auth/context/AuthContext';
@@ -9,7 +9,6 @@ import LoginPage from './auth/components/LoginPage';
 import PrivateRoute from './auth/components/PrivateRoute';
 import NotFoundPage from './pages/NotFoundPage';
 import ClientDetailPage from './pages/ClientDetailPage';
-import DataProviders from './components/DataProviders';
 
 // Dashboard selector
 import DashboardSelector from './pages/DashboardSelector';
@@ -29,6 +28,16 @@ import NewPowerDialerPage from './pages/NewPowerDialerPage';
 import SettingsPage from './pages/settings/SettingsPage';
 
 function App() {
+  // Check if we need to redirect the user directly to /sales
+  React.useEffect(() => {
+    // Force reload once after update to clear any stale state
+    const hasReloaded = sessionStorage.getItem('hasReloaded');
+    if (!hasReloaded && window.location.pathname === '/') {
+      sessionStorage.setItem('hasReloaded', 'true');
+      window.location.href = '/sales';
+    }
+  }, []);
+
   return (
     <AuthProvider>
       <ClientProvider>
@@ -48,35 +57,32 @@ function App() {
             {/* Main dashboard selector */}
             <Route path="/" element={<DashboardSelector />} />
             
-            {/* Data Provider to ensure data is loaded across all routes */}
-            <Route element={<DataProviders />}>
-              {/* All dashboards now use the unified layout */}
-              <Route element={<DashboardLayout />}>
-                {/* Backoffice section */}
-                <Route path="/backoffice">
-                  <Route index element={<BackofficeOverview />} />
-                  <Route path="clients" element={<BackofficeOverview />} />
-                  <Route path="documents" element={<div>Dokumente</div>} />
-                </Route>
-                
-                {/* Client detail page */}
-                <Route path="/client/:id" element={<ClientDetailPage />} />
-                
-                {/* Sales section */}
-                <Route path="/sales">
-                  <Route index element={<SalesOverview />} />
-                  <Route path="power-dialer" element={<PowerDialerPage />} />
-                  <Route path="simple-dialer" element={<NewPowerDialerPage />} />
-                  <Route path="leads" element={<div>Leads</div>} />
-                  <Route path="call-logs" element={<div>Anrufprotokolle</div>} />
-                </Route>
-                
-                {/* Settings */}
-                <Route path="/settings" element={<SettingsPage />} />
-                
-                {/* 404 for any unmatched nested routes */}
-                <Route path="*" element={<NotFoundPage />} />
+            {/* All dashboards now use the unified layout */}
+            <Route element={<DashboardLayout />}>
+              {/* Backoffice section */}
+              <Route path="/backoffice">
+                <Route index element={<BackofficeOverview />} />
+                <Route path="clients" element={<BackofficeOverview />} />
+                <Route path="documents" element={<div>Dokumente</div>} />
               </Route>
+              
+              {/* Client detail page */}
+              <Route path="/client/:id" element={<ClientDetailPage />} />
+              
+              {/* Sales section */}
+              <Route path="/sales">
+                <Route index element={<SalesOverview />} />
+                <Route path="power-dialer" element={<PowerDialerPage />} />
+                <Route path="simple-dialer" element={<NewPowerDialerPage />} />
+                <Route path="leads" element={<div>Leads</div>} />
+                <Route path="call-logs" element={<div>Anrufprotokolle</div>} />
+              </Route>
+              
+              {/* Settings */}
+              <Route path="/settings" element={<SettingsPage />} />
+              
+              {/* 404 for any unmatched nested routes */}
+              <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Route>
           
