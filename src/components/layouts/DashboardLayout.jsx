@@ -63,10 +63,12 @@ const DashboardLayout = () => {
     setCurrentTab(tab);
     
     // Prüfen, ob es sich um einen noch nicht implementierten Bereich handelt
-    if (tab === 'chat' || tab === 'mandanten' || tab === 'sales') {
+    if (tab === 'chat' || tab === 'mandanten' || tab === 'sales' || tab === 'home' || tab === 'settings') {
       showMaintenanceAlert(
         tab === 'chat' ? 'Chat' : 
-        tab === 'mandanten' ? 'Mandanten' : 'Sales'
+        tab === 'mandanten' ? 'Mandanten' : 
+        tab === 'sales' ? 'Sales' :
+        tab === 'home' ? 'Home' : 'Einstellungen'
       );
       
       // Bei Sales den Status nicht ändern, aber das Menü erweitern,
@@ -116,11 +118,14 @@ const DashboardLayout = () => {
           <LayoutGrid className="text-white" size={24} />
         </div>
         <div className="flex flex-col items-center space-y-8 flex-1">
-          <Home 
-            className="text-gray-400 hover:text-white cursor-pointer" 
-            size={20} 
-            onClick={() => navigate('/')}
-          />
+          <div className="relative">
+            <Home 
+              className="text-gray-400 hover:text-white cursor-pointer" 
+              size={20} 
+              onClick={() => handleTabChange('home')}
+            />
+            <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full" title="In Arbeit"></div>
+          </div>
           <div className="bg-zinc-700 p-2 rounded-md">
             <Circle 
               className="text-white hover:text-white cursor-pointer" 
@@ -134,11 +139,14 @@ const DashboardLayout = () => {
             onClick={() => handleTabChange('backoffice')}
           />
           <div className="flex-1"></div>
-          <Settings 
-            className="text-gray-400 hover:text-white cursor-pointer" 
-            size={20} 
-            onClick={() => navigate('/settings')}
-          />
+          <div className="relative">
+            <Settings 
+              className="text-gray-400 hover:text-white cursor-pointer" 
+              size={20} 
+              onClick={() => handleTabChange('settings')}
+            />
+            <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full" title="In Arbeit"></div>
+          </div>
           <LogOut 
             className="text-gray-400 hover:text-white cursor-pointer" 
             size={20} 
