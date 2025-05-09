@@ -36,14 +36,15 @@ function isInSalesSection(pathname) {
 
 const DashboardLayout = () => {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState(getInitialActiveTab(location.pathname));
+  // We don't use activeTab anymore since the Circle icon is always active
   const [expandedSales, setExpandedSales] = useState(isInSalesSection(location.pathname));
   const navigate = useNavigate();
   const { logout } = useAuth();
 
   // Handle tab changes with navigation
   const handleTabChange = (tab) => {
-    setActiveTab(tab);
+    // Always maintain the current tab state but navigate to the requested page
+    // We no longer update activeTab to keep the Circle icon always highlighted
     
     switch(tab) {
       case 'mandanten':
@@ -84,19 +85,19 @@ const DashboardLayout = () => {
         </div>
         <div className="flex flex-col items-center space-y-8 flex-1">
           <Home 
-            className={`${activeTab === 'all' ? 'text-white' : 'text-gray-400'} hover:text-white cursor-pointer`} 
+            className="text-gray-400 hover:text-white cursor-pointer" 
             size={20} 
             onClick={() => navigate('/')}
           />
-          <div className={`${activeTab === 'mandanten' ? 'bg-zinc-700 p-2 rounded-md' : ''}`}>
+          <div className="bg-zinc-700 p-2 rounded-md">
             <Circle 
-              className={`${activeTab === 'mandanten' ? 'text-white' : 'text-gray-400'} hover:text-white cursor-pointer`} 
+              className="text-white hover:text-white cursor-pointer" 
               size={20} 
               onClick={() => handleTabChange('mandanten')}
             />
           </div>
           <Briefcase 
-            className={`${activeTab === 'backoffice' ? 'text-white' : 'text-gray-400'} hover:text-white cursor-pointer`} 
+            className="text-gray-400 hover:text-white cursor-pointer" 
             size={20} 
             onClick={() => handleTabChange('backoffice')}
           />
@@ -123,7 +124,7 @@ const DashboardLayout = () => {
           {/* Main Tabs */}
           <div className="mb-6 space-y-1">
             <div 
-              className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${activeTab === 'mandanten' ? 'bg-gray-200' : ''}`} 
+              className="flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200" 
               onClick={() => handleTabChange('mandanten')}
             >
               <div className="flex items-center">
@@ -132,7 +133,7 @@ const DashboardLayout = () => {
               </div>
             </div>
             <div 
-              className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${activeTab === 'chat' ? 'bg-gray-200' : ''}`} 
+              className="flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200" 
               onClick={() => handleTabChange('chat')}
             >
               <div className="flex items-center">
@@ -147,7 +148,7 @@ const DashboardLayout = () => {
             <h2 className="text-gray-400 text-sm mb-2">Abteilung</h2>
             <div className="space-y-1">
               <div 
-                className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${activeTab === 'backoffice' ? 'bg-gray-200' : ''}`} 
+                className="flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200" 
                 onClick={() => handleTabChange('backoffice')}
               >
                 <div className="flex items-center">
@@ -159,7 +160,7 @@ const DashboardLayout = () => {
               {/* Sales with subtabs */}
               <div>
                 <div 
-                  className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${activeTab === 'sales' || expandedSales ? 'bg-gray-200' : ''}`} 
+                  className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${expandedSales ? 'bg-gray-200' : ''}`} 
                   onClick={() => {
                     setExpandedSales(!expandedSales);
                     handleTabChange('sales');
@@ -191,7 +192,7 @@ const DashboardLayout = () => {
                     {/* Subtab content */}
                     <div className="pl-4">
                       <div 
-                        className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${activeTab === 'power-dialer' ? 'bg-gray-200' : ''}`} 
+                        className="flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200" 
                         onClick={(e) => {
                           e.stopPropagation();
                           handleTabChange('power-dialer');
@@ -211,9 +212,9 @@ const DashboardLayout = () => {
           </div>
         </div>
         
-        {/* Right Content Area - White with borders */}
+        {/* Right Content Area - Clean without borders */}
         <div className="flex-1 p-6">
-          <div className="bg-white h-full rounded-xl overflow-auto border border-gray-200 shadow-sm p-6">
+          <div className="bg-white h-full overflow-auto">
             {/* Content output from the routes */}
             <Outlet />
           </div>
