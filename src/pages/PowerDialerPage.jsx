@@ -78,10 +78,48 @@ const PowerDialerPage = () => {
   // Automatische Wählsequenz States
   const [autoDialingActive, setAutoDialingActive] = useState(false);
   
+  // Telefonie-Provider-Einstellungen
+  const [telefonieSettings, setTelefonieSettings] = useState({
+    provider: 'sipgate', // 'sipgate' oder 'aircall'
+    sipgateTokenId: '',
+    sipgateToken: '',
+    sipgateDeviceId: '',
+    sipgateCallerId: '',
+    aircallUserId: '1527216',
+    aircallNumberId: '967647'
+  });
+  
+  // Lade die Telefonie-Einstellungen beim Seitenaufruf
+  useEffect(() => {
+    const fetchTelefonieSettings = async () => {
+      try {
+        const endpoint = '/api/dialer/settings/telefonie';
+        console.log(`Lade Telefonie-Einstellungen von: ${endpoint}`);
+        
+        const response = await axios.get(endpoint);
+        if (response.data.success) {
+          setTelefonieSettings({
+            provider: response.data.provider || 'sipgate',
+            sipgateTokenId: response.data.sipgateTokenId || '',
+            sipgateToken: response.data.sipgateToken || '',
+            sipgateDeviceId: response.data.sipgateDeviceId || '',
+            sipgateCallerId: response.data.sipgateCallerId || '',
+            aircallUserId: response.data.aircallUserId || '1527216',
+            aircallNumberId: response.data.aircallNumberId || '967647'
+          });
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der Telefonie-Einstellungen:', error);
+      }
+    };
+    
+    fetchTelefonieSettings();
+  }, []);
+  
   // Aircall-Konfiguration
   const aircallConfig = {
-    userId: "1527216", // Aircall-Benutzer-ID
-    numberId: "967647", // Aircall-Nummer-ID
+    userId: telefonieSettings.aircallUserId || "1527216", // Aircall-Benutzer-ID
+    numberId: telefonieSettings.aircallNumberId || "967647", // Aircall-Nummer-ID
     // Für Produktion: useMockMode auf false setzen, wenn API-Key konfiguriert ist
     useMockMode: false,  // Im Produktionsmodus auf false setzen
     debugMode: true,    // Aktiviert ausführliche Logs
@@ -1046,10 +1084,47 @@ const PowerDialerPage = () => {
                 className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-lg border border-gray-100 w-64 sm:w-72 md:w-80 overflow-hidden z-20"
               >
                 <div className="p-4 border-b border-gray-100">
-                  <h3 className="text-sm font-medium text-gray-800 mb-2 flex items-center">
-                    <PhoneIcon className="w-4 h-4 mr-2 text-gray-400" />
-                    PowerDialer-Steuerung
+                  <h3 className="text-sm font-medium text-gray-800 mb-2 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <PhoneIcon className="w-4 h-4 mr-2 text-gray-400" />
+                      PowerDialer-Steuerung
+                    </div>
+                    <a 
+                      href="/settings" 
+                      className="text-xs text-blue-600 hover:text-blue-800 flex items-center"
+                    >
+                      Einstellungen
+                    </a>
                   </h3>
+                  
+                  {/* Telefonie-Provider Auswahl */}
+                  <div className="mb-3 p-2 rounded-md bg-gray-50">
+                    <div className="text-xs text-gray-500 mb-1 font-medium">Telefonie-Provider:</div>
+                    <div className="flex space-x-4">
+                      <label className="inline-flex items-center">
+                        <input
+                          type="radio"
+                          name="provider"
+                          value="sipgate"
+                          checked={telefonieSettings.provider === 'sipgate'}
+                          onChange={(e) => setTelefonieSettings(prev => ({...prev, provider: e.target.value}))}
+                          className="h-3 w-3 text-blue-500 focus:ring-blue-500 border-gray-300"
+                        />
+                        <span className="ml-1.5 text-xs text-gray-700">SipGate</span>
+                      </label>
+                      <label className="inline-flex items-center">
+                        <input
+                          type="radio"
+                          name="provider"
+                          value="aircall"
+                          checked={telefonieSettings.provider === 'aircall'}
+                          onChange={(e) => setTelefonieSettings(prev => ({...prev, provider: e.target.value}))}
+                          className="h-3 w-3 text-blue-500 focus:ring-blue-500 border-gray-300"
+                        />
+                        <span className="ml-1.5 text-xs text-gray-700">AirCall</span>
+                      </label>
+                    </div>
+                  </div>
                   
                   {dialerActive && (
                     <div className="flex items-center justify-between mb-4">
@@ -1569,6 +1644,19 @@ const PowerDialerPage = () => {
                     </h4>
                     <div className="bg-[#f5f5f7] p-3 rounded-xl md:rounded-2xl flex-1 overflow-auto shadow-inner">
                       <p className="text-xs text-gray-600 leading-relaxed">{currentContact?.notes || "Keine Notizen verfügbar"}</p>
+                    </div>
+                    
+                    {/* Telefonie-Provider Info */}
+                    <div className="mt-3 bg-blue-50 p-2 rounded-lg text-xs text-blue-600">
+                      <div className="flex items-center">
+                        <PhoneIcon className="w-3 h-3 mr-1.5 text-blue-400" />
+                        <span>
+                          Aktiver Provider: 
+                          <span className="font-medium ml-1">
+                            {telefonieSettings.provider === 'sipgate' ? 'SipGate' : 'AirCall'}
+                          </span>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
