@@ -53,24 +53,32 @@ const DashboardLayout = () => {
   }, [location.pathname]);
 
   // Handle tab changes with navigation
+  // Wartungshinweis anzeigen für Bereiche, die noch nicht implementiert sind
+  const showMaintenanceAlert = (feature) => {
+    alert(`Der Bereich "${feature}" befindet sich derzeit im Aufbau und wird in Kürze verfügbar sein.`);
+  };
+
   const handleTabChange = (tab) => {
-    // Update the current tab and navigate
+    // Update the current tab 
     setCurrentTab(tab);
     
-    // Handle sales tab special case - toggle expansion
-    if (tab === 'sales') {
-      if (!location.pathname.includes('/sales')) {
-        // If we're not already in sales, expand it and navigate
-        setExpandedSales(true);
-        navigate('/sales');
-      } else {
-        // If we're already in sales, just toggle the expansion
+    // Prüfen, ob es sich um einen noch nicht implementierten Bereich handelt
+    if (tab === 'chat' || tab === 'mandanten' || tab === 'sales') {
+      showMaintenanceAlert(
+        tab === 'chat' ? 'Chat' : 
+        tab === 'mandanten' ? 'Mandanten' : 'Sales'
+      );
+      
+      // Bei Sales den Status nicht ändern, aber das Menü erweitern,
+      // damit der Power Dialer erreicht werden kann
+      if (tab === 'sales') {
         setExpandedSales(!expandedSales);
       }
+      
       return;
     }
     
-    // For power-dialer, make sure sales menu is expanded
+    // Handle sales tab special case for menu expansion
     if (tab === 'power-dialer') {
       setExpandedSales(true);
     } else if (!tab.includes('sales')) {
@@ -80,12 +88,6 @@ const DashboardLayout = () => {
     
     // Navigate based on the tab
     switch(tab) {
-      case 'mandanten':
-        navigate('/backoffice/clients');
-        break;
-      case 'chat':
-        // This isn't implemented yet
-        break;
       case 'backoffice':
         navigate('/backoffice');
         break;
@@ -161,6 +163,7 @@ const DashboardLayout = () => {
                 <Users size={18} className="mr-3 text-gray-600" />
                 <span className="text-gray-700">Mandanten</span>
               </div>
+              <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">In Arbeit</span>
             </div>
             <div 
               className={`flex justify-between items-center p-2.5 rounded-md cursor-pointer hover:bg-gray-200 ${currentTab === 'chat' ? 'bg-gray-200' : ''}`} 
@@ -170,6 +173,7 @@ const DashboardLayout = () => {
                 <MessageSquare size={18} className="mr-3 text-gray-600" />
                 <span className="text-gray-700">Chat</span>
               </div>
+              <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">In Arbeit</span>
             </div>
           </div>
           
@@ -199,10 +203,13 @@ const DashboardLayout = () => {
                     </div>
                     <span className="text-gray-700">Sales</span>
                   </div>
-                  {expandedSales ? 
-                    <ChevronUp size={18} className="text-gray-400" /> : 
-                    <ChevronDown size={18} className="text-gray-400" />
-                  }
+                  <div className="flex items-center">
+                    <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded mr-2">In Arbeit</span>
+                    {expandedSales ? 
+                      <ChevronUp size={18} className="text-gray-400" /> : 
+                      <ChevronDown size={18} className="text-gray-400" />
+                    }
+                  </div>
                 </div>
                 
                 {/* Sales subtabs */}
