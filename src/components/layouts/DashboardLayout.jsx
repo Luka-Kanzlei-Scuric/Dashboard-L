@@ -284,6 +284,7 @@ const DashboardLayout = () => {
           </div>
           </div>
         </div>
+        </div>
         
         {/* Right Content Area - Clean without borders */}
         <div className="flex-1 p-6">
