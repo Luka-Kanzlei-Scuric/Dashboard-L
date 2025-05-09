@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { ClientProvider } from './context/ClientContext';
 import { AuthProvider } from './auth/context/AuthContext';
@@ -9,9 +9,6 @@ import LoginPage from './auth/components/LoginPage';
 import PrivateRoute from './auth/components/PrivateRoute';
 import NotFoundPage from './pages/NotFoundPage';
 import ClientDetailPage from './pages/ClientDetailPage';
-
-// Dashboard selector
-import DashboardSelector from './pages/DashboardSelector';
 
 // New unified layout
 import DashboardLayout from './components/layouts/DashboardLayout';
@@ -28,16 +25,6 @@ import NewPowerDialerPage from './pages/NewPowerDialerPage';
 import SettingsPage from './pages/settings/SettingsPage';
 
 function App() {
-  // Check if we need to redirect the user directly to /sales
-  React.useEffect(() => {
-    // Force reload once after update to clear any stale state
-    const hasReloaded = sessionStorage.getItem('hasReloaded');
-    if (!hasReloaded && window.location.pathname === '/') {
-      sessionStorage.setItem('hasReloaded', 'true');
-      window.location.href = '/sales';
-    }
-  }, []);
-
   return (
     <AuthProvider>
       <ClientProvider>
@@ -54,8 +41,8 @@ function App() {
           
           {/* Protected Routes with New Dashboard Layout */}
           <Route element={<PrivateRoute />}>
-            {/* Main dashboard selector */}
-            <Route path="/" element={<DashboardSelector />} />
+            {/* Root redirects to sales */}
+            <Route path="/" element={<SalesOverview />} />
             
             {/* All dashboards now use the unified layout */}
             <Route element={<DashboardLayout />}>
