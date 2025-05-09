@@ -43,11 +43,11 @@ function App() {
             
             {/* Protected Routes with New Dashboard Layout */}
             <Route element={<PrivateRoute />}>
-              {/* Root redirects to sales */}
-              <Route path="/" element={<SalesOverview />} />
-              
-              {/* All dashboards now use the unified layout */}
+              {/* Root and all content pages use the new dashboard layout */}
               <Route element={<DashboardLayout />}>
+                {/* Root redirects to sales */}
+                <Route path="/" element={<SalesOverview />} />
+              
                 {/* Backoffice section */}
                 <Route path="/backoffice">
                   <Route index element={<BackofficeOverview />} />
