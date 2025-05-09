@@ -162,19 +162,34 @@ const DashboardLayout = () => {
       
       {/* Main Content */}
       <div className="flex flex-1">
-        {/* Left Panel - Grey/Light-blue Tab */}
-        <div className={`${actionsCollapsed ? 'w-0 overflow-hidden' : 'w-80'} transition-all duration-300 bg-gray-100 rounded-r-lg relative`}>
-          {/* Toggle button for collapsing the actions panel - positioned absolutely */}
-          <button 
-            className="absolute -right-3 top-6 bg-gray-200 rounded-full p-1 shadow-md z-10 hover:bg-gray-300"
-            onClick={() => setActionsCollapsed(!actionsCollapsed)}
-            title={actionsCollapsed ? "Panel öffnen" : "Panel einklappen"}
-          >
-            {actionsCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-          </button>
+        {/* Container for the panel and expand button when collapsed */}
+        <div className="relative flex">
+          {/* When panel is collapsed, show expand button */}
+          {actionsCollapsed && (
+            <button 
+              className="h-10 bg-gray-200 rounded-r p-1 my-6 shadow-md z-10 hover:bg-gray-300 flex items-center justify-center"
+              onClick={() => setActionsCollapsed(false)}
+              title="Panel öffnen"
+            >
+              <PanelLeftOpen size={16} />
+            </button>
+          )}
           
-          <div className="p-6">
-            <h1 className="text-xl font-semibold mb-6">Actions</h1>
+          {/* Left Panel - Grey/Light-blue Tab */}
+          <div className={`${actionsCollapsed ? 'w-0 overflow-hidden' : 'w-80'} transition-all duration-300 bg-gray-100 rounded-r-lg relative`}>
+            {/* Toggle button for collapsing the actions panel - positioned absolutely */}
+            {!actionsCollapsed && (
+              <button 
+                className="absolute -right-3 top-6 bg-gray-200 rounded-full p-1 shadow-md z-10 hover:bg-gray-300"
+                onClick={() => setActionsCollapsed(true)}
+                title="Panel einklappen"
+              >
+                <PanelLeftClose size={16} />
+              </button>
+            )}
+            
+            <div className="p-6">
+              <h1 className="text-xl font-semibold mb-6">Actions</h1>
           
           {/* Main Tabs */}
           <div className="mb-6 space-y-1">
