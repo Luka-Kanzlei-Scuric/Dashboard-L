@@ -1,5 +1,6 @@
 import CallRecord from '../models/CallRecord.js';
 import dialerService from '../services/dialer/index.js';
+import sipgateService from '../services/sipgateService.js';
 import axios from 'axios';
 import dotenv from 'dotenv';
 
@@ -133,13 +134,235 @@ export const makeCall = async (req, res) => {
 };
 
 /**
- * Make a call using SipGate API
+ * SipGate OAuth2 authentication endpoint
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const authSipgate = async (req, res) => {
+  try {
+    // Generate the authorization URL
+    const authUrl = sipgateService.getAuthorizationUrl();
+    
+    // Redirect the user to SipGate for authentication
+    res.redirect(authUrl);
+  } catch (error) {
+    console.error('Error generating SipGate auth URL:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Error generating SipGate authorization URL' 
+    });
+  }
+};
+
+/**
+ * SipGate OAuth2 callback endpoint
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const sipgateOAuthCallback = async (req, res) => {
+  try {
+    const { code, error, error_description } = req.query;
+    
+    // Check for errors from SipGate
+    if (error) {
+      console.error(`SipGate OAuth error: ${error} - ${error_description}`);
+      return res.status(400).send(`
+        <html>
+          <head><title>SipGate Authentication Error</title></head>
+          <body>
+            <h1>Authentication Error</h1>
+            <p>Error: ${error}</p>
+            <p>Details: ${error_description || 'No details provided'}</p>
+            <p><a href="javascript:window.close()">Close this window</a></p>
+            <script>
+              // Send message to parent window if this is in a popup
+              window.opener && window.opener.postMessage({ 
+                type: 'sipgate-auth-error',
+                error: '${error}',
+                details: '${error_description || 'No details provided'}'
+              }, '*');
+              
+              // Redirect back to the dashboard after 3 seconds
+              setTimeout(() => {
+                window.location.href = '/';
+              }, 3000);
+            </script>
+          </body>
+        </html>
+      `);
+    }
+    
+    if (!code) {
+      return res.status(400).send(`
+        <html>
+          <head><title>SipGate Authentication Error</title></head>
+          <body>
+            <h1>Authentication Error</h1>
+            <p>No authorization code received from SipGate.</p>
+            <p><a href="javascript:window.close()">Close this window</a></p>
+            <script>
+              // Send message to parent window if this is in a popup
+              window.opener && window.opener.postMessage({ 
+                type: 'sipgate-auth-error',
+                error: 'No authorization code received'
+              }, '*');
+              
+              // Redirect back to the dashboard after 3 seconds
+              setTimeout(() => {
+                window.location.href = '/';
+              }, 3000);
+            </script>
+          </body>
+        </html>
+      `);
+    }
+    
+    // Get userId from session or generate a temporary one
+    const userId = req.user?.id || 'temp-user-' + Date.now();
+    
+    // Exchange the code for tokens
+    const tokens = await sipgateService.exchangeCodeForTokens(code, userId);
+    
+    // Return success page that will communicate with the parent window
+    res.send(`
+      <html>
+        <head><title>SipGate Authentication Success</title></head>
+        <body>
+          <h1>Authentication Successful!</h1>
+          <p>You have successfully authenticated with SipGate.</p>
+          <p>You can now close this window and return to the application.</p>
+          <p><a href="javascript:window.close()">Close this window</a></p>
+          <script>
+            // Send message to parent window if this is in a popup
+            window.opener && window.opener.postMessage({ 
+              type: 'sipgate-auth-success',
+              userId: '${userId}'
+            }, '*');
+            
+            // Redirect back to the dashboard after 3 seconds
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 3000);
+          </script>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Error handling SipGate OAuth callback:', error);
+    res.status(500).send(`
+      <html>
+        <head><title>SipGate Authentication Error</title></head>
+        <body>
+          <h1>Authentication Error</h1>
+          <p>There was an error exchanging the authorization code for tokens:</p>
+          <p>${error.message}</p>
+          <p><a href="javascript:window.close()">Close this window</a></p>
+          <script>
+            // Send message to parent window if this is in a popup
+            window.opener && window.opener.postMessage({ 
+              type: 'sipgate-auth-error',
+              error: 'Token exchange error',
+              details: '${error.message.replace(/'/g, "\\'")}'
+            }, '*');
+            
+            // Redirect back to the dashboard after 3 seconds
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 3000);
+          </script>
+        </body>
+      </html>
+    `);
+  }
+};
+
+/**
+ * Check SipGate OAuth2 authentication status
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const sipgateOAuthStatus = async (req, res) => {
+  try {
+    const userId = req.query.userId || (req.user?.id || 'unknown');
+    
+    const isAuthenticated = await sipgateService.isAuthenticated(userId);
+    const deviceInfo = await sipgateService.getUserDeviceId(userId);
+    
+    res.status(200).json({
+      success: true,
+      authenticated: isAuthenticated,
+      deviceId: deviceInfo.deviceId || null,
+      callerId: deviceInfo.callerId || null
+    });
+  } catch (error) {
+    console.error('Error checking SipGate auth status:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Error checking SipGate authentication status' 
+    });
+  }
+};
+
+/**
+ * Store SipGate device ID and caller ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const sipgateStoreDeviceId = async (req, res) => {
+  try {
+    const { deviceId, callerId } = req.body;
+    const userId = req.user?.id || 'unknown';
+    
+    if (!deviceId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Device ID is required'
+      });
+    }
+    
+    // Check if the user is authenticated with SipGate
+    const isAuthenticated = await sipgateService.isAuthenticated(userId);
+    if (!isAuthenticated) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated with SipGate. Please authenticate first.',
+        authUrl: sipgateService.getAuthorizationUrl()
+      });
+    }
+    
+    // Store the device ID
+    const storeResult = await sipgateService.storeUserDeviceId(userId, deviceId, callerId || null);
+    
+    if (!storeResult) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to store device ID. Please try authenticating again.'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'Device ID stored successfully',
+      deviceId,
+      callerId: callerId || null
+    });
+  } catch (error) {
+    console.error('Error storing SipGate device ID:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Error storing SipGate device ID' 
+    });
+  }
+};
+
+/**
+ * Make a call using SipGate API with OAuth2
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
 export const makeSipgateCall = async (req, res) => {
   try {
-    const { phoneNumber, clientId } = req.body;
+    const { phoneNumber, clientId, deviceId, callerId } = req.body;
     
     if (!phoneNumber) {
       return res.status(400).json({
@@ -157,63 +380,54 @@ export const makeSipgateCall = async (req, res) => {
       });
     }
     
-    // Checking SipGate API credentials
-    if (!SIPGATE_TOKEN_ID || !SIPGATE_TOKEN) {
-      return res.status(500).json({
-        success: false,
-        message: 'SipGate API credentials not configured'
-      });
-    }
-    
-    if (!SIPGATE_DEVICE_ID) {
-      return res.status(500).json({
-        success: false,
-        message: 'SipGate device ID not configured'
-      });
-    }
-    
     // Get user ID from authenticated user or use default
     const userId = req.user?.id || '123456789';
     
-    console.log(`User ${userId} initiating SipGate call to ${phoneNumber}`);
-    
-    // Prepare SipGate API request
-    const requestBody = {
-      deviceId: SIPGATE_DEVICE_ID,
-      callerId: SIPGATE_CALLER_ID || phoneNumber,
-      caller: SIPGATE_DEVICE_ID, // The web phone extension making the call (e.g., 'e0')
-      callee: phoneNumber, // The number to call
-    };
-    
-    // Make SipGate API call
-    try {
-      const response = await axios({
-        method: 'POST',
-        url: `${SIPGATE_BASE_URL}/sessions/calls`,
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        auth: {
-          username: SIPGATE_TOKEN_ID,
-          password: SIPGATE_TOKEN,
-        },
-        data: requestBody,
+    // Check if the user is authenticated with SipGate
+    const isAuthenticated = await sipgateService.isAuthenticated(userId);
+    if (!isAuthenticated) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated with SipGate. Please authenticate first.',
+        authUrl: sipgateService.getAuthorizationUrl()
       });
+    }
+    
+    // Get the device ID (from request, user's stored device, or environment)
+    const userDeviceInfo = await sipgateService.getUserDeviceId(userId);
+    const useDeviceId = deviceId || userDeviceInfo.deviceId || SIPGATE_DEVICE_ID;
+    const useCallerId = callerId || userDeviceInfo.callerId || SIPGATE_CALLER_ID;
+    
+    if (!useDeviceId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Device ID is required. Please provide a device ID or set one in your profile.'
+      });
+    }
+    
+    console.log(`User ${userId} initiating SipGate call to ${phoneNumber} with device ${useDeviceId}`);
+    
+    // Make SipGate API call using the OAuth2 service
+    try {
+      const options = {
+        deviceId: useDeviceId,
+        callerId: useCallerId
+      };
       
-      console.log('SipGate API response:', response.status, response.data);
+      // Use our sipgateService to make the call with OAuth2
+      const response = await sipgateService.makeCall(phoneNumber, userId, options);
       
       // Generate call ID
-      const callId = `sipgate-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const callId = response.sessionId || `sipgate-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       
       // Create call record
       const callRecord = new CallRecord({
         userId,
         clientId: clientId || null,
         phoneNumber,
-        callerId: SIPGATE_CALLER_ID || phoneNumber,
-        deviceId: SIPGATE_DEVICE_ID,
-        sipgateCallId: response.data?.sessionId || callId, // Store the SipGate session ID if available
+        callerId: useCallerId || phoneNumber,
+        deviceId: useDeviceId,
+        sipgateCallId: callId, // Store the SipGate session ID if available
         status: 'initiated',
         startTime: new Date(),
         provider: 'sipgate'
@@ -225,7 +439,7 @@ export const makeSipgateCall = async (req, res) => {
       return res.status(200).json({
         success: true,
         message: 'Call initiated successfully via SipGate',
-        callId: response.data?.sessionId || callId,
+        callId: response.sessionId || callId,
         call: {
           id: callRecord._id,
           phoneNumber,
@@ -236,6 +450,15 @@ export const makeSipgateCall = async (req, res) => {
       
     } catch (sipgateError) {
       console.error('Error making SipGate API call:', sipgateError);
+      
+      // If the error is due to token expiration or authentication
+      if (sipgateError.message && sipgateError.message.includes('authentication')) {
+        return res.status(401).json({
+          success: false,
+          message: 'SipGate authentication error. Please authenticate again.',
+          authUrl: sipgateService.getAuthorizationUrl()
+        });
+      }
       
       // Return detailed error for debugging
       return res.status(500).json({

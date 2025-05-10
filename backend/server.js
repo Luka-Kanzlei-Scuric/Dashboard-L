@@ -7,6 +7,7 @@ import connectDB from './src/config/db.js';
 import Client from './src/models/Client.js';
 import emailService from './src/services/emailService.js';
 import fileService from './src/services/fileService.js';
+import sipgateTokenManager from './src/services/sipgateTokenManager.js';
 import authRoutes from './src/routes/authRoutes.js';
 import { createInitialAdmin } from './src/controllers/authController.js';
 
@@ -26,6 +27,9 @@ const app = express();
     
     // Create initial admin user if none exists
     await createInitialAdmin();
+    
+    // Initialize SipGate token manager
+    sipgateTokenManager.init();
   } catch (err) {
     console.error('MongoDB connection error:', err);
     
