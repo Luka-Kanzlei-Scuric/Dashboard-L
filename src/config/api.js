@@ -25,7 +25,13 @@ export const DIALER_ENDPOINTS = {
   config: '/dialer/config',
   initialize: '/dialer/initialize',
   webhook: '/dialer/webhook',
-  telefonieSettings: '/dialer/settings/telefonie'
+  telefonieSettings: '/dialer/settings/telefonie',
+  
+  // SipGate OAuth endpoints
+  sipgateAuth: '/dialer/auth/sipgate',
+  sipgateCallback: '/dialer/auth/sipgate/callback',
+  sipgateStatus: '/dialer/auth/sipgate/status',
+  sipgateDevice: '/dialer/auth/sipgate/device'
 };
 
 // Remove duplicates

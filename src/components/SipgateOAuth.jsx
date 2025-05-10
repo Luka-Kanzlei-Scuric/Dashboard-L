@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import api, { DIALER_ENDPOINTS } from '../config/api';
 import { 
   ArrowPathIcon, 
   LockClosedIcon, 
@@ -66,7 +67,8 @@ const SipgateOAuth = ({ onStatusChange }) => {
       
       while (attempts < maxAttempts && !success) {
         try {
-          response = await axios.get('/api/dialer/auth/sipgate/status');
+          // Use the API client with proper base URL configuration and endpoints
+          response = await api.get(DIALER_ENDPOINTS.sipgateStatus);
           success = true;
         } catch (retryError) {
           attempts++;
@@ -122,8 +124,11 @@ const SipgateOAuth = ({ onStatusChange }) => {
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
     
+    // Use the correct base URL by getting it from the api config
+    const authUrl = `${api.defaults.baseURL}${DIALER_ENDPOINTS.sipgateAuth}`;
+    
     window.open(
-      '/api/dialer/auth/sipgate',
+      authUrl,
       'SipGate Authentication',
       `width=${width},height=${height},left=${left},top=${top}`
     );
@@ -154,7 +159,7 @@ const SipgateOAuth = ({ onStatusChange }) => {
       }));
       
       // Try to save the device info
-      const response = await axios.post('/api/dialer/auth/sipgate/device', {
+      const response = await api.post(DIALER_ENDPOINTS.sipgateDevice, {
         deviceId: deviceId,
         callerId: deviceInfo.callerId
       });
