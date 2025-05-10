@@ -14,13 +14,21 @@ import {
   addToQueue,
   removeFromQueue,
   getTelefonieSettings,
-  updateTelefonieSettings
+  updateTelefonieSettings,
+  // New OAuth2 routes
+  authSipgate,
+  sipgateOAuthCallback,
+  sipgateOAuthStatus,
+  sipgateStoreDeviceId
 } from '../controllers/dialerController.js';
 
 const router = express.Router();
 
-// Protect all routes
-router.use(auth);
+// Protect all routes except the OAuth callback
+router.use([
+  '(?!/auth/sipgate/callback)',  // Don't protect the OAuth callback
+  '(?!/auth/sipgate/status)',    // Don't protect the OAuth status check
+], auth);
 
 // Dialer status and control
 router.get('/status/:userId', getDialerStatus);
@@ -45,5 +53,11 @@ router.delete('/queue/:id', removeFromQueue);
 // Telefonie settings
 router.get('/settings/telefonie', getTelefonieSettings);
 router.post('/settings/telefonie', updateTelefonieSettings);
+
+// SipGate OAuth2 routes
+router.get('/auth/sipgate', authSipgate);
+router.get('/auth/sipgate/callback', sipgateOAuthCallback); 
+router.get('/auth/sipgate/status', sipgateOAuthStatus);
+router.post('/auth/sipgate/device', sipgateStoreDeviceId);
 
 export default router;

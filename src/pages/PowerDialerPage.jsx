@@ -16,6 +16,8 @@ import {
 } from '@heroicons/react/24/outline';
 import aircallService from '../services/aircallService';
 import axios from 'axios';
+import api from '../config/api';
+import SipgateOAuth from '../components/SipgateOAuth';
 
 /**
  * PowerDialerPage Komponente - Vollständig überarbeitet
@@ -77,6 +79,17 @@ const PowerDialerPage = () => {
   
   // Automatische Wählsequenz States
   const [autoDialingActive, setAutoDialingActive] = useState(false);
+  
+  // Tab-System States
+  const [activeTab, setActiveTab] = useState('dialer');
+  
+  // SipGate-spezifische States
+  const [sipgateCredentials, setSipgateCredentials] = useState({
+    tokenId: '',
+    token: '',
+    deviceId: '',
+    callerId: ''
+  });
   
   // Telefonie-Provider-Einstellungen
   const [telefonieSettings, setTelefonieSettings] = useState({
@@ -161,6 +174,202 @@ const PowerDialerPage = () => {
     }
     
     return '+' + digitsOnly;
+  };
+  
+  /**
+   * Initiiert einen direkten Anruf über die SipGate API
+   * @param {string} phoneNumber - Die anzurufende Telefonnummer im E.164 Format
+   * @param {Object} options - Zusätzliche Optionen für den Anruf
+   * @returns {Promise<Object>} Erfolg/Misserfolg und Anrufdetails
+   */
+  const makeSipgateCallDirect = async (phoneNumber, options = {}) => {
+    try {
+      console.log(`Initiating SipGate call to ${phoneNumber}`, options);
+      
+      setIsCallInProgress(true);
+      setCallError(null);
+      
+      // Validierung des E.164-Formats
+      const e164Regex = /^\+[1-9]\d{1,14}$/;
+      if (!e164Regex.test(phoneNumber)) {
+        throw new Error('Telefonnummer muss im E.164-Format sein (z.B. +491234567890)');
+      }
+      
+      const endpoint = '/api/dialer/sipgate-call';
+      
+      // Prüfe zuerst, ob eine Device ID vorhanden ist
+      if (!sipgateCredentials.deviceId && !telefonieSettings.sipgateDeviceId) {
+        setActiveTab('credentials');
+        throw new Error('SipGate Device ID ist erforderlich. Bitte geben Sie diese auf dem Credentials-Tab ein.');
+      }
+      
+      // Bereite die Anrufoptionen vor
+      const callOptions = {
+        deviceId: sipgateCredentials.deviceId || telefonieSettings.sipgateDeviceId,
+        callerId: sipgateCredentials.callerId || telefonieSettings.sipgateCallerId,
+        ...options
+      };
+      
+      console.log('Making SipGate call with options:', {
+        deviceId: callOptions.deviceId,
+        callerId: callOptions.callerId || 'not set'
+      });
+      
+      // Make API call to the backend endpoint using OAuth2
+      const response = await axios.post(endpoint, {
+        phoneNumber,
+        deviceId: callOptions.deviceId,
+        callerId: callOptions.callerId,
+        ...options
+      });
+      
+      console.log('SipGate call response:', response.data);
+      
+      // Bei Erfolg UI anpassen
+      if (response.data && response.data.success) {
+        console.log('Simulating call answer in 3 seconds...');
+        
+        // Nach 3 Sekunden simulieren wir, dass der Anruf angenommen wurde
+        setTimeout(() => {
+          setCallAnswered(true);
+          setFormLoading(true);
+          
+          // Und nach einer weiteren Sekunde, dass das Formular geladen wurde
+          setTimeout(() => {
+            setFormLoading(false);
+            setFormLoaded(true);
+          }, 1000);
+        }, 3000);
+        
+        return {
+          success: true,
+          message: 'Call initiated successfully',
+          callId: response.data.callId,
+          call: response.data.call
+        };
+      } else {
+        throw new Error(response.data?.message || 'Unbekannter Fehler beim Anruf');
+      }
+    } catch (error) {
+      console.error('Error making SipGate call:', error);
+      
+      // Format error response
+      let errorMessage = 'Fehler beim Initiieren des Anrufs';
+      
+      if (error.response) {
+        // We have a server response with error
+        if (error.response.data && error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else {
+          errorMessage = `Server-Fehler: ${error.response.status}`;
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = 'Keine Antwort vom Server. Bitte überprüfen Sie Ihre Netzwerkverbindung.';
+      } else {
+        // Something else caused the error
+        errorMessage = error.message;
+      }
+      
+      setCallError(errorMessage);
+      setIsCallInProgress(false);
+      
+      return {
+        success: false,
+        message: errorMessage,
+        error: error.message
+      };
+    }
+  };
+  
+  /**
+   * Initiiert einen Anruf basierend auf dem ausgewählten Telefonie-Provider
+   */
+  const initiateCall = async (phoneNumber) => {
+    try {
+      if (!phoneNumber) {
+        throw new Error('Keine Telefonnummer angegeben');
+      }
+      
+      // Wenn der PowerDialer nicht aktiv ist, nicht anrufen
+      if (!dialerActive) {
+        throw new Error('PowerDialer ist nicht aktiv');
+      }
+      
+      // Je nach Provider den entsprechenden Service wählen
+      if (telefonieSettings.provider === 'sipgate') {
+        return await makeSipgateCallDirect(phoneNumber);
+      } else {
+        // Fallback auf die bestehende Aircall-Funktionalität
+        return await startCall(phoneNumber);
+      }
+    } catch (error) {
+      console.error('Error initiating call:', error);
+      setCallError(error.message);
+      setIsCallInProgress(false);
+      return {
+        success: false,
+        message: error.message
+      };
+    }
+  };
+  
+  /**
+   * Speichert die SipGate-Credentials lokal und auf dem Server
+   */
+  const saveSipgateCredentials = async () => {
+    try {
+      // Prüfen, ob die erforderlichen Credentials eingegeben wurden
+      if (!sipgateCredentials.tokenId) {
+        setCallError('SipGate Token ID ist erforderlich');
+        return;
+      }
+      
+      if (!sipgateCredentials.token) {
+        setCallError('SipGate Token ist erforderlich');
+        return;
+      }
+      
+      if (!sipgateCredentials.deviceId) {
+        setCallError('SipGate Device ID ist erforderlich');
+        return;
+      }
+      
+      // Speichern der Credentials in den telefonieSettings
+      setTelefonieSettings(prev => ({
+        ...prev,
+        provider: 'sipgate', // Automatisch auf SipGate umstellen
+        sipgateTokenId: sipgateCredentials.tokenId,
+        sipgateToken: sipgateCredentials.token,
+        sipgateDeviceId: sipgateCredentials.deviceId,
+        sipgateCallerId: sipgateCredentials.callerId
+      }));
+      
+      // Auch auf dem Server speichern
+      const response = await axios.post('/api/dialer/settings/telefonie', {
+        provider: 'sipgate',
+        sipgateTokenId: sipgateCredentials.tokenId,
+        sipgateToken: sipgateCredentials.token,
+        sipgateDeviceId: sipgateCredentials.deviceId,
+        sipgateCallerId: sipgateCredentials.callerId
+      });
+      
+      if (response.data.success) {
+        console.log('SipGate credentials saved to server');
+        setCallError(null);
+        
+        // Erfolgsmeldung anzeigen
+        alert('SipGate Credentials wurden erfolgreich gespeichert.');
+        
+        // Wechsle zurück zum Dialer-Tab
+        setActiveTab('dialer');
+      } else {
+        throw new Error(response.data.message || 'Fehler beim Speichern der Credentials');
+      }
+    } catch (error) {
+      console.error('Error saving SipGate credentials:', error);
+      setCallError(error.message || 'Fehler beim Speichern der Credentials');
+    }
   };
   
   // -------------------- Effekte --------------------
@@ -724,13 +933,19 @@ const PowerDialerPage = () => {
       }
       
       // Beende ggf. laufende Anrufe
-      if (isCallInProgress || aircallService.hasActiveCall()) {
+      if (isCallInProgress) {
         await endCurrentCall();
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
-      // Starte Anruf
-      await startCall(currentContact.phone);
+      // Bei Aircall zusätzlich prüfen und beenden
+      if (telefonieSettings.provider === 'aircall' && aircallService.hasActiveCall()) {
+        await aircallService.clearCallState();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Starte Anruf mit dem ausgewählten Provider
+      await initiateCall(currentContact.phone);
     } catch (error) {
       console.error('Fehler beim Anrufen des aktuellen Kontakts:', error);
       setCallError(error.message || 'Fehler beim Anrufen des aktuellen Kontakts');
@@ -893,8 +1108,8 @@ const PowerDialerPage = () => {
       await new Promise(resolve => setTimeout(resolve, 200));
       
       console.log(`📞 Rufe ${contactToCall.name} unter ${contactToCall.phone} an...`);
-      const callResponse = await startCall(contactToCall.phone);
-      console.log("✅ Anruf initiiert:", callResponse?.data?.id);
+      const callResponse = await initiateCall(contactToCall.phone);
+      console.log("✅ Anruf initiiert:", callResponse?.callId);
       
     } catch (error) {
       console.error("❌ Fehler beim Anrufen des nächsten Kontakts:", error);
@@ -1002,10 +1217,17 @@ const PowerDialerPage = () => {
   /**
    * Handler für das Absenden des manuellen Dialer-Formulars
    */
-  const handleDialSubmit = (e) => {
+  const handleDialSubmit = async (e) => {
     e.preventDefault();
     const formattedNumber = formatToE164(phoneNumber);
-    startCall(formattedNumber);
+    
+    // Verwende die neue initiateCall-Funktion, die den richtigen Provider wählt
+    await initiateCall(formattedNumber);
+    
+    // Bei Erfolg schließe den Dialog
+    if (!callError) {
+      setShowManualDialer(false);
+    }
   };
   
   // -------------------- Render-Funktionen --------------------
@@ -1460,98 +1682,327 @@ const PowerDialerPage = () => {
           {/* Mittlerer Bereich - Eingebettetes Formular (60%) */}
           <div className="w-full lg:w-3/5 flex flex-col">
             <div className="bg-white rounded-2xl shadow-sm flex-1 overflow-hidden flex flex-col min-h-[400px] lg:min-h-0">
-              <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="text-base font-light text-gray-800 flex items-center">
-                  <DocumentTextIcon className="w-4 h-4 mr-2 text-gray-400" />
-                  Formular
-                </h2>
-                {dialerActive && (
-                  <div className="flex items-center">
-                    {callAnswered ? (
-                      <div className="flex items-center">
-                        <div className={`w-2 h-2 rounded-full ${formLoaded ? 'bg-green-500' : 'bg-yellow-500'} mr-2 ${formLoading ? 'animate-pulse' : ''}`}></div>
-                        <span className="text-xs font-light text-gray-500">
-                          {formLoading ? 'Formular wird geladen...' : (formLoaded ? 'Formular aktiv' : 'Warten auf Formular')}
-                        </span>
+              {/* Tab-Navigation */}
+              <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100">
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => setActiveTab('dialer')}
+                    className={`py-2 px-3 text-sm font-medium rounded transition-colors ${
+                      activeTab === 'dialer' 
+                        ? 'bg-gray-100 text-gray-900' 
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    }`}
+                  >
+                    Dialer
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('credentials')}
+                    className={`py-2 px-3 text-sm font-medium rounded transition-colors ${
+                      activeTab === 'credentials' 
+                        ? 'bg-gray-100 text-gray-900' 
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    }`}
+                  >
+                    SipGate Credentials
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('dial')}
+                    className={`py-2 px-3 text-sm font-medium rounded transition-colors ${
+                      activeTab === 'dial' 
+                        ? 'bg-gray-100 text-gray-900' 
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    }`}
+                  >
+                    Einzelanruf
+                  </button>
+                </div>
+              </div>
+              
+              {/* Tab Content */}
+              <div className="flex-1 relative">
+                {/* Dialer Tab */}
+                {activeTab === 'dialer' && (
+                  <>
+                    <div className="px-4 md:px-6 py-3 border-b border-gray-100 flex items-center justify-between">
+                      <h2 className="text-base font-light text-gray-800 flex items-center">
+                        <DocumentTextIcon className="w-4 h-4 mr-2 text-gray-400" />
+                        Formular
+                      </h2>
+                      {dialerActive && (
+                        <div className="flex items-center">
+                          {callAnswered ? (
+                            <div className="flex items-center">
+                              <div className={`w-2 h-2 rounded-full ${formLoaded ? 'bg-green-500' : 'bg-yellow-500'} mr-2 ${formLoading ? 'animate-pulse' : ''}`}></div>
+                              <span className="text-xs font-light text-gray-500">
+                                {formLoading ? 'Formular wird geladen...' : (formLoaded ? 'Formular aktiv' : 'Warten auf Formular')}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center">
+                              <div className="w-2 h-2 rounded-full bg-gray-300 mr-2"></div>
+                              <span className="text-xs font-light text-gray-500">Warten auf Gespräch</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 relative">
+                      {/* Loading Animation */}
+                      {(dialerActive && callAnswered && formLoading) && (
+                        <div className="absolute inset-0 bg-white flex flex-col items-center justify-center z-10">
+                          <div className="flex items-center justify-center mb-4">
+                            <div className="rounded-full h-10 w-10 md:h-12 md:w-12 bg-[#f5f5f7] flex items-center justify-center">
+                              <svg className="animate-spin h-5 w-5 md:h-6 md:w-6 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            </div>
+                          </div>
+                          <p className="text-sm font-light text-gray-500">Formular wird geladen...</p>
+                          <p className="text-xs font-light text-gray-400 mt-1">Dies kann einen Moment dauern</p>
+                        </div>
+                      )}
+                      
+                      {/* Placeholder wenn kein Gespräch */}
+                      {(!dialerActive || !callAnswered) && (
+                        <div className="absolute inset-0 bg-[#f5f5f7] flex flex-col items-center justify-center z-10 p-4">
+                          <div className="bg-white rounded-xl md:rounded-2xl shadow-sm p-4 md:p-8 max-w-sm md:max-w-md w-full text-center">
+                            <div className="flex items-center justify-center mb-4">
+                              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                                <DocumentTextIcon className="w-6 h-6 md:w-8 md:h-8 text-gray-300" />
+                              </div>
+                            </div>
+                            <h3 className="text-base md:text-lg font-light text-gray-800 mb-2">Formular-Ansicht</h3>
+                            <p className="text-xs md:text-sm font-light text-gray-500 mb-4">
+                              {dialerActive 
+                                ? "Warten auf Gesprächsbeginn. Wenn ein Kontakt den Anruf annimmt, wird hier das entsprechende Formular geladen."
+                                : "Starten Sie den PowerDialer, um die Formular-Ansicht zu aktivieren."}
+                            </p>
+                            {dialerActive && userStatus?.available && (
+                              <div className="flex flex-col gap-3">
+                                <button 
+                                  onClick={simulateAnsweredCall}
+                                  className="text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors inline-flex items-center justify-center"
+                                >
+                                  <CheckCircleIcon className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                                  Gesprächsbeginn simulieren
+                                </button>
+                                
+                                <button 
+                                  onClick={() => setShowManualDialer(true)}
+                                  className="text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors inline-flex items-center justify-center"
+                                >
+                                  <PhoneIcon className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                                  Manuelle Nummer wählen
+                                </button>
+                              </div>
+                            )}
+                            
+                            {renderConnectionStatus()}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Das eigentliche Formular */}
+                      <div className={`h-full transition-all duration-500 ${
+                        (dialerActive && callAnswered && formLoaded) ? 'opacity-100' : 'opacity-0'
+                      }`}>
+                        <iframe 
+                          src="https://formular-mitarbeiter.vercel.app/form/8698jchba" 
+                          className="w-full h-full"
+                          title="Mitarbeiter Formular"
+                          frameBorder="0"
+                        ></iframe>
                       </div>
-                    ) : (
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 rounded-full bg-gray-300 mr-2"></div>
-                        <span className="text-xs font-light text-gray-500">Warten auf Gespräch</span>
+                    </div>
+                  </>
+                )}
+                
+                {/* SipGate Credentials Tab */}
+                {activeTab === 'credentials' && (
+                  <div className="p-6">
+                    <h2 className="text-xl font-medium text-gray-900 mb-6">SipGate Integration</h2>
+                    
+                    <div className="bg-blue-50 rounded-lg p-4 mb-6 text-sm text-blue-800">
+                      <p>Verbinden Sie Ihr SipGate-Konto über die sichere OAuth2-Authentifizierung, um Anrufe über SipGate zu tätigen.</p>
+                    </div>
+                    
+                    {callError && (
+                      <div className="bg-red-50 rounded-lg p-4 mb-6 text-sm text-red-600">
+                        {callError}
+                      </div>
+                    )}
+                    
+                    {/* SipGate OAuth Component */}
+                    <SipgateOAuth 
+                      onStatusChange={(status) => {
+                        // Update the device info in our main state when it changes
+                        if (status.deviceId) {
+                          setSipgateCredentials(prev => ({
+                            ...prev,
+                            deviceId: status.deviceId,
+                            callerId: status.callerId || ''
+                          }));
+                          
+                          // Also update telefonieSettings if authentication is successful
+                          setTelefonieSettings(prev => ({
+                            ...prev,
+                            provider: 'sipgate',
+                            sipgateDeviceId: status.deviceId,
+                            sipgateCallerId: status.callerId || ''
+                          }));
+                        }
+                        
+                        // Clear error when status changes
+                        if (callError) {
+                          setCallError(null);
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+                
+                {/* Einzelanruf Tab */}
+                {activeTab === 'dial' && (
+                  <div className="p-6">
+                    <h2 className="text-xl font-medium text-gray-900 mb-6">Einzelanruf tätigen</h2>
+                    
+                    <div className="bg-blue-50 rounded-lg p-4 mb-6 text-sm text-blue-800">
+                      <p>Geben Sie hier eine Telefonnummer ein, um einen Anruf über {telefonieSettings.provider === 'sipgate' ? 'SipGate' : 'AirCall'} zu tätigen.</p>
+                      {telefonieSettings.provider === 'sipgate' && (
+                        <p className="mt-2">
+                          <span className="font-medium">Hinweis:</span> Für SipGate-Anrufe müssen Sie zuerst auf dem Tab "SipGate Credentials" Ihr Konto verbinden.
+                        </p>
+                      )}
+                    </div>
+                    
+                    {callError && (
+                      <div className="bg-red-50 rounded-lg p-4 mb-6 text-sm text-red-600">
+                        {callError}
+                        {callError.includes('SipGate') && callError.includes('authentifizieren') && (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => setActiveTab('credentials')}
+                              className="text-blue-600 hover:text-blue-800 underline"
+                            >
+                              Zu SipGate Credentials Tab wechseln
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    <form onSubmit={handleDialSubmit} className="space-y-4">
+                      <div>
+                        <label htmlFor="singleCallNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                          Telefonnummer
+                        </label>
+                        <input
+                          type="text"
+                          id="singleCallNumber"
+                          value={phoneNumber}
+                          onChange={handlePhoneNumberChange}
+                          className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="+49 123 456789"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Bitte im Format +49... eingeben oder die Umwandlung erfolgt automatisch
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-sm text-gray-700 mb-1">Aktiver Provider:</p>
+                        <div className="flex space-x-4 mb-4">
+                          <label className="inline-flex items-center">
+                            <input
+                              type="radio"
+                              name="provider"
+                              value="sipgate"
+                              checked={telefonieSettings.provider === 'sipgate'}
+                              onChange={(e) => setTelefonieSettings(prev => ({...prev, provider: e.target.value}))}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">SipGate</span>
+                          </label>
+                          <label className="inline-flex items-center">
+                            <input
+                              type="radio"
+                              name="provider"
+                              value="aircall"
+                              checked={telefonieSettings.provider === 'aircall'}
+                              onChange={(e) => setTelefonieSettings(prev => ({...prev, provider: e.target.value}))}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">AirCall</span>
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4">
+                        <button
+                          type="submit"
+                          disabled={isCallInProgress || !dialerActive}
+                          className={`w-full px-4 py-2 rounded-lg flex items-center justify-center ${
+                            isCallInProgress || !dialerActive
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2'
+                          }`}
+                        >
+                          {isCallInProgress ? (
+                            <>
+                              <ArrowPathIcon className="w-5 h-5 mr-2 animate-spin" />
+                              Verbinde...
+                            </>
+                          ) : (
+                            <>
+                              <PhoneIcon className="w-5 h-5 mr-2" />
+                              Anrufen
+                            </>
+                          )}
+                        </button>
+                        
+                        {!dialerActive && (
+                          <p className="mt-2 text-sm text-center text-red-600">
+                            Bitte aktivieren Sie zuerst den PowerDialer
+                          </p>
+                        )}
+                      </div>
+                    </form>
+                    
+                    {isCallInProgress && (
+                      <div className="mt-6">
+                        <div className="bg-yellow-50 rounded-lg p-4 text-sm text-yellow-800">
+                          <div className="flex items-center">
+                            <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse mr-2"></div>
+                            <p>Anruf wird getätigt...</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {callAnswered && (
+                      <div className="mt-6">
+                        <div className="bg-green-50 rounded-lg p-4 text-sm text-green-800">
+                          <div className="flex items-center">
+                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse mr-2"></div>
+                            <p>Anruf verbunden!</p>
+                          </div>
+                        </div>
+                        
+                        <button
+                          onClick={endCurrentCall}
+                          className="mt-4 w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        >
+                          <span className="flex items-center justify-center">
+                            <XMarkIcon className="w-5 h-5 mr-2" />
+                            Anruf beenden
+                          </span>
+                        </button>
                       </div>
                     )}
                   </div>
                 )}
-              </div>
-              
-              <div className="flex-1 relative">
-                {/* Loading Animation */}
-                {(dialerActive && callAnswered && formLoading) && (
-                  <div className="absolute inset-0 bg-white flex flex-col items-center justify-center z-10">
-                    <div className="flex items-center justify-center mb-4">
-                      <div className="rounded-full h-10 w-10 md:h-12 md:w-12 bg-[#f5f5f7] flex items-center justify-center">
-                        <svg className="animate-spin h-5 w-5 md:h-6 md:w-6 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                    </div>
-                    <p className="text-sm font-light text-gray-500">Formular wird geladen...</p>
-                    <p className="text-xs font-light text-gray-400 mt-1">Dies kann einen Moment dauern</p>
-                  </div>
-                )}
-                
-                {/* Placeholder wenn kein Gespräch */}
-                {(!dialerActive || !callAnswered) && (
-                  <div className="absolute inset-0 bg-[#f5f5f7] flex flex-col items-center justify-center z-10 p-4">
-                    <div className="bg-white rounded-xl md:rounded-2xl shadow-sm p-4 md:p-8 max-w-sm md:max-w-md w-full text-center">
-                      <div className="flex items-center justify-center mb-4">
-                        <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-100 flex items-center justify-center">
-                          <DocumentTextIcon className="w-6 h-6 md:w-8 md:h-8 text-gray-300" />
-                        </div>
-                      </div>
-                      <h3 className="text-base md:text-lg font-light text-gray-800 mb-2">Formular-Ansicht</h3>
-                      <p className="text-xs md:text-sm font-light text-gray-500 mb-4">
-                        {dialerActive 
-                          ? "Warten auf Gesprächsbeginn. Wenn ein Kontakt den Anruf annimmt, wird hier das entsprechende Formular geladen."
-                          : "Starten Sie den PowerDialer, um die Formular-Ansicht zu aktivieren."}
-                      </p>
-                      {dialerActive && userStatus?.available && (
-                        <div className="flex flex-col gap-3">
-                          <button 
-                            onClick={simulateAnsweredCall}
-                            className="text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors inline-flex items-center justify-center"
-                          >
-                            <CheckCircleIcon className="w-3 h-3 md:w-4 md:h-4 mr-2" />
-                            Gesprächsbeginn simulieren
-                          </button>
-                          
-                          <button 
-                            onClick={() => setShowManualDialer(true)}
-                            className="text-xs md:text-sm px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors inline-flex items-center justify-center"
-                          >
-                            <PhoneIcon className="w-3 h-3 md:w-4 md:h-4 mr-2" />
-                            Manuelle Nummer wählen
-                          </button>
-                        </div>
-                      )}
-                      
-                      {renderConnectionStatus()}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Das eigentliche Formular */}
-                <div className={`h-full transition-all duration-500 ${
-                  (dialerActive && callAnswered && formLoaded) ? 'opacity-100' : 'opacity-0'
-                }`}>
-                  <iframe 
-                    src="https://formular-mitarbeiter.vercel.app/form/8698jchba" 
-                    className="w-full h-full"
-                    title="Mitarbeiter Formular"
-                    frameBorder="0"
-                  ></iframe>
-                </div>
               </div>
             </div>
           </div>
