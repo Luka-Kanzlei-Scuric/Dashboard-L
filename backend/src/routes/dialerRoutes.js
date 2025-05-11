@@ -24,11 +24,14 @@ import {
 
 const router = express.Router();
 
-// Protect all routes except the OAuth callback
-router.use([
-  '(?!/auth/sipgate/callback)',  // Don't protect the OAuth callback
-  '(?!/auth/sipgate/status)',    // Don't protect the OAuth status check
-], auth);
+// Define SipGate OAuth routes first (without auth middleware)
+// These routes need to be accessible without authentication
+router.get('/auth/sipgate', authSipgate);
+router.get('/auth/sipgate/callback', sipgateOAuthCallback); 
+router.get('/auth/sipgate/status', sipgateOAuthStatus);
+
+// Apply auth middleware to all other routes
+router.use(auth);
 
 // Dialer status and control
 router.get('/status/:userId', getDialerStatus);
@@ -54,10 +57,7 @@ router.delete('/queue/:id', removeFromQueue);
 router.get('/settings/telefonie', getTelefonieSettings);
 router.post('/settings/telefonie', updateTelefonieSettings);
 
-// SipGate OAuth2 routes
-router.get('/auth/sipgate', authSipgate);
-router.get('/auth/sipgate/callback', sipgateOAuthCallback); 
-router.get('/auth/sipgate/status', sipgateOAuthStatus);
+// SipGate OAuth2 route for storing device ID (requires authentication)
 router.post('/auth/sipgate/device', sipgateStoreDeviceId);
 
 export default router;
