@@ -28,10 +28,12 @@ const router = express.Router();
 // These routes need to be accessible without authentication
 router.get('/auth/sipgate', authSipgate);
 router.get('/auth/sipgate/callback', sipgateOAuthCallback); 
-router.get('/auth/sipgate/status', sipgateOAuthStatus);
 
 // Apply auth middleware to all other routes
 router.use(auth);
+
+// This route needs auth to get the user ID, but we'll handle non-authenticated cases inside
+router.get('/auth/sipgate/status', sipgateOAuthStatus);
 
 // Dialer status and control
 router.get('/status/:userId', getDialerStatus);

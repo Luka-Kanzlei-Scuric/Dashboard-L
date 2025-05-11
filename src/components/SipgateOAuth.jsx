@@ -38,7 +38,17 @@ const SipgateOAuth = ({ onStatusChange }) => {
       if (event.data && event.data.type) {
         if (event.data.type === 'sipgate-auth-success') {
           console.log('SipGate auth success:', event.data);
-          checkAuthStatus();
+          
+          // Store temporary user ID if provided
+          if (event.data.tempUserId) {
+            localStorage.setItem('sipgate_temp_user_id', event.data.tempUserId);
+            console.log(`Stored temporary user ID from popup: ${event.data.tempUserId}`);
+          }
+          
+          // Check auth status with a slight delay to allow backend to complete processing
+          setTimeout(() => {
+            checkAuthStatus();
+          }, 500);
         } else if (event.data.type === 'sipgate-auth-error') {
           console.error('SipGate auth error:', event.data);
           setAuthStatus(prev => ({
@@ -65,10 +75,18 @@ const SipgateOAuth = ({ onStatusChange }) => {
       let success = false;
       let response;
       
+      // Get temporary user ID from localStorage or create a new one
+      let tempUserId = localStorage.getItem('sipgate_temp_user_id');
+      if (!tempUserId) {
+        tempUserId = 'temp-user-' + Date.now();
+        localStorage.setItem('sipgate_temp_user_id', tempUserId);
+      }
+      
       while (attempts < maxAttempts && !success) {
         try {
           // Use the API client with proper base URL configuration and endpoints
-          response = await api.get(DIALER_ENDPOINTS.sipgateStatus);
+          // Pass the temporary user ID as a query parameter
+          response = await api.get(`${DIALER_ENDPOINTS.sipgateStatus}?userId=${tempUserId}`);
           success = true;
         } catch (retryError) {
           attempts++;
@@ -124,8 +142,15 @@ const SipgateOAuth = ({ onStatusChange }) => {
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
     
+    // Get or create temporary user ID
+    let tempUserId = localStorage.getItem('sipgate_temp_user_id');
+    if (!tempUserId) {
+      tempUserId = 'temp-user-' + Date.now();
+      localStorage.setItem('sipgate_temp_user_id', tempUserId);
+    }
+    
     // Use the correct base URL by getting it from the api config
-    const authUrl = `${api.defaults.baseURL}${DIALER_ENDPOINTS.sipgateAuth}`;
+    const authUrl = `${api.defaults.baseURL}${DIALER_ENDPOINTS.sipgateAuth}?tempUserId=${tempUserId}`;
     
     window.open(
       authUrl,
@@ -158,10 +183,14 @@ const SipgateOAuth = ({ onStatusChange }) => {
         error: null
       }));
       
+      // Get temp user ID for sending to backend
+      const tempUserId = localStorage.getItem('sipgate_temp_user_id');
+      
       // Try to save the device info
       const response = await api.post(DIALER_ENDPOINTS.sipgateDevice, {
         deviceId: deviceId,
-        callerId: deviceInfo.callerId
+        callerId: deviceInfo.callerId,
+        tempUserId: tempUserId // Include temp user ID in the request
       });
       
       if (response.data.success) {

@@ -140,6 +140,17 @@ export const makeCall = async (req, res) => {
  */
 export const authSipgate = async (req, res) => {
   try {
+    // Get temp user ID from query parameter if provided
+    const tempUserId = req.query.tempUserId;
+    
+    // Store temp user ID in session for the callback
+    if (tempUserId) {
+      // Store in session
+      req.session = req.session || {};
+      req.session.tempUserId = tempUserId;
+      console.log(`Stored temporary user ID in session: ${tempUserId}`);
+    }
+    
     // Generate the authorization URL
     const authUrl = sipgateService.getAuthorizationUrl();
     
@@ -217,17 +228,21 @@ export const sipgateOAuthCallback = async (req, res) => {
       `);
     }
     
-    // Get userId from the authenticated user, or use a temporary ID
+    // Get userId from the authenticated user, session, or generate a temporary ID
     let userId;
     
     if (req.user && req.user._id) {
         // User is authenticated
         userId = req.user._id.toString();
         console.log(`User is authenticated, using ID: ${userId}`);
+    } else if (req.session && req.session.tempUserId) {
+        // Use stored temporary ID from session
+        userId = req.session.tempUserId;
+        console.log(`Using temporary ID from session: ${userId}`);
     } else {
-        // User is not authenticated, use a temporary ID
+        // User is not authenticated and no temp ID in session, generate a new one
         userId = 'temp-user-' + Date.now();
-        console.log(`User is not authenticated, using temporary ID: ${userId}`);
+        console.log(`No user or session ID found, generating new temporary ID: ${userId}`);
     }
     
     // Exchange the code for tokens
@@ -246,8 +261,14 @@ export const sipgateOAuthCallback = async (req, res) => {
             // Send message to parent window if this is in a popup
             window.opener && window.opener.postMessage({ 
               type: 'sipgate-auth-success',
-              userId: '${userId}'
+              userId: '${userId}',
+              tempUserId: ${userId.startsWith('temp-user-') ? `'${userId}'` : 'null'}
             }, '*');
+            
+            // Store the temporary user ID in localStorage if it's a temporary ID
+            if ('${userId}'.startsWith('temp-user-')) {
+              localStorage.setItem('sipgate_temp_user_id', '${userId}');
+            }
             
             // Redirect back to the dashboard after 3 seconds
             setTimeout(() => {
@@ -293,7 +314,22 @@ export const sipgateOAuthCallback = async (req, res) => {
  */
 export const sipgateOAuthStatus = async (req, res) => {
   try {
-    const userId = req.query.userId || (req.user?.id || 'unknown');
+    // Determine which user ID to use
+    // 1. If userId is provided in query params and is a valid temp ID, use that
+    // 2. Otherwise use the authenticated user's ID if available
+    // 3. If neither is available, use 'unknown'
+    let userId;
+    
+    if (req.query.userId && req.query.userId.startsWith('temp-user-')) {
+      userId = req.query.userId;
+      console.log(`Using temporary user ID from query: ${userId}`);
+    } else if (req.user && req.user.id) {
+      userId = req.user.id;
+      console.log(`Using authenticated user ID: ${userId}`);
+    } else {
+      userId = 'unknown';
+      console.log('No valid user ID found, using "unknown"');
+    }
     
     const isAuthenticated = await sipgateService.isAuthenticated(userId);
     const deviceInfo = await sipgateService.getUserDeviceId(userId);
@@ -302,7 +338,8 @@ export const sipgateOAuthStatus = async (req, res) => {
       success: true,
       authenticated: isAuthenticated,
       deviceId: deviceInfo.deviceId || null,
-      callerId: deviceInfo.callerId || null
+      callerId: deviceInfo.callerId || null,
+      userId: userId // Include the user ID in the response
     });
   } catch (error) {
     console.error('Error checking SipGate auth status:', error);
@@ -320,8 +357,24 @@ export const sipgateOAuthStatus = async (req, res) => {
  */
 export const sipgateStoreDeviceId = async (req, res) => {
   try {
-    const { deviceId, callerId } = req.body;
-    const userId = req.user?.id || 'unknown';
+    const { deviceId, callerId, tempUserId } = req.body;
+    
+    // Determine which user ID to use
+    // 1. If tempUserId is provided in the request body, use that
+    // 2. Otherwise use the authenticated user's ID
+    // 3. If neither is available, use 'unknown'
+    let userId;
+    
+    if (tempUserId && tempUserId.startsWith('temp-user-')) {
+      userId = tempUserId;
+      console.log(`Using temporary user ID from request: ${userId}`);
+    } else if (req.user && req.user.id) {
+      userId = req.user.id;
+      console.log(`Using authenticated user ID: ${userId}`);
+    } else {
+      userId = 'unknown';
+      console.log('No valid user ID found, using "unknown"');
+    }
     
     if (!deviceId) {
       return res.status(400).json({
