@@ -19,7 +19,7 @@ const SIPGATE_LOGIN_URL = 'https://login.sipgate.com/auth/realms/third-party/pro
 // Configuration
 const SIPGATE_CLIENT_ID = process.env.SIPGATE_CLIENT_ID;
 const SIPGATE_CLIENT_SECRET = process.env.SIPGATE_CLIENT_SECRET;
-const SIPGATE_REDIRECT_URI = process.env.SIPGATE_REDIRECT_URI || 'https://dashboard-l.onrender.com/api/auth/sipgate/callback';
+const SIPGATE_REDIRECT_URI = process.env.SIPGATE_REDIRECT_URI || 'https://dashboard-l.onrender.com/api/dialer/auth/sipgate/callback';
 
 // In-memory cache for tokens to reduce database load
 // Maps userId to { token, expires } for quick access checking
