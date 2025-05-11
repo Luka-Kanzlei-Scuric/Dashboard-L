@@ -456,13 +456,53 @@ class DialerService {
     try {
       console.log(`Initiating SipGate call to ${phoneNumber}`, options);
       
+      // Get relevant data from localStorage
+      const tempUserId = localStorage.getItem('sipgate_temp_user_id');
+      const deviceId = localStorage.getItem('sipgate_device_id') || options.deviceId;
+      const callerId = localStorage.getItem('sipgate_caller_id') || options.callerId;
+      
+      console.log('Call parameters:', {
+        phoneNumber,
+        tempUserId,
+        deviceId,
+        callerId,
+        options
+      });
+      
+      // Validate we have necessary data
+      if (!tempUserId) {
+        console.warn('No temporary user ID found in localStorage');
+      }
+      
+      if (!deviceId) {
+        console.warn('No device ID found for SipGate call');
+        return {
+          success: false,
+          message: 'Device ID is required for SipGate calls. Please set your device ID in the settings.'
+        };
+      }
+      
       const endpoint = '/api/dialer/sipgate-call';
       
-      // Make API call to the backend endpoint
+      // Make API call to the backend endpoint with all available data
       const response = await api.post(endpoint, {
         phoneNumber,
+        tempUserId,
+        deviceId,
+        callerId,
         ...options
       });
+      
+      console.log('SipGate call API response:', response.data);
+      
+      // Check if response contains the expected data
+      if (!response.data || !response.data.success) {
+        return {
+          success: false,
+          message: response.data?.message || 'Unknown error from SipGate API',
+          details: response.data
+        };
+      }
       
       return {
         success: true,
@@ -473,15 +513,31 @@ class DialerService {
     } catch (error) {
       console.error('Error making SipGate call:', error);
       
+      // Enhanced error logging
+      if (error.response) {
+        console.error('Error response from server:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+      } else {
+        console.error('Error setting up request:', error.message);
+      }
+      
       // Format error response
       let errorMessage = 'Failed to initiate call';
+      let errorDetails = null;
       
       if (error.response) {
         // We have a server response with error
         if (error.response.data && error.response.data.message) {
           errorMessage = error.response.data.message;
+          errorDetails = error.response.data;
         } else {
           errorMessage = `Server error: ${error.response.status}`;
+          errorDetails = error.response.data;
         }
       } else if (error.request) {
         // Request was made but no response received
@@ -494,7 +550,8 @@ class DialerService {
       return {
         success: false,
         message: errorMessage,
-        error: error.message
+        error: error.message,
+        details: errorDetails
       };
     }
   }

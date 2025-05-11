@@ -425,7 +425,7 @@ export const sipgateStoreDeviceId = async (req, res) => {
  */
 export const makeSipgateCall = async (req, res) => {
   try {
-    const { phoneNumber, clientId, deviceId, callerId } = req.body;
+    const { phoneNumber, clientId, deviceId, callerId, tempUserId } = req.body;
     
     if (!phoneNumber) {
       return res.status(400).json({
@@ -443,8 +443,22 @@ export const makeSipgateCall = async (req, res) => {
       });
     }
     
-    // Get user ID from authenticated user or use default
-    const userId = req.user?.id || '123456789';
+    // Determine which user ID to use
+    // 1. If tempUserId is provided in the request body, use that
+    // 2. Otherwise use the authenticated user's ID
+    // 3. If neither is available, use a default ID
+    let userId;
+    
+    if (tempUserId && tempUserId.startsWith('temp-user-')) {
+      userId = tempUserId;
+      console.log(`Using temporary user ID for SipGate call: ${userId}`);
+    } else if (req.user && req.user.id) {
+      userId = req.user.id;
+      console.log(`Using authenticated user ID for SipGate call: ${userId}`);
+    } else {
+      userId = '123456789';
+      console.log('No valid user ID found, using default ID for SipGate call');
+    }
     
     // Check if the user is authenticated with SipGate
     const isAuthenticated = await sipgateService.isAuthenticated(userId);
@@ -458,8 +472,17 @@ export const makeSipgateCall = async (req, res) => {
     
     // Get the device ID (from request, user's stored device, or environment)
     const userDeviceInfo = await sipgateService.getUserDeviceId(userId);
+    
+    // Prioritize deviceId from request over stored value
     const useDeviceId = deviceId || userDeviceInfo.deviceId || SIPGATE_DEVICE_ID;
     const useCallerId = callerId || userDeviceInfo.callerId || SIPGATE_CALLER_ID;
+    
+    console.log(`Making call with deviceId: ${useDeviceId}, callerId: ${useCallerId || 'none'}`);
+    
+    // Verify that we have a device ID
+    if (!useDeviceId) {
+      console.error(`No device ID available for user ${userId}`);
+    }
     
     if (!useDeviceId) {
       return res.status(400).json({

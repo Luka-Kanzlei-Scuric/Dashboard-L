@@ -101,22 +101,39 @@ const SipgateOAuth = ({ onStatusChange }) => {
         }
       }
       
+      // Get any locally stored device info
+      const localDeviceId = localStorage.getItem('sipgate_device_id');
+      const localCallerId = localStorage.getItem('sipgate_caller_id');
+      
+      // Use backend info, fall back to local storage info
+      const deviceId = response.data.deviceId || localDeviceId;
+      const callerId = response.data.callerId || localCallerId;
+      
       const newStatus = {
         checking: false,
         authenticated: response.data.authenticated,
-        deviceId: response.data.deviceId,
-        callerId: response.data.callerId,
+        deviceId: deviceId,
+        callerId: callerId,
+        userId: response.data.userId,
         error: null
       };
       
+      console.log('Auth status check result:', newStatus);
+      
       setAuthStatus(newStatus);
       
-      // Update device info if we have it
+      // Update device info form fields
+      setDeviceInfo({
+        deviceId: deviceId || '',
+        callerId: callerId || ''
+      });
+      
+      // Update localStorage if we have info from backend
       if (response.data.deviceId) {
-        setDeviceInfo({
-          deviceId: response.data.deviceId,
-          callerId: response.data.callerId || ''
-        });
+        localStorage.setItem('sipgate_device_id', response.data.deviceId);
+      }
+      if (response.data.callerId) {
+        localStorage.setItem('sipgate_caller_id', response.data.callerId);
       }
       
       // Notify parent of status change
@@ -194,6 +211,12 @@ const SipgateOAuth = ({ onStatusChange }) => {
       });
       
       if (response.data.success) {
+        // Store device info in localStorage for frontend reference
+        localStorage.setItem('sipgate_device_id', deviceId);
+        if (deviceInfo.callerId) {
+          localStorage.setItem('sipgate_caller_id', deviceInfo.callerId);
+        }
+        
         setAuthStatus(prev => ({
           ...prev,
           checking: false,
@@ -209,6 +232,8 @@ const SipgateOAuth = ({ onStatusChange }) => {
             callerId: deviceInfo.callerId
           });
         }
+        
+        console.log(`Device info saved: deviceId=${deviceId}, callerId=${deviceInfo.callerId || 'none'}`);
       }
     } catch (error) {
       console.error('Error saving device info:', error);

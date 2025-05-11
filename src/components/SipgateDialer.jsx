@@ -48,8 +48,21 @@ const SipgateDialer = ({ onCallInitiated }) => {
       
       console.log(`Initiating call to ${formattedNumber}`);
       
+      // Get temporary user ID to include in logs
+      const tempUserId = localStorage.getItem('sipgate_temp_user_id');
+      console.log(`Making call with tempUserId: ${tempUserId || 'none'}`);
+      
+      // Log device info from localStorage if available
+      const deviceId = localStorage.getItem('sipgate_device_id');
+      console.log(`Current device ID from localStorage: ${deviceId || 'none'}`);
+
       // Call the API to make a call
-      const response = await dialerService.makeSipgateCall(formattedNumber);
+      const response = await dialerService.makeSipgateCall(formattedNumber, {
+        // Include any additional options we have available
+        deviceId: deviceId
+      });
+      
+      console.log('SipGate call response:', response);
       
       if (response.success) {
         setSuccess(`Anruf erfolgreich initiiert an ${formattedNumber}`);
@@ -64,6 +77,8 @@ const SipgateDialer = ({ onCallInitiated }) => {
           });
         }
       } else {
+        // More detailed error handling
+        console.error('Failed to make call:', response);
         setError(response.message || 'Fehler beim Initiieren des Anrufs');
       }
     } catch (error) {
