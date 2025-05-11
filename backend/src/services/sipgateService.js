@@ -76,8 +76,14 @@ async function exchangeCodeForTokens(code, userId) {
         throw new Error('SIPGATE_CLIENT_ID, SIPGATE_CLIENT_SECRET, and SIPGATE_REDIRECT_URI must be configured');
     }
     
-    // Validate userId is a proper MongoDB ObjectId
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
+    // Validate userId - it should be either a valid MongoDB ObjectId or a special format
+    // Allow temporary IDs for OAuth flow
+    if (!userId || typeof userId !== 'string') {
+        throw new Error('User ID is required');
+    }
+    
+    // If it's not a MongoDB ObjectId, check if it's a temporary ID
+    if (!mongoose.Types.ObjectId.isValid(userId) && !userId.startsWith('temp-user-')) {
         throw new Error('Invalid user ID format');
     }
     
@@ -105,29 +111,35 @@ async function exchangeCodeForTokens(code, userId) {
         const encryptedAccessToken = SipgateToken.encryptToken(tokenData.access_token);
         const encryptedRefreshToken = SipgateToken.encryptToken(tokenData.refresh_token);
         
-        // Find existing token or create a new one
-        let tokenRecord = await SipgateToken.findOne({ userId });
-        
-        if (tokenRecord) {
-            // Update existing token
-            tokenRecord.accessToken = encryptedAccessToken.token;
-            tokenRecord.refreshToken = encryptedRefreshToken.token;
-            tokenRecord.iv = encryptedAccessToken.iv; // Store the IV for decryption
-            tokenRecord.expiresAt = expiresAt;
-            tokenRecord.lastRefreshed = new Date();
+        // Only save to database if userId is a valid MongoDB ObjectId
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+            // Find existing token or create a new one
+            let tokenRecord = await SipgateToken.findOne({ userId });
             
-            await tokenRecord.save();
+            if (tokenRecord) {
+                // Update existing token
+                tokenRecord.accessToken = encryptedAccessToken.token;
+                tokenRecord.refreshToken = encryptedRefreshToken.token;
+                tokenRecord.iv = encryptedAccessToken.iv; // Store the IV for decryption
+                tokenRecord.expiresAt = expiresAt;
+                tokenRecord.lastRefreshed = new Date();
+                
+                await tokenRecord.save();
+            } else {
+                // Create a new token record
+                tokenRecord = new SipgateToken({
+                    userId,
+                    accessToken: encryptedAccessToken.token,
+                    refreshToken: encryptedRefreshToken.token,
+                    iv: encryptedAccessToken.iv,
+                    expiresAt: expiresAt
+                });
+                
+                await tokenRecord.save();
+            }
         } else {
-            // Create a new token record
-            tokenRecord = new SipgateToken({
-                userId,
-                accessToken: encryptedAccessToken.token,
-                refreshToken: encryptedRefreshToken.token,
-                iv: encryptedAccessToken.iv,
-                expiresAt: expiresAt
-            });
-            
-            await tokenRecord.save();
+            // For temporary users, just store in memory cache
+            console.log(`Using in-memory storage for temporary user: ${userId}`);
         }
         
         // Store in memory cache for quick access
@@ -165,6 +177,13 @@ async function getAccessToken(userId) {
     if (cachedToken && cachedToken.access_token && Date.now() < cachedToken.expires_at - 60000) {
         console.log(`Using cached access token for user: ${userId}`);
         return cachedToken.access_token;
+    }
+    
+    // For temporary users, we only use memory cache
+    if (!mongoose.Types.ObjectId.isValid(userId) && userId.startsWith('temp-user-')) {
+        console.log(`No cached token found for temporary user: ${userId}`);
+        tokenCache.delete(userId); // Clear any stale cache
+        throw new Error('No authentication tokens found. Please authenticate first.');
     }
     
     // Try to get token from database
@@ -281,6 +300,11 @@ async function isAuthenticated(userId) {
         return true;
     }
     
+    // For temporary users, we only check memory cache
+    if (!mongoose.Types.ObjectId.isValid(userId) && userId.startsWith('temp-user-')) {
+        return false; // If not in cache, temporary user is not authenticated
+    }
+    
     try {
         // Check database
         const tokenRecord = await SipgateToken.findOne({ userId });
@@ -379,7 +403,26 @@ async function makeCall(callee, userId, options = {}) {
  */
 async function storeUserDeviceId(userId, deviceId, callerId = null) {
     try {
-        // Find the user's token record
+        // For temporary users, we only update the cache
+        if (!mongoose.Types.ObjectId.isValid(userId) && userId.startsWith('temp-user-')) {
+            console.log(`Storing device ID for temporary user ${userId} in memory cache only`);
+            
+            // Get cached token or create an empty one
+            const cachedToken = tokenCache.get(userId) || {};
+            
+            // Update with device info
+            cachedToken.deviceId = deviceId;
+            if (callerId) {
+                cachedToken.callerId = callerId;
+            }
+            
+            // Store back in cache
+            tokenCache.set(userId, cachedToken);
+            
+            return true;
+        }
+        
+        // For regular users, update the database
         let tokenRecord = await SipgateToken.findOne({ userId });
         
         if (!tokenRecord) {
@@ -426,6 +469,11 @@ async function getUserDeviceId(userId) {
                 deviceId: cachedToken.deviceId,
                 callerId: cachedToken.callerId
             };
+        }
+        
+        // For temporary users, we only check memory cache
+        if (!mongoose.Types.ObjectId.isValid(userId) && userId.startsWith('temp-user-')) {
+            return { deviceId: null, callerId: null };
         }
         
         // Check database

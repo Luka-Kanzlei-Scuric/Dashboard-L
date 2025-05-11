@@ -217,8 +217,18 @@ export const sipgateOAuthCallback = async (req, res) => {
       `);
     }
     
-    // Get userId from session or generate a temporary one
-    const userId = req.user?.id || 'temp-user-' + Date.now();
+    // Get userId from the authenticated user, or use a temporary ID
+    let userId;
+    
+    if (req.user && req.user._id) {
+        // User is authenticated
+        userId = req.user._id.toString();
+        console.log(`User is authenticated, using ID: ${userId}`);
+    } else {
+        // User is not authenticated, use a temporary ID
+        userId = 'temp-user-' + Date.now();
+        console.log(`User is not authenticated, using temporary ID: ${userId}`);
+    }
     
     // Exchange the code for tokens
     const tokens = await sipgateService.exchangeCodeForTokens(code, userId);
