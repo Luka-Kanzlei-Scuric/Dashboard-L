@@ -55,7 +55,7 @@ function getAuthorizationUrl() {
         client_id: SIPGATE_CLIENT_ID,
         redirect_uri: SIPGATE_REDIRECT_URI,
         response_type: 'code',
-        scope: 'call:write device:read',
+        scope: 'sessions:calls:write account:read devices:read',
     };
     
     const authUrl = `${SIPGATE_LOGIN_URL}/auth?${querystring.stringify(params)}`;
